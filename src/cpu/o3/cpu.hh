@@ -449,6 +449,8 @@ class CPU : public BaseCPU
     /** Cleans up all instructions on the remove list. */
     void cleanUpRemovedInsts();
 
+    void cleanUpTraceInsts(const DynInstPtr &commitInst);
+
     /** Debug function to print all instructions on the list. */
     void dumpInsts();
 
@@ -460,6 +462,9 @@ class CPU : public BaseCPU
 
     /** List of all the instructions in flight. */
     std::list<DynInstPtr> instList;
+
+    /** List of all the instructions in flight. */
+    std::list<DynInstPtr> instTraceList;
 
     /** List of all the instructions that will be removed at the end of this
      *  cycle.
@@ -632,6 +637,9 @@ class CPU : public BaseCPU
     std::map<Addr, brConf> brConfMap; // total, miss, starve, starve_rate
     std::map<Addr, btbConf> btbConfMap; // total, miss, starve, starve_rate
     //EMISSARY: END
+
+    //ChampSim Trace tracking varaibles
+    bool prevSquashed = false;
 
     /** CPU pushRequest function, forwards request to LSQ. */
     Fault pushRequest(const DynInstPtr& inst, bool isLoad, uint8_t *data,

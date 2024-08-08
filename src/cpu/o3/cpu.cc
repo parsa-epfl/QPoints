@@ -1413,6 +1413,7 @@ CPU::ListIt
 CPU::addInst(const DynInstPtr &inst)
 {
     instList.push_back(inst);
+    instTraceList.push_back(inst);
 
     return --(instList.end());
 }
@@ -1496,6 +1497,8 @@ CPU::removeInstsNotInROB(ThreadID tid)
 void
 CPU::removeInstsUntil(const InstSeqNum &seq_num, ThreadID tid)
 {
+    if(instList.empty())
+        return;
     assert(!instList.empty());
 
     removeInstsThisCycle = true;
@@ -1539,6 +1542,38 @@ CPU::squashInstIt(const ListIt &instIt, ThreadID tid)
         // Remove the instruction from the list.
         removeList.push(instIt);
     }
+}
+
+void
+CPU::cleanUpTraceInsts(const DynInstPtr &commitInst)
+{
+    std::vector<Addr> prefetchList;
+    while (!instTraceList.empty() && commitInst->seqNum ) {
+
+        auto head_inst = instTraceList.front();
+        if(head_inst->seqNum > commitInst->seqNum)
+            break;
+        auto tid = head_inst->threadNumber;
+
+        if (head_inst->traceData) {
+            head_inst->traceData->setPCState(head_inst->pcState());
+            head_inst->traceData->setFetchSeq(head_inst->seqNum);
+            head_inst->traceData->squashed = head_inst->isSquashed();
+
+            //DPRINTFN("Control: %d breSeqNum: %llu squashed: %d\n", head_inst->isControl(), head_inst->brSeqNum, head_inst->isSquashed());
+            //fetch.updateFTQTrace(tid, head_inst->origBrSeqNum, prefetchList);
+            head_inst->traceData->dumpNopInst(prefetchList, prevSquashed);
+            head_inst->traceData->dump();
+
+            delete head_inst->traceData;
+            head_inst->traceData = NULL;
+            prefetchList.clear();
+
+            prevSquashed = head_inst->isSquashed();
+        }
+        instTraceList.erase(instTraceList.begin());
+    }
+
 }
 
 void

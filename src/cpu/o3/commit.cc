@@ -1359,20 +1359,20 @@ Commit::commitHead(const DynInstPtr &head_inst, unsigned inst_num)
         DPRINTF(Commit,
             "[tid:%i] [sn:%llu] Committing instruction with fault\n",
             tid, head_inst->seqNum);
-        if (head_inst->traceData) {
-            // We ignore ReExecution "faults" here as they are not real
-            // (architectural) faults but signal flush/replays.
-            if (debug::ExecFaulting
-                && dynamic_cast<ReExec*>(inst_fault.get()) == nullptr) {
+        //if (head_inst->traceData) {
+        //    // We ignore ReExecution "faults" here as they are not real
+        //    // (architectural) faults but signal flush/replays.
+        //    if (debug::ExecFaulting
+        //        && dynamic_cast<ReExec*>(inst_fault.get()) == nullptr) {
 
-                head_inst->traceData->setFaulting(true);
-                head_inst->traceData->setFetchSeq(head_inst->seqNum);
-                head_inst->traceData->setCPSeq(thread[tid]->numOp);
-                head_inst->traceData->dump();
-            }
-            delete head_inst->traceData;
-            head_inst->traceData = NULL;
-        }
+        //        head_inst->traceData->setFaulting(true);
+        //        head_inst->traceData->setFetchSeq(head_inst->seqNum);
+        //        head_inst->traceData->setCPSeq(thread[tid]->numOp);
+        //        head_inst->traceData->dump();
+        //    }
+        //    delete head_inst->traceData;
+        //    head_inst->traceData = NULL;
+        //}
 
         // Generate trap squash event.
         generateTrapEvent(tid, inst_fault);
@@ -1384,13 +1384,13 @@ Commit::commitHead(const DynInstPtr &head_inst, unsigned inst_num)
     DPRINTF(Commit,
             "[tid:%i] [sn:%llu] Committing instruction with PC %s\n",
             tid, head_inst->seqNum, head_inst->pcState());
-    if (head_inst->traceData) {
-        head_inst->traceData->setFetchSeq(head_inst->seqNum);
-        head_inst->traceData->setCPSeq(thread[tid]->numOp);
-        head_inst->traceData->dump();
-        delete head_inst->traceData;
-        head_inst->traceData = NULL;
-    }
+    //if (head_inst->traceData) {
+    //    head_inst->traceData->setFetchSeq(head_inst->seqNum);
+    //    head_inst->traceData->setCPSeq(thread[tid]->numOp);
+    //    head_inst->traceData->dump();
+    //    delete head_inst->traceData;
+    //    head_inst->traceData = NULL;
+    //}
     if (head_inst->isReturn()) {
         DPRINTF(Commit,
                 "[tid:%i] [sn:%llu] Return Instruction Committed PC %s \n",
@@ -1544,6 +1544,8 @@ Commit::commitHead(const DynInstPtr &head_inst, unsigned inst_num)
             stats.commPathMemStallCost += cycleDiff;
         }
     }
+
+    cpu->cleanUpTraceInsts(head_inst);
 
     prevCommCycle = curTick()/500;
     stats.decodeIdleNonSpecPath += head_inst->idleCycles;

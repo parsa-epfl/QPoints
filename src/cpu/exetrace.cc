@@ -51,11 +51,240 @@
 #include "debug/ExecAll.hh"
 #include "debug/FmtTicksOff.hh"
 #include "enums/OpClass.hh"
+#include "debug/ChampSimTraceDbg.hh"
+
+namespace ChampsimTrace {
+    void destReg(struct input_instr &t, int reg){
+        WriteToSet<unsigned char>(t.destination_registers,
+           t.destination_registers + NUM_INSTR_DESTINATIONS,
+           reg);   
+    }
+
+    void srcReg(struct input_instr &t, int reg){
+        WriteToSet<unsigned char>(t.source_registers,
+           t.source_registers + NUM_INSTR_SOURCES,
+           reg);   
+    }
+}
 
 namespace gem5
 {
 
 namespace Trace {
+
+#define BASE 3
+#define FLAGS_REG 1
+#define PC_REG 2
+#define RSP_REG 7
+#define NON_SPEC 0
+#define SERIAL 1
+#define SERIAL_AFTER 2
+#define SERIAL_BEFORE 3
+#define READ_BARRIER 4
+#define WRITE_BARRIER 5
+#define SQUASH_AFTER 6
+#define SQUASHED 7
+
+void
+Trace::ExeTracerRecord::dumpCmpInst(const StaticInstPtr &inst, bool ran)
+{
+    if(!inst){
+        return;
+    }
+    cTraceInst = {};
+    Addr cur_pc = pc.instAddr();
+    cTraceInst.ip = cur_pc; 
+
+    DPRINTF(ChampSimTraceDbg, "PC: %llx squashed: %d\n", cur_pc, squashed);
+
+    char brCode = 0;
+    if(inst->isControl()){
+        brCode |= 0x01;
+
+        if(inst->isCondCtrl()){
+            brCode |= ( 1 << 1);
+        }
+
+        if(inst->isDirectCtrl()){
+            brCode |= ( 1 << 2);
+        }
+
+        if(inst->isCall()){
+            brCode |= ( 1 << 3);
+        }
+
+        if(inst->isReturn()){
+            brCode |= ( 1 << 4);
+        }
+    }
+    char flags = 0;
+
+    if(inst->isSerializing()){
+
+        if(inst->isSerializeBefore()){
+            flags |= (1 << SERIAL_BEFORE);
+        }else if(inst->isSerializeAfter()){
+            flags |= (1 << SERIAL_AFTER);
+        }else{
+            flags |= (1 << SERIAL);
+        }
+    }
+
+    if(inst->isReadBarrier()){
+        flags |= (1 << READ_BARRIER);
+    }
+
+    if(inst->isWriteBarrier()){
+        flags |= (1 << WRITE_BARRIER);
+    }
+
+    if(inst->isNonSpeculative()){
+        flags |= (1 << NON_SPEC);
+    }
+
+    if(inst->isSquashAfter()){
+        flags |= (1 << SQUASH_AFTER);
+    }
+
+    if(squashed){
+        flags |= (1 << SQUASHED);
+    }
+
+    //Write PC reg
+    //if(inst->getName() == "wrip" || inst->getName() == "wripi"){
+    //   ChampsimTrace::destReg(cTraceInst, PC_REG);
+
+    //   if(inst->getName() == "wrip"){
+    //       //Direct Branch
+    //       if(inst->isCall()){
+    //           //Reads SP IP
+    //           //Writes SP IP
+    //           ChampsimTrace::srcReg(cTraceInst, PC_REG);
+    //           ChampsimTrace::srcReg(cTraceInst, RSP_REG);
+
+    //           ChampsimTrace::destReg(cTraceInst, RSP_REG);
+    //       }else if(inst->isCondCtrl()){
+    //           //Reads IP FLAGS
+    //           //Writes IP
+    //           ChampsimTrace::srcReg(cTraceInst, PC_REG);
+    //           ChampsimTrace::srcReg(cTraceInst, FLAGS_REG);
+    //       }else{
+    //           //Direct Jump
+    //       }
+    //   }else{
+    //       //Indirect Branch
+    //       if(inst->isReturn()){
+    //           //Reads SP
+    //           //Writes SP IP
+    //           ChampsimTrace::srcReg(cTraceInst, RSP_REG);
+
+    //           ChampsimTrace::destReg(cTraceInst, RSP_REG);
+    //       }else if(inst->isCall()){
+    //           //Reads others
+    //           //Reads SP IP
+    //           //Writes SP IP
+    //           ChampsimTrace::srcReg(cTraceInst, PC_REG);
+    //           ChampsimTrace::srcReg(cTraceInst, RSP_REG);
+
+    //           ChampsimTrace::destReg(cTraceInst, RSP_REG);
+
+    //           for(int i = 0; i < inst->numSrcRegs(); i++){
+    //               ChampsimTrace::srcReg(cTraceInst, i + BASE);
+    //           }
+    //       }else{
+    //           //Reads others
+    //           for(int i = 0; i < inst->numSrcRegs(); i++){
+    //               ChampsimTrace::srcReg(cTraceInst, i + BASE);
+    //           }
+    //       }
+    //   }
+    //} else{
+
+    int src_regs=0;
+    int dest_regs=0;
+
+    bool found_flag = false;
+        for(int i = 0; i < inst->numSrcRegs(); i++){
+            if(inst->srcRegIdx(i).is(IntRegClass)){
+                ChampsimTrace::WriteToSet<unsigned char>(cTraceInst.source_registers,
+                  cTraceInst.source_registers + ChampsimTrace::NUM_INSTR_SOURCES,
+                  inst->srcRegIdx(i).flatIndex() + BASE);   
+                    src_regs++;
+            }else if(inst->srcRegIdx(i).is(CCRegClass)){
+                ChampsimTrace::WriteToSet<unsigned char>(cTraceInst.source_registers,
+                  cTraceInst.source_registers + ChampsimTrace::NUM_INSTR_SOURCES,
+                  1);   
+                if(!found_flag){
+                    src_regs++;
+                    found_flag = true;
+                }
+            //}else{
+            //    DPRINTFNR("%d ",inst->srcRegIdx(i).flatIndex());
+            //    DPRINTFNR("%d ",inst->srcRegIdx(i));
+            }
+        }
+        //DPRINTFNR("\n");
+    found_flag = false;
+        for(int i = 0; i < inst->numDestRegs(); i++){
+            if(inst->destRegIdx(i).is(IntRegClass)){
+                ChampsimTrace::WriteToSet<unsigned char>(cTraceInst.destination_registers,
+                  cTraceInst.destination_registers + ChampsimTrace::NUM_INSTR_DESTINATIONS,
+                  inst->destRegIdx(i).flatIndex() + BASE);   
+                    dest_regs++;
+            }else if(inst->destRegIdx(i).is(CCRegClass)){
+                ChampsimTrace::WriteToSet<unsigned char>(cTraceInst.destination_registers,
+                  cTraceInst.destination_registers + ChampsimTrace::NUM_INSTR_DESTINATIONS,
+                  1);   
+                if(!found_flag){
+                    dest_regs++;
+                    found_flag = true;
+                }
+            }
+            //DPRINTFNR("%d ",inst->destRegIdx(i).flatIndex());
+            //DPRINTFNR("%d ",inst->destRegIdx(i));
+        }
+    //}
+
+    //DPRINTFNR("pc: 0x%llx src_regs %d dest_regs %d\n", cur_pc, src_regs, dest_regs);
+
+
+    if(getMemValid()){
+        if(inst->isLoad()){
+             ChampsimTrace::WriteToSet<unsigned long long>(cTraceInst.source_memory,
+               cTraceInst.source_memory + ChampsimTrace::NUM_INSTR_SOURCES,
+               addr);   
+         }else if (inst->isStore()){
+             ChampsimTrace::WriteToSet<unsigned long long>(cTraceInst.destination_memory,
+               cTraceInst.destination_memory + ChampsimTrace::NUM_INSTR_DESTINATIONS,
+               addr);   
+         }
+    } 
+
+    
+
+   if(!inst->isMicroop() || inst->isLastMicroop()){
+        if(inst->isControl()){
+            cTraceInst.is_branch = brCode;
+            //DPRINTFN("pc is %s size:%d branching: %d\n",pc,pc.size(), pc.branching());
+            auto npc = pc;
+            staticInst->advancePC(npc);
+
+            if((pc.instAddr() + pc.size()) != npc.instAddr()){
+                //cTraceInst.is_branch = 1;
+                cTraceInst.branch_taken = 1;
+            }
+            //TODO: size check to figure out taken or not
+        } 
+    }
+
+    cTraceInst.pref = 0;
+    cTraceInst.flags = flags;
+    auto &traceOut = thread->getCpuPtr()->getTracer()->traceOut;
+    typename decltype(thread->getCpuPtr()->getTracer()->traceOut)::char_type buf[sizeof(ChampSimTraceInst)];
+    std::memcpy(buf, &cTraceInst, sizeof(ChampSimTraceInst));
+    traceOut.write(buf, sizeof(ChampSimTraceInst));
+    //Dump to file here
+}
 
 void
 Trace::ExeTracerRecord::traceInst(const StaticInstPtr &inst, bool ran)
@@ -67,6 +296,10 @@ Trace::ExeTracerRecord::traceInst(const StaticInstPtr &inst, bool ran)
         return;
     if (!in_user_mode && !debug::ExecKernel)
         return;
+
+    if(squashed){
+        outs << "==== ";
+    }
 
     if (debug::ExecAsid) {
         outs << "A" << std::dec <<
@@ -104,6 +337,7 @@ Trace::ExeTracerRecord::traceInst(const StaticInstPtr &inst, bool ran)
     outs << std::setw(26) << std::left;
     outs << inst->disassemble(cur_pc, &loader::debugSymbolTable);
 
+    
     if (ran) {
         outs << " : ";
 
@@ -153,6 +387,34 @@ Trace::ExeTracerRecord::traceInst(const StaticInstPtr &inst, bool ran)
     Trace::getDebugLogger()->dprintf_flag(
         when, thread->getCpuPtr()->name(), "ExecEnable", "%s",
         outs.str().c_str());
+    
+ }
+
+void
+Trace::ExeTracerRecord::dumpNopInst(std::vector<Addr> &addrList, bool prevSquashed)
+{
+    for( auto prefAddr : addrList){
+        cTraceInst = {};
+
+        //zero initialize trace object
+        //std::memset(&cTraceInst, 0,  sizeof(ChampSimTraceInst));
+        Addr cur_pc = prefAddr;
+
+        DPRINTF(ChampSimTraceDbg, "Writing dummy inst at PC: %llx prevSquashed %d\n", cur_pc, prevSquashed);
+
+        char flags = 0;
+
+        flags = prevSquashed;
+
+        cTraceInst.ip = cur_pc; 
+        cTraceInst.flags = flags;
+        cTraceInst.is_branch = 0;
+        cTraceInst.pref = 1;
+        auto &traceOut = thread->getCpuPtr()->getTracer()->traceOut;
+        typename decltype(thread->getCpuPtr()->getTracer()->traceOut)::char_type buf[sizeof(ChampSimTraceInst)];
+        std::memcpy(buf, &cTraceInst, sizeof(ChampSimTraceInst));
+        traceOut.write(buf, sizeof(ChampSimTraceInst));
+    }
 }
 
 void
@@ -176,6 +438,8 @@ Trace::ExeTracerRecord::dump()
     if (debug::ExecMicro || !staticInst->isMicroop()) {
         traceInst(staticInst, true);
     }
+    dumpCmpInst(staticInst, true);
+
 }
 
 } // namespace Trace

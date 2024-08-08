@@ -68,6 +68,8 @@ DebugFlag('O3PipeView')
 DebugFlag('PCEvent')
 DebugFlag('Quiesce')
 DebugFlag('Mwait')
+DebugFlag('ChampSimTrace','Enable Trace generation compatible with ChampSim')
+DebugFlag('ChampSimTraceDbg','Enable Trace generation compatible with ChampSim')
 
 CompoundFlag('ExecAll', [ 'ExecEnable', 'ExecCPSeq', 'ExecEffAddr',
     'ExecFaulting', 'ExecFetchSeq', 'ExecOpClass', 'ExecRegDelta',

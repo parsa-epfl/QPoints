@@ -154,6 +154,9 @@ class InstRecord
     bool faulting;
 
   public:
+    bool squashed = false;
+
+  public:
     InstRecord(Tick _when, ThreadContext *_thread,
                const StaticInstPtr _staticInst,
                TheISA::PCState _pc,
@@ -162,7 +165,7 @@ class InstRecord
         macroStaticInst(_macroStaticInst), addr(0), size(0), flags(0),
         fetch_seq(0), cp_seq(0), data_status(DataInvalid), mem_valid(false),
         fetch_seq_valid(false), cp_seq_valid(false), predicate(true),
-        faulting(false)
+        faulting(false), squashed(false)
     { }
 
     virtual ~InstRecord()
@@ -231,11 +234,14 @@ class InstRecord
 
     virtual void dump() = 0;
 
+    virtual void dumpNopInst(std::vector<Addr> &addrList, bool prevSquashed) {return;};
+
   public:
     Tick getWhen() const { return when; }
     ThreadContext *getThread() const { return thread; }
     StaticInstPtr getStaticInst() const { return staticInst; }
     TheISA::PCState getPCState() const { return pc; }
+    void setPCState(TheISA::PCState new_pc) { pc = new_pc; }
     StaticInstPtr getMacroStaticInst() const { return macroStaticInst; }
 
     Addr getAddr() const { return addr; }
@@ -259,6 +265,7 @@ class InstRecord
 class InstTracer : public SimObject
 {
   public:
+    std::ofstream traceOut;
     InstTracer(const Params &p) : SimObject(p)
     {}
 
