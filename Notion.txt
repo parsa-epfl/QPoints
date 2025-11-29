@@ -1,0 +1,2 @@
+Find the Notion page for this project here with useful explanations for various aspects of the project:
+https://www.notion.so/gem5-Checkpoint-Conversion-2af46d7f056e804d9dc0e3a1c4758184?source=copy_link
