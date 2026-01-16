@@ -54,11 +54,10 @@ def extract_value(inp_byte_str):
   return addr
 
 def run_gdb_on_docker(args):
-
   script_file = 'gdb.script'
 
   if args.multi:
-    script_file = 'gdb.script.multi'
+      script_file = 'gdb.script.multi'
 
   if not args.m1:
     script_file += '.linux'
@@ -74,18 +73,30 @@ def run_gdb_on_docker(args):
   cwd = os.getcwd()
   cmd = 'cd {}; gdb-multiarch -x /qpoints/scripts/gdb_scripts/{}; cd {}'.format(args.dest_dir, script_file, cwd)
 
-
-  proc = subprocess.Popen(
+  '''proc = subprocess.Popen(
           [cmd],
           stdout=subprocess.PIPE,
           stdin=subprocess.PIPE,
           stderr=subprocess.PIPE,
-          shell=True
+          shell=True,
           )
+
   proc.stdin.write(b"quit\n")
   proc.stdin.write(b"y\n")
   proc.stdin.flush()
-  proc.wait()
+  proc.wait()'''
+
+  # Ali: lines above were buggy. Lines below fix the issue.
+  proc = subprocess.Popen(
+    cmd,
+    shell=True,
+    stdin=subprocess.PIPE,
+    stdout=subprocess.PIPE,
+    stderr=subprocess.PIPE,
+    text=True,
+    )
+
+  out, err = proc.communicate("quit\ny\n")
 
 def copy_base_files(out_dir):
   proc = subprocess.Popen(
@@ -221,14 +232,16 @@ def collect_snapshot(args):
     copy_disk_image(dest_dir = args.dest_dir,
             disk_image = args.disk_image)
 
-  #tn.write(bytes("dump-guest-memory {}/physmem.elf\n".format(os.path.abspath(args.dest_dir)), 'ascii'))
-  tn.write(bytes("dump-guest-memory physmem.elf\n", 'ascii'))
+  cwd = os.getcwd()
+  tn.write(bytes(f"dump-guest-memory {cwd}/physmem.elf\n", 'ascii'))
   inp=tn.read_until(b"(qemu)")
+
 
   dump_disk_dev_info(tn, args.dest_dir, "dev.info")
 
   move_file_dest_dir(dest_dir = args.dest_dir,
-          fname = '/qpoints/physmem.elf')
+          fname = f'{cwd}/physmem.elf')
+
   #Start gdb server
   tn.write(b"gdbserver\n")
   inp=tn.read_until(b"(qemu)")

@@ -1,1 +1,1 @@
-docker run -u $UID:$GID --volume $(pwd):/qpoints --rm -it gem5-qpoints:1.0 
+docker run --volume $(pwd):/qpoints --rm -it cloudsuitetest/gem5-qpoints:1.0 
