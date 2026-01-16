@@ -1,2 +1,4 @@
 checkpoints
 imgs/*.img
+*.img
+*.qcow2
