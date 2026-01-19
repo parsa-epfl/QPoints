@@ -1,6 +1,8 @@
 import argparse
 import sys
 import os
+import re
+import shutil
 from telnetlib import Telnet
 import subprocess
 import time
@@ -15,16 +17,15 @@ def parse_args():
             action='store_true',
             help='Set this flag if snapshot is collected on m1 mac')
 
-    parser.add_argument('--multi',  default=False,
-            action='store_true',
-            help='Set this flag to collect multi core snapshot')
+    parser.add_argument('--num-cores', type=int, default=1,
+            help='Number of cores for multi core snapshot collection')
 
     parser.add_argument('--skip-dump',  default=False,
             action='store_true',
             help='Flag to skip the first part of snapshot collection process')
 
-    parser.add_argument('--disk-image',type=str, required=True,
-            help='Disk image file name')
+    parser.add_argument('--disk-image',type=str,
+            help='Disk image file name (required with --copy-disk-img)')
 
     parser.add_argument('--dest-dir',type=str, required=True,
             help='Destination directory to save snapshot files')
@@ -34,6 +35,8 @@ def parse_args():
             help='Flag to enable disk image copy')
 
     args = parser.parse_args()
+    if args.copy_disk_img and not args.disk_image:
+        parser.error("--disk-image is required when --copy-disk-img is set")
     return args
 
 def extract_addr(inp_byte_str):
@@ -53,40 +56,18 @@ def extract_value(inp_byte_str):
   addr = int(last_tok,base=16)
   return addr
 
-def run_gdb_on_docker(args):
-  script_file = 'gdb.script'
+def _resolve_gdb_script_path(script_file):
+  base_dir = os.path.dirname(os.path.abspath(__file__))
+  template_path = os.path.join(base_dir, 'templates', script_file)
+  if os.path.exists(template_path):
+    return template_path
+  return os.path.join(base_dir, 'gdb_scripts', script_file)
 
-  if args.multi:
-      script_file = 'gdb.script.multi'
-
-  if not args.m1:
-    script_file += '.linux'
-
-  #cmd = '''docker run \
-  #             --rm -v$(pwd)/gdb_scripts:/tools \
-  #             -v$(pwd)/{}:/tools/ckpt_dir \
-  #             --privileged  --net host ubuntu-gdb \
-  #             sh -c "cd /tools/ckpt_dir; gdb-multiarch -x /tools/{}"
-  #       '''.format(args.dest_dir, script_file)
-  #print(cmd)
-  
+def _run_gdb_script(dest_dir, script_path):
   cwd = os.getcwd()
-  cmd = 'cd {}; gdb-multiarch -x /qpoints/scripts/gdb_scripts/{}; cd {}'.format(args.dest_dir, script_file, cwd)
+  cmd = 'cd {}; gdb-multiarch -x {}; cd {}'.format(dest_dir, script_path, cwd)
 
-  '''proc = subprocess.Popen(
-          [cmd],
-          stdout=subprocess.PIPE,
-          stdin=subprocess.PIPE,
-          stderr=subprocess.PIPE,
-          shell=True,
-          )
-
-  proc.stdin.write(b"quit\n")
-  proc.stdin.write(b"y\n")
-  proc.stdin.flush()
-  proc.wait()'''
-
-  # Ali: lines above were buggy. Lines below fix the issue.
+  # Ali: lines below fix the earlier interactive issues.
   proc = subprocess.Popen(
     cmd,
     shell=True,
@@ -96,7 +77,45 @@ def run_gdb_on_docker(args):
     text=True,
     )
 
-  out, err = proc.communicate("quit\ny\n")
+  proc.communicate("quit\ny\n")
+
+def _render_multicore_gdb_script(template_text, thread_id, core_idx):
+  script_text = re.sub(r'^thread\s+\S+\s*$', 'thread {}'.format(thread_id),
+                       template_text, flags=re.MULTILINE)
+  script_text = re.sub(r'^set logging file\s+\S+\s*$',
+                       'set logging file reg_info.virtio.{}'.format(core_idx),
+                       script_text, flags=re.MULTILINE)
+  return script_text
+
+def run_gdb_on_docker(args):
+  script_file = 'gdb.script'
+
+  if args.num_cores < 1:
+    raise ValueError("num_cores must be >= 1 for snapshots")
+
+  if args.num_cores > 1:
+      script_file = 'gdb.script.multi'
+
+  if not args.m1:
+    script_file += '.linux'
+
+  if args.num_cores == 1:
+    script_path = _resolve_gdb_script_path(script_file)
+    _run_gdb_script(args.dest_dir, script_path)
+    return
+
+  template_path = _resolve_gdb_script_path(script_file)
+  with open(template_path, 'r', encoding='utf-8') as fh:
+    template_text = fh.read()
+
+  for core_idx in range(args.num_cores):
+    thread_id = 1 + core_idx
+    script_text = _render_multicore_gdb_script(template_text, thread_id, core_idx)
+    script_name = 'gdb.script.multi.core{}'.format(core_idx)
+    script_path = os.path.join(args.dest_dir, script_name)
+    with open(script_path, 'w', encoding='utf-8') as fh:
+      fh.write(script_text)
+    _run_gdb_script(args.dest_dir, script_path)
 
 def copy_base_files(out_dir):
   proc = subprocess.Popen(
@@ -169,7 +188,7 @@ def copy_disk_image(dest_dir, disk_image):
 
 def move_file_dest_dir(dest_dir, fname):
   if not os.path.exists(fname):
-      print("{} doesnot exist".format(fname))
+      print("{} does not exist".format(fname))
       return
   proc = subprocess.Popen(
           ['mv',fname,dest_dir],
@@ -277,8 +296,8 @@ def process_snapshot(args):
     reg_info_args.append('--dev-info')
     reg_info_args.append(dev_info_fname)
 
-    reg_info_args.append('--num-cpus')
-    reg_info_args.append('1')
+    reg_info_args.append('--num-cores')
+    reg_info_args.append(str(args.num_cores))
 
     reg_info_args.append('--m5-miscreg-info')
     reg_info_args.append('gem5_misc_regs')
@@ -290,7 +309,9 @@ def process_snapshot(args):
     if args.m1:
         reg_info_args.append('m5.cpt.gicv2.template')
     else:
-        reg_info_args.append('m5.cpt.template')
+        # Ali: fix the hardcoded value
+        reg_info_args.append('m5.cpt.multicore.template')
+        #reg_info_args.append('m5.cpt.template')
 
     parse_reg_info.gen_m5cpt(reg_info_args)
 
@@ -313,13 +334,24 @@ if __name__ == "__main__":
 
     if not args.skip_dump:
         if os.path.exists(args.dest_dir):
-            # Donot run the script if dest dir exists
-            print("Dest direscoty  {} already exists.\n"
-                    "Please delete it and try again.".format(args.dest_dir))
-            sys.exit()
-
-        #Create the directory
-        os.mkdir(args.dest_dir)
+            prompt = ("Destination directory {} already exists.\n"
+                      "Proceed with existing contents? [y/n]: ").format(args.dest_dir)
+            resp = input(prompt).strip().lower()
+            if resp in ("y", "yes"):
+                pass
+            elif resp in ("n", "no"):
+                for entry in os.listdir(args.dest_dir):
+                    entry_path = os.path.join(args.dest_dir, entry)
+                    if os.path.isdir(entry_path):
+                        shutil.rmtree(entry_path)
+                    else:
+                        os.remove(entry_path)
+            else:
+                print("Unrecognized response. Aborting.")
+                sys.exit(1)
+        else:
+            #Create the directory
+            os.mkdir(args.dest_dir)
 
         collect_snapshot(args)
 

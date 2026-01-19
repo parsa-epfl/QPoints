@@ -25,7 +25,7 @@ def parse_args(inp_args):
     parser.add_argument('--m5-template',type=str, required=True,
             help='m5ckpt template file')
 
-    parser.add_argument('--num-cpus',type=int, required=True,
+    parser.add_argument('--num-cores',type=int, required=True,
             help='Number of cpu cores')
 
     args = parser.parse_args(inp_args)
@@ -201,7 +201,7 @@ def gen_m5cpt(cli_args):
     args.m5_template = os.path.join(parent_dir_name, "templates",  args.m5_template)
     args.m5_miscreg_info = os.path.join(parent_dir_name, args.m5_miscreg_info)
     print(args.m5_template)
-    if args.num_cpus == 1:
+    if args.num_cores == 1:
         reg_map = parse_reg_info(args.gdb_reg_info)
         parse_dev_info(args.dev_info, reg_map)
         fix_sp_regs(reg_map)
@@ -230,17 +230,18 @@ def gen_m5cpt(cli_args):
         # lets write the substitution to a file
         with open(args.out_reg_info,'w') as f: f.write(subs)
     else:
-        reg_map = [None for i in range(0,args.num_cpus)]
-        miscreg_str = [None for i in range(0,args.num_cpus)]
-        intreg_str = [None for i in range(0,args.num_cpus)]
-        fpreg_str = [None for i in range(0,args.num_cpus)]
-        ccreg_str = [None for i in range(0,args.num_cpus)]
-        pc = [None for i in range(0,args.num_cpus)]
-        npc = [None for i in range(0,args.num_cpus)]
+        reg_map = [None for i in range(0,args.num_cores)]
+        miscreg_str = [None for i in range(0,args.num_cores)]
+        intreg_str = [None for i in range(0,args.num_cores)]
+        fpreg_str = [None for i in range(0,args.num_cores)]
+        ccreg_str = [None for i in range(0,args.num_cores)]
+        pc = [None for i in range(0,args.num_cores)]
+        npc = [None for i in range(0,args.num_cores)]
 
 
-        for i in range(0, args.num_cpus):
-            reg_map[i] = parse_reg_info(args.gdb_reg_info + "." + str(i+1))
+        for i in range(0, args.num_cores):
+            reg_map[i] = parse_reg_info(args.gdb_reg_info + "." + str(i))
+            parse_dev_info(args.dev_info, reg_map[i])
             fix_sp_regs(reg_map[i])
 
             miscreg_str[i] = get_miscreg_output(args.m5_miscreg_info, args.out_reg_info, reg_map[i])
@@ -263,7 +264,7 @@ def gen_m5cpt(cli_args):
                           fpreg_string = fpreg_str,
                           ccreg_string = ccreg_str,
                           reg_map = reg_map,
-                          num_cpus = args.num_cpus
+                          num_cores = args.num_cores
                       )
         # lets write the substitution to a file
         with open(args.out_reg_info,'w') as f: f.write(subs)
@@ -272,5 +273,3 @@ if __name__ == '__main__':
     #Parse Command line argunments first
     print(sys.argv)
     gen_m5cpt(sys.argv[1:])
-
-
