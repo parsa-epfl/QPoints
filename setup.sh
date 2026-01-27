@@ -1,5 +1,6 @@
 #!/bin/bash
 
+# TODO: these packages must be installed in the Dockerfile, not here
 if command -v apt-get >/dev/null 2>&1; then
   if command -v sudo >/dev/null 2>&1; then
     SUDO="sudo"
@@ -18,17 +19,19 @@ if command -v apt-get >/dev/null 2>&1; then
     m4 \
     pkg-config \
     protobuf-compiler \
+    gdb-multiarch \
     python3 \
     python3-dev \
     python3-pip \
+    python3-jinja2 \
     python3-six \
+    qemu-utils \
+    vim \
     wget \
     zlib1g-dev
   python3 -m pip install "scons==3.1.2"
+  python3 -m pip install --break-system-packages gdown
 fi
-
-echo Creating required directories
-mkdir checkpoints
 
 echo cloning gem5 repo
 git clone -b cassandra-issue-fix https://github.com/bgodala/gem5_ARM_FDIP.git  gem5
@@ -38,10 +41,6 @@ echo build gem5
 cd gem5
 scons -j8 build/ARM/gem5.opt CXX=g++ CXXFLAGS="-std=c++17"
 cd ..
-
-echo Pulling Docker image
-docker pull cloudsuitetest/gem5-qpoints
-echo done
 
 echo Getting ARM kernel image files for gem5
 cd bin/m5
