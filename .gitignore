@@ -2,3 +2,9 @@ checkpoints
 imgs/*.img
 *.img
 *.qcow2
+__pycache__/
+*.pyc
+sim_outs
+run_gen_snapshot.sh
+gem5
+bin
