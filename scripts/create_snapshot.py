@@ -32,6 +32,8 @@ def parse_args():
 
     parser.add_argument('--dest-dir',type=str, required=True,
             help='Destination directory to save snapshot files')
+    parser.add_argument('--monitor-port', type=int, default=45454,
+            help='QEMU monitor telnet port (default: 45454)')
 
     parser.add_argument('--copy-disk-img', default=False,
             action='store_true',
@@ -238,8 +240,7 @@ def collect_snapshot(args):
   if args.m1:
     host="host.docker.internal"
 
-  port="45454"
-  tn = Telnet(host, port)
+  tn = Telnet(host, args.monitor_port)
 
   inp=tn.read_until(b"(qemu)")
   tn.write(b"stop\n")
@@ -254,15 +255,11 @@ def collect_snapshot(args):
     copy_disk_image(dest_dir = args.dest_dir,
             disk_image = args.disk_image)
 
-  cwd = os.getcwd()
-  tn.write(bytes(f"dump-guest-memory {cwd}/physmem.elf\n", 'ascii'))
+  tn.write(bytes(f"dump-guest-memory {args.dest_dir}/physmem.elf\n", 'ascii'))
   inp=tn.read_until(b"(qemu)")
 
 
   dump_disk_dev_info(tn, args.dest_dir, "dev.info")
-
-  move_file_dest_dir(dest_dir = args.dest_dir,
-          fname = f'{cwd}/physmem.elf')
 
   #Start gdb server
   tn.write(b"gdbserver\n")
