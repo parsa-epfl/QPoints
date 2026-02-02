@@ -28,9 +28,27 @@ if [[ "$copy_img" == "1" || "$copy_img" == "true" || "$copy_img" == "yes" ]]; th
   disk_arg="--disk-image \"$image\""
 fi
 
-if [[ -d "${ckp_dir}/${snapshot}" ]]; then
-  find "${ckp_dir}/${snapshot}" -mindepth 1 ! -name "*.img" -exec rm -rf {} +
+dest_dir="${ckp_dir}/${snapshot}"
+if [[ -d "$dest_dir" ]]; then
+  echo "Destination directory already exists: $dest_dir"
+  printf "Delete it and proceed? [y/n]: " > /dev/tty
+  read -r resp < /dev/tty
+  case "$resp" in
+    y|Y|yes|YES)
+      rm -rf "$dest_dir"
+      ;;
+    n|N|no|NO)
+      echo "Aborting."
+      exit 1
+      ;;
+    *)
+      echo "Unrecognized response. Aborting."
+      exit 1
+      ;;
+  esac
 fi
+
+mkdir -p "$dest_dir"
 
 cd scripts
 python3 create_snapshot.py $disk_arg $copy_arg --dest-dir ${ckp_dir}/${snapshot} --num-cores "$num_cores"

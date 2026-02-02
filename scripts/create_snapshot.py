@@ -10,6 +10,9 @@ import time
 import parse_reg_info
 import gen_mem_file
 
+def eprint(*args, **kwargs):
+    print(*args, file=sys.stderr, **kwargs)
+
 def parse_args():
     parser = argparse.ArgumentParser(description='Script to generate Full System Snapshot to be used with gem5 simulator')
 
@@ -126,8 +129,8 @@ def copy_base_files(out_dir):
           shell=True
           )
   proc.wait()
-  print(proc.stdout.read())
-  print(proc.stderr.read())
+  eprint(proc.stdout.read())
+  eprint(proc.stderr.read())
 
 
 
@@ -188,7 +191,7 @@ def copy_disk_image(dest_dir, disk_image):
 
 def move_file_dest_dir(dest_dir, fname):
   if not os.path.exists(fname):
-      print("{} does not exist".format(fname))
+      eprint("{} does not exist".format(fname))
       return
   proc = subprocess.Popen(
           ['mv',fname,dest_dir],
@@ -207,7 +210,7 @@ def dump_disk_dev_info(tn, dest_dir, fname):
 
   tn.write(b"xp /xw 0xa003e40\n")
   inp=tn.read_until(b"(qemu)")
-  print(inp.decode('utf-8'))
+  eprint(inp.decode('utf-8'))
   addr = extract_addr(inp)
   vio_base = hex(addr)
   addr = addr + 0x4002
@@ -217,12 +220,12 @@ def dump_disk_dev_info(tn, dest_dir, fname):
   inp=tn.read_until(b"(qemu)")
 
   OFFSET_MASK = ( 1 << 16) - 1
-  print("offset",inp.decode('utf-8'))
+  eprint("offset",inp.decode('utf-8'))
   offset_val = extract_value(inp)
-  print("offse_val", offset_val)
+  eprint("offse_val", offset_val)
   offset = offset_val & OFFSET_MASK
 
-  print(offset)
+  eprint(offset)
   fh.write("vio_base {}\n".format(vio_base))
   fh.write("queue0_offset {}\n".format(offset))
 
@@ -271,6 +274,11 @@ def collect_snapshot(args):
   #move_file_dest_dir(dest_dir = args.dest_dir,
   #        fname = 'reg_info.virtio')
 
+  # Quit QEMU via monitor.
+  tn.write(b"quit\n")
+  tn.read_until(b"(qemu)", timeout=2)
+  tn.close()
+
 def get_elf_skip_bytes(elf_name):
   proc = subprocess.Popen(
           ['readelf -l {} | grep LOAD'.format(elf_name)],
@@ -309,9 +317,10 @@ def process_snapshot(args):
     if args.m1:
         reg_info_args.append('m5.cpt.gicv2.template')
     else:
-        # Ali: fix the hardcoded value
-        reg_info_args.append('m5.cpt.multicore.template')
-        #reg_info_args.append('m5.cpt.template')
+        if int(args.num_cores) == 1:
+            reg_info_args.append('m5.cpt.template')
+        else:
+            reg_info_args.append('m5.cpt.multicore.template')
 
     parse_reg_info.gen_m5cpt(reg_info_args)
 
@@ -326,32 +335,14 @@ def process_snapshot(args):
     copy_base_files(out_dir=args.dest_dir)
 
 
-
-
 if __name__ == "__main__":
     args = parse_args()
 
 
     if not args.skip_dump:
-        if os.path.exists(args.dest_dir):
-            prompt = ("Destination directory {} already exists.\n"
-                      "Proceed with existing contents? [y/n]: ").format(args.dest_dir)
-            resp = input(prompt).strip().lower()
-            if resp in ("y", "yes"):
-                pass
-            elif resp in ("n", "no"):
-                for entry in os.listdir(args.dest_dir):
-                    entry_path = os.path.join(args.dest_dir, entry)
-                    if os.path.isdir(entry_path):
-                        shutil.rmtree(entry_path)
-                    else:
-                        os.remove(entry_path)
-            else:
-                print("Unrecognized response. Aborting.")
-                sys.exit(1)
-        else:
-            #Create the directory
-            os.mkdir(args.dest_dir)
+        if not os.path.exists(args.dest_dir):
+            print(f"Destination directory does not exist: {args.dest_dir}", file=sys.stdout)
+            sys.exit(1)
 
         collect_snapshot(args)
 

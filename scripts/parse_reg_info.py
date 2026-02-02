@@ -7,6 +7,10 @@ from reg_mappings import miscreg_map
 from reg_mappings import intreg_list
 
 
+def eprint(*args, **kwargs):
+    print(*args, file=sys.stderr, **kwargs)
+
+
 def parse_args(inp_args):
     parser = argparse.ArgumentParser(description='Script to generate register info in m5 checkpoint form')
 
@@ -58,7 +62,7 @@ def parse_dev_info(fname, reg_map):
     dev_info = open(fname, 'r')
 
     for line in dev_info:
-        print(line)
+        eprint(line)
         toks = line.split()
 
         name = toks[0]
@@ -142,7 +146,7 @@ def get_cc_reg_string(cpsr):
     C = (NZCV >> 1 ) & 0x01
     V = (NZCV) & 0x01
     cc_reg_string = '{} {} {} 0 0 0'.format(NZ,C,V)
-    print("cc_reg_string is "+cc_reg_string)
+    eprint("cc_reg_string is "+cc_reg_string)
     return cc_reg_string
 
 def get_miscreg_output(miscreg_ref_fname, out_fname, reg_map):
@@ -164,7 +168,7 @@ def get_miscreg_output(miscreg_ref_fname, out_fname, reg_map):
             reg_val = reg_map[miscreg_map[reg_name]]
 
         else:
-            print(f'{reg_name} not in reg_map')
+            eprint(f'{reg_name} not in reg_map')
             pass
 
         #out_fg.write(f'{reg_name}={reg_val}\n')
@@ -195,12 +199,12 @@ def fix_sp_regs(reg_map):
 
 def gen_m5cpt(cli_args):
     args = parse_args(cli_args)
-    print(os.path.abspath(__file__))
+    eprint(os.path.abspath(__file__))
     cur_file_abspath = os.path.abspath(__file__)
     parent_dir_name = os.path.dirname(cur_file_abspath)
     args.m5_template = os.path.join(parent_dir_name, "templates",  args.m5_template)
     args.m5_miscreg_info = os.path.join(parent_dir_name, args.m5_miscreg_info)
-    print(args.m5_template)
+    eprint(args.m5_template)
     if args.num_cores == 1:
         reg_map = parse_reg_info(args.gdb_reg_info)
         parse_dev_info(args.dev_info, reg_map)
@@ -215,7 +219,7 @@ def gen_m5cpt(cli_args):
         npc = pc + 4
 
         #Generate the checkpoint file using jinja2 template file
-        print(reg_map)
+        eprint(reg_map)
         subs = jinja2.Environment(
                       loader=jinja2.FileSystemLoader('/')
                       ).get_template(args.m5_template).render(
@@ -253,7 +257,7 @@ def gen_m5cpt(cli_args):
             npc[i] = pc[i] + 4
 
         #Generate the checkpoint file using jinja2 template file
-        print(reg_map)
+        eprint(reg_map)
         subs = jinja2.Environment(
                       loader=jinja2.FileSystemLoader('/')
                       ).get_template(args.m5_template).render(
@@ -271,5 +275,5 @@ def gen_m5cpt(cli_args):
 
 if __name__ == '__main__':
     #Parse Command line argunments first
-    print(sys.argv)
+    eprint(sys.argv)
     gen_m5cpt(sys.argv[1:])

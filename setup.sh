@@ -17,7 +17,9 @@ if command -v apt-get >/dev/null 2>&1; then
     libprotobuf-dev \
     libsqlite3-dev \
     m4 \
+    netcat-openbsd \
     pkg-config \
+    sshpass \
     protobuf-compiler \
     gdb-multiarch \
     python3 \
