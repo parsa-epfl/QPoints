@@ -1,16 +1,16 @@
 if [[ "$1" == "-h" || "$1" == "--help" ]]; then
   cat <<'EOF'
-Usage: run_gem5.sh [--ckpt-base DIR] [--workload NAME] [--snapshot NAME] [--inst N] [--cores N]
+Usage: run_gem5.sh --gem5-ckp-dir DIR --experiment NAME --snapshot NAME --inst N --cores N
 
-Arguments (all optional):
-  --ckpt-base  Checkpoint base directory (default: /checkpoints)
-  --workload   Workload name (default: web_search)
-  --snapshot   Snapshot name (default: snapshot_0)
-  --inst       Instruction count (default: 100000)
-  --cores      Number of cores (default: 1)
+Arguments (all required):
+  --gem5-ckp-dir  Checkpoint root directory
+  --experiment    Experiment name
+  --snapshot      Snapshot name
+  --inst          Instruction count
+  --cores         Number of cores
 
 Example:
-  run_gem5.sh --ckpt-base /checkpoints --workload web_search --snapshot snapshot_0 --inst 100000 --cores 1
+  run_gem5.sh --gem5-ckp-dir /checkpoints --experiment OoO --snapshot snapshot_0 --inst 100000 --cores 1
 EOF
   exit 0
 fi
@@ -19,20 +19,20 @@ export M5_PATH=$(pwd)/bin/m5
 GEM5_HOME=$(pwd)/gem5
 GEM5_CFG=$GEM5_HOME/configs/example/arm/starter_fs.py
 
-CKPT_BASE="/checkpoints"
-WORKLOAD="web_search"
-SNAPSHOT="snapshot_0"
-INST=100000
-CORES=1
+GEM5_CKP_DIR=""
+EXPERIMENT=""
+SNAPSHOT=""
+INST=""
+CORES=""
 
 while [[ $# -gt 0 ]]; do
   case "$1" in
-    --ckpt-base)
-      CKPT_BASE="$2"
+    --gem5-ckp-dir)
+      GEM5_CKP_DIR="$2"
       shift 2
       ;;
-    --workload)
-      WORKLOAD="$2"
+    --experiment)
+      EXPERIMENT="$2"
       shift 2
       ;;
     --snapshot)
@@ -53,9 +53,15 @@ while [[ $# -gt 0 ]]; do
       ;;
   esac
 done
-CKPT_DIR="${CKPT_BASE}/${WORKLOAD}/${SNAPSHOT}"
 
-OUTDIR=sim_outs/${WORKLOAD}/${SNAPSHOT}
+if [[ -z "$GEM5_CKP_DIR" || -z "$EXPERIMENT" || -z "$SNAPSHOT" || -z "$INST" || -z "$CORES" ]]; then
+  echo "Missing required arguments."
+  exit 1
+fi
+
+CKPT_DIR="${GEM5_CKP_DIR}/${SNAPSHOT}"
+
+OUTDIR=sim_outs/${EXPERIMENT}/${SNAPSHOT}
 mkdir -p $OUTDIR
 touch ${OUTDIR}
 
