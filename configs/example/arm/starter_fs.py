@@ -293,6 +293,8 @@ def main():
     #                    help="Specify the physical memory size")
     parser.add_argument("--checkpoint", action="store_true")
     parser.add_argument("--restore", type=str, default=None)
+    parser.add_argument("--branch-trace", action="store_true",
+                        help="Enable per-core branch trace logging")
 
 
     Options.addCommonOptions(parser)

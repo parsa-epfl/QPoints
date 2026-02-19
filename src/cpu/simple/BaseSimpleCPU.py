@@ -50,3 +50,4 @@ class BaseSimpleCPU(BaseCPU):
             exit(1)
 
     branchPred = Param.BranchPredictor(NULL, "Branch Predictor")
+    branch_trace_enable = Param.Bool(False, "Enable branch trace logging")

@@ -87,6 +87,9 @@ BaseSimpleCPU::BaseSimpleCPU(const BaseSimpleCPUParams &p)
       branchPred(p.branchPred),
       zeroReg(p.isa[0]->regClasses().at(IntRegClass).zeroReg()),
       traceData(NULL),
+      branchTraceEnable(p.branch_trace_enable),
+      branchTraceStream(nullptr),
+      lastInstAddr(0),
       _status(Idle)
 {
     SimpleThread *thread;
@@ -113,9 +116,16 @@ BaseSimpleCPU::BaseSimpleCPU(const BaseSimpleCPUParams &p)
         checker->setSystem(p.system);
         // Manipulate thread context
         ThreadContext *cpu_tc = threadContexts[0];
-        threadContexts[0] = new CheckerThreadContext<ThreadContext>(cpu_tc, this->checker);
+        threadContexts[0] = new CheckerThreadContext<ThreadContext>(
+            cpu_tc, this->checker);
     } else {
         checker = NULL;
+    }
+
+    if (branchTraceEnable) {
+        const std::string fname = csprintf(
+            "branch_trace_core_%d.log", cpuId());
+        branchTraceStream = simout.findOrCreate(fname)->stream();
     }
 }
 
@@ -325,6 +335,7 @@ BaseSimpleCPU::preExecute()
 
     // decode the instruction
     TheISA::PCState pcState = thread->pcState();
+    lastInstAddr = pcState.instAddr();
 
     auto &decoder = thread->decoder;
 
@@ -411,6 +422,10 @@ BaseSimpleCPU::postExecute()
 
     if (curStaticInst->isControl()) {
         ++t_info.execContextStats.numBranches;
+        if (branchTraceEnable && branchTraceStream) {
+            ccprintf(*branchTraceStream, "%llu\n",
+                     static_cast<unsigned long long>(lastInstAddr));
+        }
     }
 
     /* Power model statistics */

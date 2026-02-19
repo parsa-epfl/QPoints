@@ -137,6 +137,9 @@ class CpuCluster(SubSystem):
             cpu.createInterruptController()
             cpu.socket_id = system.numCpuClusters()
 
+            if hasattr(cpu, "branch_trace_enable"):
+                cpu.branch_trace_enable = args.branch_trace
+
             print(cpu_type)
             if cpu_type == O3CPU:
                 if args.fdip:

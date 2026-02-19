@@ -46,6 +46,7 @@
 
 #include <csignal>
 #include <iostream>
+#include <memory>
 #include <string>
 
 #if defined(__FreeBSD__)
@@ -63,19 +64,25 @@
 namespace gem5
 {
 
-// Use an separate stack for fatal signal handlers
-static uint8_t fatalSigStack[2 * SIGSTKSZ];
+// Use an separate stack for fatal signal handlers. Allocate at runtime since
+// SIGSTKSZ may be dynamically sized on some platforms.
+static std::unique_ptr<uint8_t[]> fatalSigStack;
+static size_t fatalSigStackSize = 0;
 
 static bool
 setupAltStack()
 {
+    if (!fatalSigStack) {
+        fatalSigStackSize = 2 * SIGSTKSZ;
+        fatalSigStack = std::make_unique<uint8_t[]>(fatalSigStackSize);
+    }
     stack_t stack;
 #if defined(__FreeBSD__) && (__FreeBSD_version < 1100097)
-    stack.ss_sp = (char *)fatalSigStack;
+    stack.ss_sp = (char *)fatalSigStack.get();
 #else
-    stack.ss_sp = fatalSigStack;
+    stack.ss_sp = fatalSigStack.get();
 #endif
-    stack.ss_size = sizeof(fatalSigStack);
+    stack.ss_size = fatalSigStackSize;
     stack.ss_flags = 0;
 
     return sigaltstack(&stack, NULL) == 0;

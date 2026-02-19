@@ -42,7 +42,11 @@
 #ifndef __CPU_SIMPLE_BASE_HH__
 #define __CPU_SIMPLE_BASE_HH__
 
+#include <ostream>
+
+#include "base/output.hh"
 #include "base/statistics.hh"
+#include "base/types.hh"
 #include "cpu/base.hh"
 #include "cpu/checker/cpu.hh"
 #include "cpu/exec_context.hh"
@@ -84,6 +88,9 @@ class BaseSimpleCPU : public BaseCPU
     branch_prediction::BPredUnit *branchPred;
 
     const RegIndex zeroReg;
+    bool branchTraceEnable;
+    std::ostream *branchTraceStream;
+    Addr lastInstAddr;
 
     void checkPcEventQueue();
     void swapActiveThread();
