@@ -1,6 +1,6 @@
 if [[ "$1" == "-h" || "$1" == "--help" ]]; then
   cat <<'EOF'
-Usage: run_gem5.sh --gem5-ckp-dir DIR --experiment NAME --snapshot NAME --inst N --cores N
+Usage: run_gem5.sh --gem5-ckp-dir DIR --experiment NAME --snapshot NAME --inst N --cores N [--branch-trace]
 
 Arguments (all required):
   --gem5-ckp-dir  Checkpoint root directory
@@ -10,7 +10,7 @@ Arguments (all required):
   --cores         Number of cores
 
 Example:
-  run_gem5.sh --gem5-ckp-dir /checkpoints --experiment OoO --snapshot snapshot_0 --inst 100000 --cores 1
+  run_gem5.sh --gem5-ckp-dir /checkpoints --experiment OoO --snapshot snapshot_0 --inst 100000 --cores 1 --branch-trace
 EOF
   exit 0
 fi
@@ -24,6 +24,7 @@ EXPERIMENT=""
 SNAPSHOT=""
 INST=""
 CORES=""
+BRANCH_TRACE=""
 
 while [[ $# -gt 0 ]]; do
   case "$1" in
@@ -47,6 +48,10 @@ while [[ $# -gt 0 ]]; do
       CORES="$2"
       shift 2
       ;;
+    --branch-trace)
+      BRANCH_TRACE="--branch-trace"
+      shift 1
+      ;;
     *)
       echo "Unknown argument: $1"
       exit 1
@@ -65,4 +70,4 @@ OUTDIR=sim_outs/${EXPERIMENT}/${SNAPSHOT}
 mkdir -p $OUTDIR
 touch ${OUTDIR}
 
-$GEM5_HOME/build/ARM/gem5.opt  --outdir=${OUTDIR} --debug-file=debug.insts  $GEM5_CFG -I $INST --disk-image="${CKPT_DIR}/${SNAPSHOT}.img" --bootloader="${M5_PATH}/binaries/boot_v2_qemu_virt.arm64" --caches --cpu-type AtomicSimpleCPU --fdip --bp-type TAGE --restore "${CKPT_DIR}" --num-cores ${CORES} --mem-size 16384MiB --mem-channels=2
+$GEM5_HOME/build/ARM/gem5.opt  --outdir=${OUTDIR} --debug-file=debug.insts  $GEM5_CFG -I $INST --disk-image="${CKPT_DIR}/${SNAPSHOT}.img" --bootloader="${M5_PATH}/binaries/boot_v2_qemu_virt.arm64" --caches --cpu-type AtomicSimpleCPU --fdip --bp-type TAGE --restore "${CKPT_DIR}" --num-cores ${CORES} --mem-size 16384MiB --mem-channels=2 ${BRANCH_TRACE}
