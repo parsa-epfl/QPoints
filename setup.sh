@@ -35,9 +35,14 @@ if command -v apt-get >/dev/null 2>&1; then
   python3 -m pip install --break-system-packages gdown
 fi
 
-echo cloning gem5 repo
-git clone -b cassandra-issue-fix https://github.com/bgodala/gem5_ARM_FDIP.git  gem5
-cp scripts/qflex/gem5_patch/init_signals.cc gem5/src/sim/init_signals.cc 
+echo initializing gem5 submodule
+if [[ ! -e gem5 ]]; then
+  git submodule update --init --recursive --remote gem5
+elif [[ -f gem5/.git ]]; then
+  git submodule update --init --recursive --remote gem5
+else
+  echo "gem5 exists and is not a submodule; skipping submodule init" >&2
+fi
 
 echo build gem5
 cd gem5
