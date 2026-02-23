@@ -35,6 +35,8 @@ if command -v apt-get >/dev/null 2>&1; then
   python3 -m pip install --break-system-packages gdown
 fi
 
+cd /home/dev/qflex/QPoints
+
 echo initializing gem5 submodule
 if [[ ! -e gem5 ]]; then
   git submodule update --init --recursive --remote gem5
@@ -53,6 +55,7 @@ echo Getting ARM kernel image files for gem5
 cd bin/m5
 wget http://dist.gem5.org/dist/v22-0/arm/aarch-system-20220707.tar.bz2
 tar -xvf aarch-system-20220707.tar.bz2
-cd ../../
+
+cd /home/dev/qflex
 
 echo Setup is complete!
