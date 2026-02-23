@@ -21,15 +21,15 @@ trap 'cleanup_children; exit 130' INT TERM
 
 usage() {
   cat <<'EOF'
-Usage: run_all.sh --qflex-ckp-dir DIR --gem5-ckp-dir DIR --cores N --mem MB \
+Usage: run_all.sh --qflex-ckp-dir DIR --gem5-ckp-dir DIR --core-count N --memory-gb GB \
   --base IMAGE --snapshot NAME [--ssh-host HOST] [--ssh-user USER] \
   [--monitor-base PORT] [--qmp-base PORT] [--ssh-base PORT]
 
 Example:
   run_all.sh --qflex-ckp-dir qflex_checkpoints --gem5-ckp-dir gem5_checkpoints \
-    --cores 4 --mem 16384 --base web_search.qcow2 --snapshot snapshot_0
+    --core-count 4 --memory-gb 16 --base web_search.qcow2 --snapshot snapshot_0
   run_all.sh --qflex-ckp-dir qflex_checkpoints --gem5-ckp-dir gem5_checkpoints \
-    --cores 4 --mem 16384 --base web_search.qcow2 --snapshot snapshot_0 \
+    --core-count 4 --memory-gb 16 --base web_search.qcow2 --snapshot snapshot_0 \
     --ssh-host 127.0.0.1 --ssh-user ubuntu --monitor-base 45454 --qmp-base 4444 \
     --ssh-base 2222
 EOF
@@ -37,8 +37,8 @@ EOF
 
 qflex_ckp_dir=""
 gem5_ckp_dir=""
-cores=""
-mem=""
+core_count=""
+memory_gb=""
 base=""
 snapshot=""
 ssh_host="127.0.0.1"
@@ -61,12 +61,12 @@ while [[ $# -gt 0 ]]; do
       gem5_ckp_dir="${2:-}"
       shift 2
       ;;
-    --cores)
-      cores="${2:-}"
+    --core-count)
+      core_count="${2:-}"
       shift 2
       ;;
-    --mem)
-      mem="${2:-}"
+    --memory-gb)
+      memory_gb="${2:-}"
       shift 2
       ;;
     --base)
@@ -105,11 +105,12 @@ while [[ $# -gt 0 ]]; do
   esac
 done
 
-if [[ -z "$qflex_ckp_dir" || -z "$gem5_ckp_dir" || -z "$cores" || -z "$mem" || -z "$base" || -z "$snapshot" ]]; then
+if [[ -z "$qflex_ckp_dir" || -z "$gem5_ckp_dir" || -z "$core_count" || -z "$memory_gb" || -z "$base" || -z "$snapshot" ]]; then
   echo "Missing required arguments." >&2
   usage
   exit 1
 fi
+
 
 ROOT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 run_dir="${qflex_ckp_dir}/run"
@@ -136,7 +137,7 @@ chmod +x "$run_dir/run_qemu_emu.sh"
 echo "[${snapshot}] start qemu in the background"
 (
   cd "$run_dir"
-  exec ./run_qemu_emu.sh "$cores" "$mem" "$base" "$snapshot" \
+  exec ./run_qemu_emu.sh "$core_count" "${memory_gb}G" "$base" "$snapshot" \
     "$monitor_port" "$qmp_port" "$ssh_port" > "qemu_emu_${snapshot}.log" 2>&1
 ) &
 qemu_pid=$!
@@ -156,7 +157,7 @@ img_dest_dir="${gem5_ckp_dir}/${snapshot}"
 tmp_log="${run_dir}/gen_snapshot_${snapshot}.log"
 
 echo "[${snapshot}] start generating gem5 checkpoint"
-"$ROOT_DIR/gen_snapshot.sh" "$gem5_ckp_dir" "$snapshot" "" 0 "$cores" "$monitor_port" \
+"$ROOT_DIR/gen_snapshot.sh" "$gem5_ckp_dir" "$snapshot" "" 0 "$core_count" "$monitor_port" \
   2> "$tmp_log"
 
 if [[ -d "$img_dest_dir" ]]; then

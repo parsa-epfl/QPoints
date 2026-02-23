@@ -8,7 +8,7 @@ Usage: run_all_multi_snapshot.sh --first snapshot_N --last snapshot_M --parallel
 
 Example:
   run_all_multi_snapshot.sh --first snapshot_0 --last snapshot_99 --parallel 4 \
-    --qflex-ckp-dir /path/qflex --gem5-ckp-dir /path/gem5 --cores 4 --mem 16384 \
+    --qflex-ckp-dir /path/qflex --gem5-ckp-dir /path/gem5 --core-count 4 --memory-gb 16 \
     --base clean_4core.qcow2 --ssh-user qflex
 EOF
 }
