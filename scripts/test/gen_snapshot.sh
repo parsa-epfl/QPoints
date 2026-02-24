@@ -31,25 +31,6 @@ if [[ "$copy_img" == "1" || "$copy_img" == "true" || "$copy_img" == "yes" ]]; th
 fi
 
 dest_dir="${ckp_dir}/${snapshot}"
-if [[ -d "$dest_dir" ]]; then
-  echo "Destination directory already exists: $dest_dir"
-  printf "Delete it and proceed? [y/n]: " > /dev/tty
-  read -r resp < /dev/tty
-  case "$resp" in
-    y|Y|yes|YES)
-      rm -rf "$dest_dir"
-      ;;
-    n|N|no|NO)
-      echo "Aborting."
-      exit 1
-      ;;
-    *)
-      echo "Unrecognized response. Aborting."
-      exit 1
-      ;;
-  esac
-fi
-
 mkdir -p "$dest_dir"
 
 cd scripts
