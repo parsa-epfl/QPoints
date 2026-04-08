@@ -1,4 +1,0 @@
-[submodule "gem5"]
-	path = gem5
-	url = https://github.com/parsa-epfl/gem5
-	branch = gem5_ckp_conversion
