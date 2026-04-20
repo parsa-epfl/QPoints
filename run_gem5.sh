@@ -64,10 +64,10 @@ if [[ -z "$GEM5_CKP_DIR" || -z "$EXPERIMENT" || -z "$SNAPSHOT" || -z "$INST" || 
   exit 1
 fi
 
-CKPT_DIR="${GEM5_CKP_DIR}/${SNAPSHOT}"
+CKPT_DIR="${GEM5_CKP_DIR}/${SNAPSHOT}.gem"
 
 OUTDIR=sim_outs/${EXPERIMENT}/${SNAPSHOT}
 mkdir -p $OUTDIR
 touch ${OUTDIR}
 
-$GEM5_HOME/build/ARM/gem5.opt  --outdir=${OUTDIR} --debug-file=debug.insts  $GEM5_CFG -I $INST --disk-image="${CKPT_DIR}/${SNAPSHOT}.img" --bootloader="${M5_PATH}/binaries/boot_v2_qemu_virt.arm64" --caches --cpu-type AtomicSimpleCPU --fdip --bp-type TAGE --restore "${CKPT_DIR}" --num-cores ${CORES} --mem-size 16384MiB --mem-channels=2 ${BRANCH_TRACE}
+$GEM5_HOME/build/ARM/gem5.opt --debug-flags=All --outdir=${OUTDIR} --debug-file=debug.insts  $GEM5_CFG -I $INST --disk-image="${CKPT_DIR}/${SNAPSHOT}.img" --cpu atomic --restore "${CKPT_DIR}" --num-cores ${CORES} --mem-size 8192MiB --mem-channels=1
