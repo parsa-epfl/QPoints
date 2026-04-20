@@ -1,3 +1,5 @@
+#!/usr/bin/env bash
+
 usage() {
   cat <<'EOF'
 Usage: run_gem5.sh --gem5-ckp-dir DIR --experiment NAME --snapshot NAME --inst N --cores N [--branch-trace] [--timing-ruby]
@@ -34,6 +36,12 @@ require_value() {
 
 require_file() {
   if [[ ! -f "$1" ]]; then
+    die "$2 not found: $1"
+  fi
+}
+
+require_dir() {
+  if [[ ! -d "$1" ]]; then
     die "$2 not found: $1"
   fi
 }
@@ -110,10 +118,15 @@ if [[ -z "$GEM5_CKP_DIR" || -z "$EXPERIMENT" || -z "$SNAPSHOT" || -z "$INST" || 
 fi
 
 CKPT_DIR="${GEM5_CKP_DIR}/${SNAPSHOT}"
+DISK_IMAGE="${CKPT_DIR}/${SNAPSHOT}.img"
+BOOTLOADER="${M5_PATH}/binaries/boot_v2_qemu_virt.arm64"
 
 OUTDIR=sim_outs/${EXPERIMENT}/${SNAPSHOT}
+require_dir "$CKPT_DIR" "Checkpoint directory"
+require_file "$DISK_IMAGE" "Checkpoint disk image"
+require_file "$BOOTLOADER" "Bootloader"
+
 mkdir -p "$OUTDIR"
-touch "$OUTDIR"
 
 if [[ -n "$TIMING_RUBY" ]]; then
   require_executable "$GEM5_BIN_TIMING_RUBY" "Timing Ruby gem5 binary"
@@ -125,8 +138,8 @@ if [[ -n "$TIMING_RUBY" ]]; then
     "--debug-file=debug.insts"
     "$GEM5_CFG_TIMING_RUBY"
     -I "$INST"
-    "--disk-image=${CKPT_DIR}/${SNAPSHOT}.img"
-    "--bootloader=${M5_PATH}/binaries/boot_v2_qemu_virt.arm64"
+    "--disk-image=${DISK_IMAGE}"
+    "--bootloader=${BOOTLOADER}"
     --cpu-type O3CPU
     --bp-type TAGE
     --btb-entries 4096
@@ -146,8 +159,8 @@ else
     "--debug-file=debug.insts"
     "$GEM5_CFG_CLASSIC"
     -I "$INST"
-    "--disk-image=${CKPT_DIR}/${SNAPSHOT}.img"
-    "--bootloader=${M5_PATH}/binaries/boot_v2_qemu_virt.arm64"
+    "--disk-image=${DISK_IMAGE}"
+    "--bootloader=${BOOTLOADER}"
     --caches
     --cpu-type AtomicSimpleCPU
     --fdip
