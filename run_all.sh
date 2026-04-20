@@ -13,7 +13,11 @@ report_timing() {
 trap report_timing EXIT
 
 qemu_pid=""
+converted_img_tmp=""
 cleanup_children() {
+  if [[ -n "${converted_img_tmp:-}" && -f "$converted_img_tmp" ]]; then
+    rm -f "$converted_img_tmp"
+  fi
   if [[ -n "${qemu_pid:-}" ]]; then
     kill -TERM -- "-$qemu_pid" >/dev/null 2>&1 || kill "$qemu_pid" >/dev/null 2>&1 || true
     sleep 1
@@ -183,19 +187,20 @@ else
 fi
 
 cp "$ROOT_DIR/scripts/qflex/convert.sh" "$run_dir/"
+converted_img="${img_dest_dir}/${snapshot}.img"
+converted_img_tmp="${img_dest_dir}/.${snapshot}.img.tmp.$$"
+rm -f "$converted_img" "$converted_img_tmp"
 
 (
   cd "$run_dir"
   chmod +x convert.sh
   echo "[${snapshot}] start converting the disk image"
-  ./convert.sh "$base" "$snapshot"
+  ./convert.sh "$base" "$snapshot" "$converted_img_tmp"
 )
 
-img_src="${run_dir}/${snapshot}.img"
-if [[ -f "$img_src" ]]; then
-  echo "[${snapshot}] moving the raw disk image to the destination folder"
-  mv "$img_src" "$img_dest_dir/."
+if [[ -f "$converted_img_tmp" ]]; then
+  mv "$converted_img_tmp" "$converted_img"
 else
-  echo "[${snapshot}] Converted image not found: $img_src" >&2
+  echo "[${snapshot}] Converted image not found: $converted_img_tmp" >&2
   exit 1
 fi

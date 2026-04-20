@@ -3,10 +3,13 @@ set -euo pipefail
 
 usage() {
   cat <<'EOF'
-Usage: convert.sh [BASE] [SNAPSHOT]
+Usage: convert.sh [BASE] [SNAPSHOT] [OUT_IMG]
+
+OUT_IMG defaults to SNAPSHOT.img in the current directory.
 
 Example:
   convert.sh clean_4core.qcow2 init_warmed
+  convert.sh clean_4core.qcow2 init_warmed /checkpoints/init_warmed/init_warmed.img
 EOF
 }
 
@@ -22,6 +25,7 @@ fi
 
 BASE="$1"
 SNAPSHOT="$2"
+OUT_IMG="${3:-"${SNAPSHOT}.img"}"
 
 # Convert snapshot directly without temp copy.
-qemu-img convert -f qcow2 -O raw -l "$SNAPSHOT" "$BASE" "${SNAPSHOT}.img"
+qemu-img convert -f qcow2 -O raw -l "$SNAPSHOT" "$BASE" "$OUT_IMG"
