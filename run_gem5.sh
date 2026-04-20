@@ -1,6 +1,8 @@
-if [[ "$1" == "-h" || "$1" == "--help" ]]; then
+#!/usr/bin/env bash
+
+usage() {
   cat <<'EOF'
-Usage: run_gem5.sh --gem5-ckp-dir DIR --experiment NAME --snapshot NAME --inst N --cores N [--branch-trace]
+Usage: run_gem5.sh --gem5-ckp-dir DIR --experiment NAME --snapshot NAME --inst N --cores N [--branch-trace] [--timing-ruby]
 
 Arguments (all required):
   --gem5-ckp-dir  Checkpoint root directory
@@ -9,65 +11,167 @@ Arguments (all required):
   --inst          Instruction count
   --cores         Number of cores
 
+Options:
+  --branch-trace  Enable per-core branch trace logging
+  --timing-ruby   Use O3CPU with Ruby MESI_Two_Level. Without this flag,
+                  the existing starter_fs.py AtomicSimpleCPU config is used.
+
 Example:
   run_gem5.sh --gem5-ckp-dir /checkpoints --experiment OoO --snapshot snapshot_0 --inst 100000 --cores 1 --branch-trace
 EOF
+}
+
+die() {
+  echo "Error: $*" >&2
+  echo >&2
+  usage >&2
+  exit 1
+}
+
+require_value() {
+  if [[ $# -lt 2 || -z "${2:-}" || "${2:0:2}" == "--" ]]; then
+    die "$1 requires a value."
+  fi
+}
+
+require_file() {
+  if [[ ! -f "$1" ]]; then
+    die "$2 not found: $1"
+  fi
+}
+
+require_dir() {
+  if [[ ! -d "$1" ]]; then
+    die "$2 not found: $1"
+  fi
+}
+
+require_executable() {
+  if [[ ! -x "$1" ]]; then
+    die "$2 not found or not executable: $1"
+  fi
+}
+
+if [[ "$1" == "-h" || "$1" == "--help" ]]; then
+  usage
   exit 0
 fi
 
-export M5_PATH=$(pwd)/bin/m5
-GEM5_HOME=$(pwd)/gem5
-GEM5_CFG=$GEM5_HOME/configs/example/arm/starter_fs.py
+ROOT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
+export M5_PATH="${ROOT_DIR}/bin/m5"
+GEM5_HOME="${ROOT_DIR}/gem5"
+GEM5_CFG_CLASSIC="${GEM5_HOME}/configs/example/arm/starter_fs.py"
+GEM5_CFG_TIMING_RUBY="${GEM5_HOME}/configs/example/arm/qpoints_mesi_fs.py"
+GEM5_BIN_CLASSIC="${GEM5_HOME}/build/ARM/gem5.opt"
+GEM5_BIN_TIMING_RUBY="${GEM5_HOME}/build/ARM_MESI_Two_Level/gem5.opt"
 
 GEM5_CKP_DIR=""
 EXPERIMENT=""
 SNAPSHOT=""
 INST=""
 CORES=""
-BRANCH_TRACE=""
+BRANCH_TRACE_ARGS=()
+TIMING_RUBY=""
 
 while [[ $# -gt 0 ]]; do
   case "$1" in
     --gem5-ckp-dir)
+      require_value "$1" "${2:-}"
       GEM5_CKP_DIR="$2"
       shift 2
       ;;
     --experiment)
+      require_value "$1" "${2:-}"
       EXPERIMENT="$2"
       shift 2
       ;;
     --snapshot)
+      require_value "$1" "${2:-}"
       SNAPSHOT="$2"
       shift 2
       ;;
     --inst)
+      require_value "$1" "${2:-}"
       INST="$2"
       shift 2
       ;;
     --cores)
+      require_value "$1" "${2:-}"
       CORES="$2"
       shift 2
       ;;
     --branch-trace)
-      BRANCH_TRACE="--branch-trace"
+      BRANCH_TRACE_ARGS=(--branch-trace)
+      shift 1
+      ;;
+    --timing-ruby)
+      TIMING_RUBY="1"
       shift 1
       ;;
     *)
-      echo "Unknown argument: $1"
-      exit 1
+      die "Unknown argument: $1"
       ;;
   esac
 done
 
 if [[ -z "$GEM5_CKP_DIR" || -z "$EXPERIMENT" || -z "$SNAPSHOT" || -z "$INST" || -z "$CORES" ]]; then
-  echo "Missing required arguments."
-  exit 1
+  die "Missing required arguments."
 fi
 
 CKPT_DIR="${GEM5_CKP_DIR}/${SNAPSHOT}"
+DISK_IMAGE="${CKPT_DIR}/${SNAPSHOT}.img"
+BOOTLOADER="${M5_PATH}/binaries/boot_v2_qemu_virt.arm64"
 
-OUTDIR=sim_outs/${EXPERIMENT}/${SNAPSHOT}
-mkdir -p $OUTDIR
-touch ${OUTDIR}
+OUTDIR="${ROOT_DIR}/sim_outs/${EXPERIMENT}/${SNAPSHOT}"
+require_dir "$CKPT_DIR" "Checkpoint directory"
+require_file "$DISK_IMAGE" "Checkpoint disk image"
+require_file "$BOOTLOADER" "Bootloader"
 
-$GEM5_HOME/build/ARM/gem5.opt  --outdir=${OUTDIR} --debug-file=debug.insts  $GEM5_CFG -I $INST --disk-image="${CKPT_DIR}/${SNAPSHOT}.img" --bootloader="${M5_PATH}/binaries/boot_v2_qemu_virt.arm64" --caches --cpu-type AtomicSimpleCPU --fdip --bp-type TAGE --restore "${CKPT_DIR}" --num-cores ${CORES} --mem-size 16384MiB --mem-channels=2 ${BRANCH_TRACE}
+mkdir -p "$OUTDIR"
+
+if [[ -n "$TIMING_RUBY" ]]; then
+  require_executable "$GEM5_BIN_TIMING_RUBY" "Timing Ruby gem5 binary"
+  require_file "$GEM5_CFG_TIMING_RUBY" "Timing Ruby gem5 config"
+
+  gem5_cmd=(
+    "$GEM5_BIN_TIMING_RUBY"
+    "--outdir=${OUTDIR}"
+    "--debug-file=debug.insts"
+    "$GEM5_CFG_TIMING_RUBY"
+    -I "$INST"
+    "--disk-image=${DISK_IMAGE}"
+    "--bootloader=${BOOTLOADER}"
+    --cpu-type O3CPU
+    --bp-type TAGE
+    --btb-entries 4096
+    --restore "$CKPT_DIR"
+    --num-cores "$CORES"
+    --mem-size 16384MiB
+    --mem-channels=2
+    "${BRANCH_TRACE_ARGS[@]}"
+  )
+else
+  require_executable "$GEM5_BIN_CLASSIC" "Classic gem5 binary"
+  require_file "$GEM5_CFG_CLASSIC" "Classic gem5 config"
+
+  gem5_cmd=(
+    "$GEM5_BIN_CLASSIC"
+    "--outdir=${OUTDIR}"
+    "--debug-file=debug.insts"
+    "$GEM5_CFG_CLASSIC"
+    -I "$INST"
+    "--disk-image=${DISK_IMAGE}"
+    "--bootloader=${BOOTLOADER}"
+    --caches
+    --cpu-type AtomicSimpleCPU
+    --fdip
+    --bp-type TAGE
+    --restore "$CKPT_DIR"
+    --num-cores "$CORES"
+    --mem-size 16384MiB
+    --mem-channels=2
+    "${BRANCH_TRACE_ARGS[@]}"
+  )
+fi
+
+"${gem5_cmd[@]}"
