@@ -43,6 +43,7 @@ base=""
 snapshot=""
 ssh_host="127.0.0.1"
 ssh_user="qflex"
+ssh_password="${QPOINTS_SSH_PASSWORD:-qflex}"
 monitor_base="45454"
 qmp_base="4444"
 ssh_base="2222"
@@ -143,15 +144,23 @@ echo "[${snapshot}] start qemu in the background"
 qemu_pid=$!
 
 # Wait for SSH to become available before proceeding.
-while true; do
-  if SSHPASS="qflex" sshpass -e ssh -o ConnectTimeout=2 -o StrictHostKeyChecking=no \
+max_ssh_attempts="${QPOINTS_SSH_MAX_ATTEMPTS:-120}"
+ssh_attempt=0
+while (( ssh_attempt < max_ssh_attempts )); do
+  if SSHPASS="$ssh_password" sshpass -e ssh -o ConnectTimeout=2 -o StrictHostKeyChecking=no \
     -o UserKnownHostsFile=/dev/null -p "$ssh_port" "${ssh_user}@${ssh_host}" "true" \
     >/dev/null 2>&1; then
     break
   fi
-  echo "[${snapshot}] waiting for vm ssh (${ssh_user}@${ssh_host}:${ssh_port})..."
+  ssh_attempt=$((ssh_attempt + 1))
+  echo "[${snapshot}] waiting for vm ssh (${ssh_user}@${ssh_host}:${ssh_port})... (${ssh_attempt}/${max_ssh_attempts})"
   sleep 0.5
 done
+
+if (( ssh_attempt >= max_ssh_attempts )); then
+  echo "[${snapshot}] ERROR: timed out waiting for vm ssh (${ssh_user}@${ssh_host}:${ssh_port}) after ${max_ssh_attempts} attempts." >&2
+  exit 1
+fi
 
 img_dest_dir="${gem5_ckp_dir}/${snapshot}"
 tmp_log="${run_dir}/gen_snapshot_${snapshot}.log"

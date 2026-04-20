@@ -69,20 +69,18 @@ def _resolve_gdb_script_path(script_file):
   return os.path.join(base_dir, 'gdb_scripts', script_file)
 
 def _run_gdb_script(dest_dir, script_path):
-  cwd = os.getcwd()
-  cmd = 'cd {}; gdb-multiarch -x {}; cd {}'.format(dest_dir, script_path, cwd)
-
-  # Ali: lines below fix the earlier interactive issues.
-  proc = subprocess.Popen(
-    cmd,
-    shell=True,
+  dest_dir = os.path.abspath(dest_dir)
+  script_path = os.path.abspath(script_path)
+  subprocess.run(
+    ['gdb-multiarch', '-x', script_path],
+    cwd=dest_dir,
+    check=True,
     stdin=subprocess.PIPE,
     stdout=subprocess.PIPE,
     stderr=subprocess.PIPE,
     text=True,
-    )
-
-  proc.communicate("quit\ny\n")
+    input="quit\ny\n",
+  )
 
 def _render_multicore_gdb_script(template_text, thread_id, core_idx):
   script_text = re.sub(r'^thread\s+\S+\s*$', 'thread {}'.format(thread_id),
@@ -123,82 +121,62 @@ def run_gdb_on_docker(args):
     _run_gdb_script(args.dest_dir, script_path)
 
 def copy_base_files(out_dir):
-  proc = subprocess.Popen(
-          ['cp -r base_files/* {}'.format(out_dir)],
-          stdout=subprocess.PIPE,
-          stdin=subprocess.PIPE,
-          stderr=subprocess.PIPE,
-          shell=True
-          )
-  proc.wait()
-  eprint(proc.stdout.read())
-  eprint(proc.stderr.read())
+  base_files_dir = os.path.join(os.path.dirname(os.path.abspath(__file__)),
+                                'base_files')
+  for name in os.listdir(base_files_dir):
+    src = os.path.join(base_files_dir, name)
+    dst = os.path.join(out_dir, name)
+    if os.path.isdir(src):
+      if os.path.exists(dst):
+        shutil.rmtree(dst)
+      shutil.copytree(src, dst)
+    else:
+      shutil.copy2(src, dst)
 
 
 
 def run_gdb_process_test():
-  proc = subprocess.Popen(
-          ['gdb-multiarch -x gdb.script'],
+  subprocess.run(
+          ['gdb-multiarch', '-x', 'gdb.script'],
           stdout=subprocess.PIPE,
           stdin=subprocess.PIPE,
           stderr=subprocess.PIPE,
-          shell=True
+          check=True,
+          input=b"quit\ny\n"
           )
-  proc.stdin.write(b"quit\n")
-  proc.stdin.write(b"y\n")
-  proc.stdin.flush()
-  proc.wait()
 
 def run_gdb_process():
-  proc = subprocess.Popen(
+  return subprocess.run(
           ['gdb-multiarch'],
           stdout=subprocess.PIPE,
           stdin=subprocess.PIPE,
           stderr=subprocess.PIPE,
-          shell=True
+          check=True,
+          input=(
+              b"help\n"
+              b"target remote localhost:1234\n"
+              b"set pagination off\n"
+              b"set logging file reg_info_test.virtio\n"
+              b"set logging on\n"
+              b"info registers all\n"
+              b"set logging off\n"
+              b"quit\n"
+              b"y\n"
+              )
           )
-  proc.stdin.write(b"help\n")
-  proc.stdin.flush()
-  proc.stdin.write(b"target remote localhost:1234\n")
-  proc.stdin.flush()
-  proc.stdin.write(b"set pagination off\n")
-  proc.stdin.flush()
-  proc.stdin.write(b"set logging file reg_info_test.virtio\n")
-  proc.stdin.flush()
-  proc.stdin.write(b"set logging on\n")
-  proc.stdin.flush()
-  proc.stdin.write(b"info registers all\n")
-  proc.stdin.flush()
-  proc.stdin.write(b"set logging off\n")
-  proc.stdin.flush()
-  proc.stdin.write(b"quit\n")
-  proc.stdin.write(b"y\n")
-  proc.stdin.flush()
-  proc.wait()
-  #print(proc.communicate(timeout=5))
-  return proc
 
 def copy_disk_image(dest_dir, disk_image):
   #Make sure all pending write are writtenback to disc
-  proc = subprocess.Popen(
-          ['sync'],
-          stdout=subprocess.PIPE)
-  proc.wait()
+  subprocess.run(['sync'], check=True)
 
   #Now copy the image
-  proc = subprocess.Popen(
-          ['cp',disk_image,dest_dir],
-          stdout=subprocess.PIPE)
-  proc.wait()
+  shutil.copy2(disk_image, dest_dir)
 
 def move_file_dest_dir(dest_dir, fname):
   if not os.path.exists(fname):
       eprint("{} does not exist".format(fname))
       return
-  proc = subprocess.Popen(
-          ['mv',fname,dest_dir],
-          stdout=subprocess.PIPE)
-  proc.wait()
+  shutil.move(fname, dest_dir)
 
 
 def dump_to_file(fname, value_map):
@@ -277,15 +255,17 @@ def collect_snapshot(args):
   tn.close()
 
 def get_elf_skip_bytes(elf_name):
-  proc = subprocess.Popen(
-          ['readelf -l {} | grep LOAD'.format(elf_name)],
-          shell=True,
+  proc = subprocess.run(
+          ['readelf', '-l', elf_name],
           stdout=subprocess.PIPE,
+          stderr=subprocess.PIPE,
+          check=True,
           text=True)
-  proc.wait()
-  out = proc.stdout.read()
-  toks = out.split()
-  return toks[1]
+  for line in proc.stdout.splitlines():
+    toks = line.split()
+    if toks and toks[0] == 'LOAD':
+      return toks[1]
+  raise ValueError("No LOAD segment found in {}".format(elf_name))
 
 def process_snapshot(args):
     reg_info_fname = "{}/reg_info.virtio".format(args.dest_dir)
