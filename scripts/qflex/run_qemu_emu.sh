@@ -52,7 +52,7 @@ if [[ -z "$BIOS_PATH" || ! -f "$BIOS_PATH" ]]; then
   exit 1
 fi
 
-./vanilla-qemu-system-aarch64 \
+exec ./vanilla-qemu-system-aarch64 \
   -M virt,gic-version=max,virtualization=off,secure=off \
   -smp "$CORES" \
   -cpu max,pauth=off \

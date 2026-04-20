@@ -7,9 +7,7 @@ report_timing() {
   local end_time
   end_time="$(date +%s)"
   local elapsed=$((end_time - start_time))
-  if [[ "$exit_code" -ne 0 ]]; then
-    cleanup_children
-  fi
+  cleanup_children
   echo "[${snapshot:-unknown}] run_all.sh completed in ${elapsed}s (exit code: ${exit_code})"
 }
 trap report_timing EXIT
@@ -17,7 +15,9 @@ trap report_timing EXIT
 qemu_pid=""
 cleanup_children() {
   if [[ -n "${qemu_pid:-}" ]]; then
-    kill "$qemu_pid" >/dev/null 2>&1 || true
+    kill -TERM -- "-$qemu_pid" >/dev/null 2>&1 || kill "$qemu_pid" >/dev/null 2>&1 || true
+    sleep 1
+    kill -KILL -- "-$qemu_pid" >/dev/null 2>&1 || kill -KILL "$qemu_pid" >/dev/null 2>&1 || true
     wait "$qemu_pid" >/dev/null 2>&1 || true
   fi
 }
@@ -140,10 +140,7 @@ if [[ ! -d "$run_dir" ]]; then
   exit 1
 fi
 
-if [[ ! -f "$run_dir/run_qemu_emu.sh" ]]; then
-  cp -u "$ROOT_DIR/scripts/qflex/run_qemu_emu.sh" "$run_dir/"
-fi
-
+cp "$ROOT_DIR/scripts/qflex/run_qemu_emu.sh" "$run_dir/"
 chmod +x "$run_dir/run_qemu_emu.sh"
 echo "[${snapshot}] start qemu in the background"
 (
@@ -185,9 +182,7 @@ else
   exit 1
 fi
 
-if [[ ! -f "$run_dir/convert.sh" ]]; then
-  cp -u "$ROOT_DIR/scripts/qflex/convert.sh" "$run_dir/"
-fi
+cp "$ROOT_DIR/scripts/qflex/convert.sh" "$run_dir/"
 
 (
   cd "$run_dir"
