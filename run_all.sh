@@ -10,7 +10,6 @@ report_timing() {
   cleanup_children
   echo "[${snapshot:-unknown}] run_all.sh completed in ${elapsed}s (exit code: ${exit_code})"
 }
-trap report_timing EXIT
 
 qemu_pid=""
 converted_img_tmp=""
@@ -25,6 +24,7 @@ cleanup_children() {
     wait "$qemu_pid" >/dev/null 2>&1 || true
   fi
 }
+trap report_timing EXIT
 trap 'cleanup_children; exit 130' INT TERM
 
 usage() {
