@@ -57,8 +57,9 @@ if [[ "$1" == "-h" || "$1" == "--help" ]]; then
   exit 0
 fi
 
-export M5_PATH="$(pwd)/bin/m5"
-GEM5_HOME="$(pwd)/gem5"
+ROOT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
+export M5_PATH="${ROOT_DIR}/bin/m5"
+GEM5_HOME="${ROOT_DIR}/gem5"
 GEM5_CFG_CLASSIC="${GEM5_HOME}/configs/example/arm/starter_fs.py"
 GEM5_CFG_TIMING_RUBY="${GEM5_HOME}/configs/example/arm/qpoints_mesi_fs.py"
 GEM5_BIN_CLASSIC="${GEM5_HOME}/build/ARM/gem5.opt"
@@ -121,7 +122,7 @@ CKPT_DIR="${GEM5_CKP_DIR}/${SNAPSHOT}"
 DISK_IMAGE="${CKPT_DIR}/${SNAPSHOT}.img"
 BOOTLOADER="${M5_PATH}/binaries/boot_v2_qemu_virt.arm64"
 
-OUTDIR=sim_outs/${EXPERIMENT}/${SNAPSHOT}
+OUTDIR="${ROOT_DIR}/sim_outs/${EXPERIMENT}/${SNAPSHOT}"
 require_dir "$CKPT_DIR" "Checkpoint directory"
 require_file "$DISK_IMAGE" "Checkpoint disk image"
 require_file "$BOOTLOADER" "Bootloader"
