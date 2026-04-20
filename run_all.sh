@@ -122,8 +122,22 @@ fi
 
 
 ROOT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
-qflex_ckp_dir="$(cd "$qflex_ckp_dir" && pwd)"
-gem5_ckp_dir="$(mkdir -p "$gem5_ckp_dir" && cd "$gem5_ckp_dir" && pwd)"
+if [[ ! -d "$qflex_ckp_dir" ]]; then
+  echo "[${snapshot}] qflex checkpoint directory not found: $qflex_ckp_dir" >&2
+  exit 1
+fi
+if ! qflex_ckp_dir="$(cd "$qflex_ckp_dir" && pwd)"; then
+  echo "[${snapshot}] failed to access qflex checkpoint directory: $qflex_ckp_dir" >&2
+  exit 1
+fi
+if ! mkdir -p "$gem5_ckp_dir"; then
+  echo "[${snapshot}] failed to create gem5 checkpoint directory: $gem5_ckp_dir" >&2
+  exit 1
+fi
+if ! gem5_ckp_dir="$(cd "$gem5_ckp_dir" && pwd)"; then
+  echo "[${snapshot}] failed to access gem5 checkpoint directory: $gem5_ckp_dir" >&2
+  exit 1
+fi
 run_dir="${qflex_ckp_dir}/run"
 
 snapshot_idx=0
