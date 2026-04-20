@@ -7,14 +7,18 @@ report_timing() {
   local end_time
   end_time="$(date +%s)"
   local elapsed=$((end_time - start_time))
+  if [[ "$exit_code" -ne 0 ]]; then
+    cleanup_children
+  fi
   echo "[${snapshot:-unknown}] run_all.sh completed in ${elapsed}s (exit code: ${exit_code})"
 }
 trap report_timing EXIT
 
 qemu_pid=""
 cleanup_children() {
-  if [[ -n "$qemu_pid" ]]; then
+  if [[ -n "${qemu_pid:-}" ]]; then
     kill "$qemu_pid" >/dev/null 2>&1 || true
+    wait "$qemu_pid" >/dev/null 2>&1 || true
   fi
 }
 trap 'cleanup_children; exit 130' INT TERM
@@ -125,6 +129,12 @@ monitor_port=$((monitor_base + snapshot_idx))
 qmp_port=$((qmp_base + snapshot_idx))
 ssh_port=$((ssh_base + snapshot_idx))
 
+max_ssh_attempts="${QPOINTS_SSH_MAX_ATTEMPTS:-120}"
+if [[ ! "$max_ssh_attempts" =~ ^[1-9][0-9]*$ ]]; then
+  echo "[${snapshot}] ERROR: QPOINTS_SSH_MAX_ATTEMPTS must be a positive integer, got: ${max_ssh_attempts}" >&2
+  exit 1
+fi
+
 if [[ ! -d "$run_dir" ]]; then
   echo "[${snapshot}] run directory not found: $run_dir" >&2
   exit 1
@@ -144,12 +154,6 @@ echo "[${snapshot}] start qemu in the background"
 qemu_pid=$!
 
 # Wait for SSH to become available before proceeding.
-max_ssh_attempts="${QPOINTS_SSH_MAX_ATTEMPTS:-120}"
-if [[ ! "$max_ssh_attempts" =~ ^[1-9][0-9]*$ ]]; then
-  echo "[${snapshot}] ERROR: QPOINTS_SSH_MAX_ATTEMPTS must be a positive integer, got: ${max_ssh_attempts}" >&2
-  exit 1
-fi
-
 ssh_attempt=0
 while (( ssh_attempt < max_ssh_attempts )); do
   if SSHPASS="$ssh_password" sshpass -e ssh -o ConnectTimeout=2 -o StrictHostKeyChecking=no \
