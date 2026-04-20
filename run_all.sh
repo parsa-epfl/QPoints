@@ -7,16 +7,24 @@ report_timing() {
   local end_time
   end_time="$(date +%s)"
   local elapsed=$((end_time - start_time))
+  cleanup_children
   echo "[${snapshot:-unknown}] run_all.sh completed in ${elapsed}s (exit code: ${exit_code})"
 }
-trap report_timing EXIT
 
 qemu_pid=""
+converted_img_tmp=""
 cleanup_children() {
-  if [[ -n "$qemu_pid" ]]; then
-    kill "$qemu_pid" >/dev/null 2>&1 || true
+  if [[ -n "${converted_img_tmp:-}" && -f "$converted_img_tmp" ]]; then
+    rm -f "$converted_img_tmp"
+  fi
+  if [[ -n "${qemu_pid:-}" ]]; then
+    kill -TERM -- "-$qemu_pid" >/dev/null 2>&1 || kill "$qemu_pid" >/dev/null 2>&1 || true
+    sleep 1
+    kill -KILL -- "-$qemu_pid" >/dev/null 2>&1 || kill -KILL "$qemu_pid" >/dev/null 2>&1 || true
+    wait "$qemu_pid" >/dev/null 2>&1 || true
   fi
 }
+trap report_timing EXIT
 trap 'cleanup_children; exit 130' INT TERM
 
 usage() {
@@ -43,6 +51,7 @@ base=""
 snapshot=""
 ssh_host="127.0.0.1"
 ssh_user="qflex"
+ssh_password="${QPOINTS_SSH_PASSWORD:-qflex}"
 monitor_base="45454"
 qmp_base="4444"
 ssh_base="2222"
@@ -113,6 +122,22 @@ fi
 
 
 ROOT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
+if [[ ! -d "$qflex_ckp_dir" ]]; then
+  echo "[${snapshot}] qflex checkpoint directory not found: $qflex_ckp_dir" >&2
+  exit 1
+fi
+if ! qflex_ckp_dir="$(cd "$qflex_ckp_dir" && pwd)"; then
+  echo "[${snapshot}] failed to access qflex checkpoint directory: $qflex_ckp_dir" >&2
+  exit 1
+fi
+if ! mkdir -p "$gem5_ckp_dir"; then
+  echo "[${snapshot}] failed to create gem5 checkpoint directory: $gem5_ckp_dir" >&2
+  exit 1
+fi
+if ! gem5_ckp_dir="$(cd "$gem5_ckp_dir" && pwd)"; then
+  echo "[${snapshot}] failed to access gem5 checkpoint directory: $gem5_ckp_dir" >&2
+  exit 1
+fi
 run_dir="${qflex_ckp_dir}/run"
 
 snapshot_idx=0
@@ -124,15 +149,18 @@ monitor_port=$((monitor_base + snapshot_idx))
 qmp_port=$((qmp_base + snapshot_idx))
 ssh_port=$((ssh_base + snapshot_idx))
 
+max_ssh_attempts="${QPOINTS_SSH_MAX_ATTEMPTS:-120}"
+if [[ ! "$max_ssh_attempts" =~ ^[1-9][0-9]*$ ]]; then
+  echo "[${snapshot}] ERROR: QPOINTS_SSH_MAX_ATTEMPTS must be a positive integer, got: ${max_ssh_attempts}" >&2
+  exit 1
+fi
+
 if [[ ! -d "$run_dir" ]]; then
   echo "[${snapshot}] run directory not found: $run_dir" >&2
   exit 1
 fi
 
-if [[ ! -f "$run_dir/run_qemu_emu.sh" ]]; then
-  cp -u "$ROOT_DIR/scripts/qflex/run_qemu_emu.sh" "$run_dir/"
-fi
-
+cp "$ROOT_DIR/scripts/qflex/run_qemu_emu.sh" "$run_dir/"
 chmod +x "$run_dir/run_qemu_emu.sh"
 echo "[${snapshot}] start qemu in the background"
 (
@@ -143,15 +171,22 @@ echo "[${snapshot}] start qemu in the background"
 qemu_pid=$!
 
 # Wait for SSH to become available before proceeding.
-while true; do
-  if SSHPASS="qflex" sshpass -e ssh -o ConnectTimeout=2 -o StrictHostKeyChecking=no \
+ssh_attempt=0
+while (( ssh_attempt < max_ssh_attempts )); do
+  if SSHPASS="$ssh_password" sshpass -e ssh -o ConnectTimeout=2 -o StrictHostKeyChecking=no \
     -o UserKnownHostsFile=/dev/null -p "$ssh_port" "${ssh_user}@${ssh_host}" "true" \
     >/dev/null 2>&1; then
     break
   fi
-  echo "[${snapshot}] waiting for vm ssh (${ssh_user}@${ssh_host}:${ssh_port})..."
+  ssh_attempt=$((ssh_attempt + 1))
+  echo "[${snapshot}] waiting for vm ssh (${ssh_user}@${ssh_host}:${ssh_port})... (${ssh_attempt}/${max_ssh_attempts})"
   sleep 0.5
 done
+
+if (( ssh_attempt >= max_ssh_attempts )); then
+  echo "[${snapshot}] ERROR: timed out waiting for vm ssh (${ssh_user}@${ssh_host}:${ssh_port}) after ${max_ssh_attempts} attempts." >&2
+  exit 1
+fi
 
 img_dest_dir="${gem5_ckp_dir}/${snapshot}"
 tmp_log="${run_dir}/gen_snapshot_${snapshot}.log"
@@ -167,22 +202,21 @@ else
   exit 1
 fi
 
-if [[ ! -f "$run_dir/convert.sh" ]]; then
-  cp -u "$ROOT_DIR/scripts/qflex/convert.sh" "$run_dir/"
-fi
+cp "$ROOT_DIR/scripts/qflex/convert.sh" "$run_dir/"
+converted_img="${img_dest_dir}/${snapshot}.img"
+converted_img_tmp="${img_dest_dir}/.${snapshot}.img.tmp.$$"
+rm -f "$converted_img" "$converted_img_tmp"
 
 (
   cd "$run_dir"
   chmod +x convert.sh
   echo "[${snapshot}] start converting the disk image"
-  ./convert.sh "$base" "$snapshot"
+  ./convert.sh "$base" "$snapshot" "$converted_img_tmp"
 )
 
-img_src="${run_dir}/${snapshot}.img"
-if [[ -f "$img_src" ]]; then
-  echo "[${snapshot}] moving the raw disk image to the destination folder"
-  mv "$img_src" "$img_dest_dir/."
+if [[ -f "$converted_img_tmp" ]]; then
+  mv "$converted_img_tmp" "$converted_img"
 else
-  echo "[${snapshot}] Converted image not found: $img_src" >&2
+  echo "[${snapshot}] Converted image not found: $converted_img_tmp" >&2
   exit 1
 fi

@@ -1,2 +1,59 @@
-Please follow the instructions in this [README](https://www.notion.so/README-2ea46d7f056e80d1aeb5f644d6bb0204?source=copy_link) to run gem5 simulation using QFlex snapshots.
+# QPoints
 
+QPoints generates gem5-compatible checkpoints from QEMU/QFlex snapshots for
+ARM full-system simulation. The repository includes helpers for creating
+checkpoints, converting snapshot disk images, and running the resulting
+checkpoints in gem5.
+
+Detailed project notes are also available in the supplemental
+[Notion README](https://www.notion.so/README-2ea46d7f056e80d1aeb5f644d6bb0204?source=copy_link).
+Keep the local README as the version-controlled quickstart.
+
+## Requirements
+
+- QEMU/QFlex snapshot inputs
+- Python 3
+- `gdb-multiarch`
+- `qemu-img`
+- `sshpass`
+- gem5 and the ARM gem5 system files under `bin/m5`
+
+The setup script installs common package dependencies when `apt-get` is
+available, initializes the gem5 submodule, builds gem5, and downloads the ARM
+gem5 system files:
+
+```bash
+bash setup.sh
+```
+
+## Generate a Checkpoint
+
+Use `run_all.sh` to start QEMU from a QFlex snapshot, wait for SSH, collect the
+gem5 checkpoint, convert the selected qcow2 snapshot to a raw image, and place
+the generated files in the gem5 checkpoint directory.
+
+```bash
+./run_all.sh --qflex-ckp-dir qflex_checkpoints --gem5-ckp-dir gem5_checkpoints \
+  --core-count 4 --memory-gb 16 --base web_search.qcow2 --snapshot snapshot_0
+```
+
+Optional environment variables:
+
+- `QPOINTS_SSH_PASSWORD`: SSH password used while waiting for the guest
+- `QPOINTS_SSH_MAX_ATTEMPTS`: maximum SSH readiness attempts
+- `QEMU_EFI_FD`: explicit UEFI firmware path for QEMU
+
+## Run a Checkpoint in gem5
+
+The default mode preserves the existing classic gem5 flow. Add `--timing-ruby`
+to use the O3CPU + Ruby MESI_Two_Level configuration.
+
+```bash
+./run_gem5.sh --gem5-ckp-dir gem5_checkpoints --experiment test \
+  --snapshot snapshot_0 --inst 100000 --cores 1
+```
+
+```bash
+./run_gem5.sh --gem5-ckp-dir gem5_checkpoints --experiment test \
+  --snapshot snapshot_0 --inst 100000 --cores 1 --timing-ruby
+```

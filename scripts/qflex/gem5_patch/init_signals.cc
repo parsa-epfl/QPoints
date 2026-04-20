@@ -44,7 +44,11 @@
 #include <sys/types.h>
 #include <unistd.h>
 
+#include <pthread.h>
+
+#include <cstdint>
 #include <csignal>
+#include <cstring>
 #include <iostream>
 #include <memory>
 #include <string>

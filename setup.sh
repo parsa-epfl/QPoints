@@ -1,4 +1,8 @@
-#!/bin/bash
+#!/usr/bin/env bash
+set -euo pipefail
+
+ROOT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
+PROJECT_ROOT="$(cd "${ROOT_DIR}/.." && pwd)"
 
 # TODO: these packages must be installed in the Dockerfile, not here
 if command -v apt-get >/dev/null 2>&1; then
@@ -35,7 +39,7 @@ if command -v apt-get >/dev/null 2>&1; then
   python3 -m pip install --break-system-packages gdown
 fi
 
-cd /home/dev/qflex/QPoints
+cd "$ROOT_DIR"
 
 echo initializing gem5 submodule
 if [[ ! -e gem5 ]]; then
@@ -56,6 +60,6 @@ cd bin/m5
 wget http://dist.gem5.org/dist/v22-0/arm/aarch-system-20220707.tar.bz2
 tar -xvf aarch-system-20220707.tar.bz2
 
-cd /home/dev/qflex
+cd "$PROJECT_ROOT"
 
 echo Setup is complete!

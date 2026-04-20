@@ -1,12 +1,26 @@
-#!/usr/bin/bash
+#!/usr/bin/env bash
+set -euo pipefail
+
 # This script must be used in the folder where the qflex snapshot resides
-if [[ "${1:-}" == "-h" || "${1:-}" == "--help" || $# -lt 7 ]]; then
+usage() {
   cat <<'EOF'
-Usage: run_qemu_emu.sh [CORES] [MEM] [BASE] [SNAPSHOT] [MONITOR_PORT] [QMP_PORT] [SSH_PORT]
+Usage: run_qemu_emu.sh [CORES] [MEMORY] [BASE] [SNAPSHOT] [MONITOR_PORT] [QMP_PORT] [SSH_PORT]
+
+MEMORY may be specified as a plain integer or with a QEMU size suffix,
+for example 16384, 16384M, or 16G.
 
 Example:
-  run_qemu_emu.sh 4 16384 web_search.qcow2 snapshot_0 45454 4444 2222
+  run_qemu_emu.sh 4 16G web_search.qcow2 snapshot_0 45454 4444 2222
 EOF
+}
+
+if [[ "${1:-}" == "-h" || "${1:-}" == "--help" ]]; then
+  usage
+  exit 0
+fi
+
+if [[ $# -lt 7 ]]; then
+  usage >&2
   exit 1
 fi
 
@@ -18,18 +32,38 @@ MONITOR_PORT="$5"
 QMP_PORT="$6"
 SSH_PORT="$7"
 
-./vanilla-qemu-system-aarch64 \
+BIOS_PATH="${QEMU_EFI_FD:-}"
+if [[ -z "$BIOS_PATH" ]]; then
+  for candidate in \
+    "./QEMU_EFI.fd" \
+    "/usr/share/qemu-efi-aarch64/QEMU_EFI.fd" \
+    "/usr/share/AAVMF/AAVMF_CODE.fd" \
+    "/usr/share/edk2/aarch64/QEMU_EFI.fd"
+  do
+    if [[ -f "$candidate" ]]; then
+      BIOS_PATH="$candidate"
+      break
+    fi
+  done
+fi
+
+if [[ -z "$BIOS_PATH" || ! -f "$BIOS_PATH" ]]; then
+  echo "Error: could not find UEFI firmware. Set QEMU_EFI_FD to a valid QEMU_EFI.fd/AAVMF_CODE.fd path." >&2
+  exit 1
+fi
+
+exec ./vanilla-qemu-system-aarch64 \
   -M virt,gic-version=max,virtualization=off,secure=off \
-  -smp ${CORES} \
+  -smp "$CORES" \
   -cpu max,pauth=off \
-  -m ${MEM} \
+  -m "$MEM" \
   -boot order=d,menu=on \
-  -bios ./QEMU_EFI.fd \
-  -drive if=virtio,file=${BASE},format=qcow2,snapshot=on,tmp-snapshot-name=${SNAPSHOT} \
-  -nic user,model=virtio-net-pci,hostfwd=tcp::${SSH_PORT}-:22 \
+  -bios "$BIOS_PATH" \
+  -drive "if=virtio,file=${BASE},format=qcow2,snapshot=on,tmp-snapshot-name=${SNAPSHOT}" \
+  -nic "user,model=virtio-net-pci,hostfwd=tcp::${SSH_PORT}-:22" \
   -rtc clock=vm \
-  -loadvm ${SNAPSHOT} \
-  -qmp tcp:localhost:${QMP_PORT},server,nowait -monitor telnet::${MONITOR_PORT},server,nowait \
+  -loadvm "$SNAPSHOT" \
+  -qmp "tcp:localhost:${QMP_PORT},server,nowait" -monitor "telnet::${MONITOR_PORT},server,nowait" \
   -nographic \
   -serial mon:stdio \
   -no-reboot
