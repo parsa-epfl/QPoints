@@ -75,7 +75,6 @@ def _run_gdb_script(dest_dir, script_path):
     ['gdb-multiarch', '-x', script_path],
     cwd=dest_dir,
     check=True,
-    stdin=subprocess.PIPE,
     stdout=subprocess.PIPE,
     stderr=subprocess.PIPE,
     text=True,
@@ -139,7 +138,6 @@ def run_gdb_process_test():
   subprocess.run(
           ['gdb-multiarch', '-x', 'gdb.script'],
           stdout=subprocess.PIPE,
-          stdin=subprocess.PIPE,
           stderr=subprocess.PIPE,
           check=True,
           input=b"quit\ny\n"
@@ -149,7 +147,6 @@ def run_gdb_process():
   return subprocess.run(
           ['gdb-multiarch'],
           stdout=subprocess.PIPE,
-          stdin=subprocess.PIPE,
           stderr=subprocess.PIPE,
           check=True,
           input=(
