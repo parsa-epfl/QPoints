@@ -122,6 +122,8 @@ fi
 
 
 ROOT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
+qflex_ckp_dir="$(cd "$qflex_ckp_dir" && pwd)"
+gem5_ckp_dir="$(mkdir -p "$gem5_ckp_dir" && cd "$gem5_ckp_dir" && pwd)"
 run_dir="${qflex_ckp_dir}/run"
 
 snapshot_idx=0
