@@ -47,7 +47,7 @@ if [[ -z "$BIOS_PATH" ]]; then
   done
 fi
 
-if [[ -z "$BIOS_PATH" ]]; then
+if [[ -z "$BIOS_PATH" || ! -f "$BIOS_PATH" ]]; then
   echo "Error: could not find UEFI firmware. Set QEMU_EFI_FD to a valid QEMU_EFI.fd/AAVMF_CODE.fd path." >&2
   exit 1
 fi
