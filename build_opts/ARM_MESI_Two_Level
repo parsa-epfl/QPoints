@@ -1,0 +1,7 @@
+# Copyright (c) 2026 EPFL
+# All rights reserved.
+
+TARGET_ISA = 'arm'
+CPU_MODELS = 'AtomicSimpleCPU,TimingSimpleCPU,O3CPU,MinorCPU'
+PROTOCOL = 'MESI_Two_Level'
+NUMBER_BITS_PER_SET = '128'
