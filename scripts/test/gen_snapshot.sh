@@ -26,8 +26,17 @@ copy_img="${4:-0}"
 num_cores="${5:-1}"
 monitor_port="${6:-45454}"
 
-script_path="$(readlink -f "${BASH_SOURCE[0]}")"
-script_dir="$(cd "$(dirname "$script_path")" && pwd)"
+script_path="${BASH_SOURCE[0]}"
+while [[ -L "$script_path" ]]; do
+  script_dir="$(cd -P "$(dirname "$script_path")" && pwd)"
+  link_target="$(readlink "$script_path")"
+  if [[ "$link_target" == /* ]]; then
+    script_path="$link_target"
+  else
+    script_path="${script_dir}/${link_target}"
+  fi
+done
+script_dir="$(cd -P "$(dirname "$script_path")" && pwd)"
 root_dir="$(cd "${script_dir}/../.." && pwd)"
 dest_dir="${ckp_dir}/${snapshot}"
 mkdir -p "$dest_dir"
