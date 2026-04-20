@@ -145,6 +145,11 @@ qemu_pid=$!
 
 # Wait for SSH to become available before proceeding.
 max_ssh_attempts="${QPOINTS_SSH_MAX_ATTEMPTS:-120}"
+if [[ ! "$max_ssh_attempts" =~ ^[1-9][0-9]*$ ]]; then
+  echo "[${snapshot}] ERROR: QPOINTS_SSH_MAX_ATTEMPTS must be a positive integer, got: ${max_ssh_attempts}" >&2
+  exit 1
+fi
+
 ssh_attempt=0
 while (( ssh_attempt < max_ssh_attempts )); do
   if SSHPASS="$ssh_password" sshpass -e ssh -o ConnectTimeout=2 -o StrictHostKeyChecking=no \

@@ -4,10 +4,13 @@ set -euo pipefail
 # This script must be used in the folder where the qflex snapshot resides
 usage() {
   cat <<'EOF'
-Usage: run_qemu_emu.sh [CORES] [MEM] [BASE] [SNAPSHOT] [MONITOR_PORT] [QMP_PORT] [SSH_PORT]
+Usage: run_qemu_emu.sh [CORES] [MEMORY] [BASE] [SNAPSHOT] [MONITOR_PORT] [QMP_PORT] [SSH_PORT]
+
+MEMORY may be specified as a plain integer or with a QEMU size suffix,
+for example 16384, 16384M, or 16G.
 
 Example:
-  run_qemu_emu.sh 4 16384 web_search.qcow2 snapshot_0 45454 4444 2222
+  run_qemu_emu.sh 4 16G web_search.qcow2 snapshot_0 45454 4444 2222
 EOF
 }
 
