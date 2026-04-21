@@ -52,14 +52,14 @@ if [[ -z "$BIOS_PATH" || ! -f "$BIOS_PATH" ]]; then
   exit 1
 fi
 
-exec ./vanilla-qemu-system-aarch64 \
+exec ./qemu-system-aarch64 \
   -M virt,gic-version=max,virtualization=off,secure=off \
   -smp "$CORES" \
   -cpu max,pauth=off \
   -m "$MEM" \
   -boot order=d,menu=on \
   -bios "$BIOS_PATH" \
-  -drive "if=virtio,file=${BASE},format=qcow2,snapshot=on,tmp-snapshot-name=${SNAPSHOT}" \
+  -drive "if=virtio,file=${BASE},format=qcow2" \
   -nic "user,model=virtio-net-pci,hostfwd=tcp::${SSH_PORT}-:22" \
   -rtc clock=vm \
   -loadvm "$SNAPSHOT" \
