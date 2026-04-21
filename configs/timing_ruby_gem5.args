@@ -1,0 +1,5 @@
+# Extra gem5 CLI arguments for the QPoints timing-Ruby run path.
+# Keep one argument per line and use native gem5 option syntax.
+
+--l2_size=1MB
+--l2_assoc=16

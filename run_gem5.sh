@@ -2,7 +2,7 @@
 
 usage() {
   cat <<'EOF'
-Usage: run_gem5.sh --gem5-ckp-dir DIR --experiment NAME --snapshot NAME --inst N --cores N [--branch-trace] [--timing-ruby]
+Usage: run_gem5.sh --gem5-ckp-dir DIR --experiment NAME --snapshot NAME --inst N --cores N [--branch-trace] [--timing-ruby] [--sim-config FILE]
 
 Arguments (all required):
   --gem5-ckp-dir  Checkpoint root directory
@@ -15,6 +15,10 @@ Options:
   --branch-trace  Enable per-core branch trace logging
   --timing-ruby   Use O3CPU with Ruby MESI_Two_Level. Without this flag,
                   the existing starter_fs.py AtomicSimpleCPU config is used.
+  --sim-config    Optional file containing additional gem5 CLI arguments,
+                  one per line. This is currently applied to the timing-Ruby
+                  path and lets the modeled machine stay in a tracked config
+                  file instead of growing the wrapper script.
 
 Example:
   run_gem5.sh --gem5-ckp-dir /checkpoints --experiment OoO --snapshot snapshot_0 --inst 100000 --cores 1 --branch-trace
@@ -52,6 +56,20 @@ require_executable() {
   fi
 }
 
+load_gem5_args_file() {
+  local args_file="$1"
+  local -n out_array_ref="$2"
+
+  require_file "$args_file" "Simulation config file"
+
+  mapfile -t out_array_ref < <(
+    sed \
+      -e 's/[[:space:]]*#.*$//' \
+      -e '/^[[:space:]]*$/d' \
+      "$args_file"
+  )
+}
+
 if [[ "$1" == "-h" || "$1" == "--help" ]]; then
   usage
   exit 0
@@ -64,12 +82,14 @@ GEM5_CFG_CLASSIC="${GEM5_HOME}/configs/example/arm/starter_fs.py"
 GEM5_CFG_TIMING_RUBY="${GEM5_HOME}/configs/example/arm/qpoints_mesi_fs.py"
 GEM5_BIN_CLASSIC="${GEM5_HOME}/build/ARM/gem5.opt"
 GEM5_BIN_TIMING_RUBY="${GEM5_HOME}/build/ARM_MESI_Two_Level/gem5.opt"
+DEFAULT_TIMING_RUBY_SIM_CONFIG="${ROOT_DIR}/configs/timing_ruby_gem5.args"
 
 GEM5_CKP_DIR=""
 EXPERIMENT=""
 SNAPSHOT=""
 INST=""
 CORES=""
+SIM_CONFIG=""
 BRANCH_TRACE_ARGS=()
 TIMING_RUBY=""
 
@@ -104,6 +124,11 @@ while [[ $# -gt 0 ]]; do
       BRANCH_TRACE_ARGS=(--branch-trace)
       shift 1
       ;;
+    --sim-config)
+      require_value "$1" "${2:-}"
+      SIM_CONFIG="$2"
+      shift 2
+      ;;
     --timing-ruby)
       TIMING_RUBY="1"
       shift 1
@@ -133,6 +158,10 @@ if [[ -n "$TIMING_RUBY" ]]; then
   require_executable "$GEM5_BIN_TIMING_RUBY" "Timing Ruby gem5 binary"
   require_file "$GEM5_CFG_TIMING_RUBY" "Timing Ruby gem5 config"
 
+  TIMING_RUBY_SIM_CONFIG="${SIM_CONFIG:-$DEFAULT_TIMING_RUBY_SIM_CONFIG}"
+  TIMING_RUBY_CONFIG_ARGS=()
+  load_gem5_args_file "$TIMING_RUBY_SIM_CONFIG" TIMING_RUBY_CONFIG_ARGS
+
   gem5_cmd=(
     "$GEM5_BIN_TIMING_RUBY"
     "--outdir=${OUTDIR}"
@@ -148,6 +177,7 @@ if [[ -n "$TIMING_RUBY" ]]; then
     --num-cores "$CORES"
     --mem-size 16384MiB
     --mem-channels=2
+    "${TIMING_RUBY_CONFIG_ARGS[@]}"
     "${BRANCH_TRACE_ARGS[@]}"
   )
 else
