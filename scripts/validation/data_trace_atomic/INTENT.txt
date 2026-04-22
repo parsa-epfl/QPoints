@@ -1,0 +1,18 @@
+Collect raw AtomicSimpleCPU data-access traces and replay them through a
+simple software LRU cache model.
+
+This validation helper is meant to answer a very specific question:
+does gem5's Atomic/simple execution produce the memory access stream we
+think the benchmark should generate?
+
+The script:
+1. runs gem5 through the qflex CLI with --data-trace enabled,
+2. stages the raw per-core data_trace_core_*.log files,
+3. replays each trace through a 64 KiB, 8-way, 64 B-line LRU model by
+   default, and
+4. stores a manifest with the collected files and replay statistics.
+
+The cache replay is intentionally simple. It does not try to model
+hardware prefetching, coherence, MSHRs, or timing. Its job is to help us
+reason about the memory stream itself before we blame deeper simulator
+state.
