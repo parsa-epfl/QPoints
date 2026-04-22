@@ -2,7 +2,7 @@
 
 usage() {
   cat <<'EOF'
-Usage: run_gem5.sh --gem5-ckp-dir DIR --experiment NAME --snapshot NAME --inst N --cores N [--branch-trace] [--timing-ruby] [--sim-config FILE]
+Usage: run_gem5.sh --gem5-ckp-dir DIR --experiment NAME --snapshot NAME --inst N --cores N [--branch-trace] [--data-trace] [--timing-ruby] [--sim-config FILE]
 
 Arguments (all required):
   --gem5-ckp-dir  Checkpoint root directory
@@ -13,12 +13,13 @@ Arguments (all required):
 
 Options:
   --branch-trace  Enable per-core branch trace logging
+  --data-trace    Enable per-core data access trace logging
   --timing-ruby   Use O3CPU with Ruby MESI_Two_Level. Without this flag,
                   the existing starter_fs.py AtomicSimpleCPU config is used.
   --sim-config    Optional file containing additional gem5 CLI arguments,
-                  one per line. This is currently applied to the timing-Ruby
-                  path and lets the modeled machine stay in a tracked config
-                  file instead of growing the wrapper script.
+                  one per line. This is applied to whichever simulation path
+                  is selected and lets the modeled machine stay in a tracked
+                  config file instead of growing the wrapper script.
 
 Example:
   run_gem5.sh --gem5-ckp-dir /checkpoints --experiment OoO --snapshot snapshot_0 --inst 100000 --cores 1 --branch-trace
@@ -82,6 +83,7 @@ GEM5_CFG_CLASSIC="${GEM5_HOME}/configs/example/arm/starter_fs.py"
 GEM5_CFG_TIMING_RUBY="${GEM5_HOME}/configs/example/arm/qpoints_mesi_fs.py"
 GEM5_BIN_CLASSIC="${GEM5_HOME}/build/ARM/gem5.opt"
 GEM5_BIN_TIMING_RUBY="${GEM5_HOME}/build/ARM_MESI_Two_Level/gem5.opt"
+DEFAULT_CLASSIC_SIM_CONFIG="${ROOT_DIR}/configs/classic_atomic_gem5.args"
 DEFAULT_TIMING_RUBY_SIM_CONFIG="${ROOT_DIR}/configs/timing_ruby_gem5.args"
 
 GEM5_CKP_DIR=""
@@ -91,6 +93,7 @@ INST=""
 CORES=""
 SIM_CONFIG=""
 BRANCH_TRACE_ARGS=()
+DATA_TRACE_ARGS=()
 TIMING_RUBY=""
 
 while [[ $# -gt 0 ]]; do
@@ -122,6 +125,10 @@ while [[ $# -gt 0 ]]; do
       ;;
     --branch-trace)
       BRANCH_TRACE_ARGS=(--branch-trace)
+      shift 1
+      ;;
+    --data-trace)
+      DATA_TRACE_ARGS=(--data-trace)
       shift 1
       ;;
     --sim-config)
@@ -176,13 +183,17 @@ if [[ -n "$TIMING_RUBY" ]]; then
     --restore "$CKPT_DIR"
     --num-cores "$CORES"
     --mem-size 16384MiB
-    --mem-channels=2
     "${TIMING_RUBY_CONFIG_ARGS[@]}"
     "${BRANCH_TRACE_ARGS[@]}"
+    "${DATA_TRACE_ARGS[@]}"
   )
 else
   require_executable "$GEM5_BIN_CLASSIC" "Classic gem5 binary"
   require_file "$GEM5_CFG_CLASSIC" "Classic gem5 config"
+
+  CLASSIC_SIM_CONFIG="${SIM_CONFIG:-$DEFAULT_CLASSIC_SIM_CONFIG}"
+  CLASSIC_CONFIG_ARGS=()
+  load_gem5_args_file "$CLASSIC_SIM_CONFIG" CLASSIC_CONFIG_ARGS
 
   gem5_cmd=(
     "$GEM5_BIN_CLASSIC"
@@ -199,8 +210,9 @@ else
     --restore "$CKPT_DIR"
     --num-cores "$CORES"
     --mem-size 16384MiB
-    --mem-channels=2
+    "${CLASSIC_CONFIG_ARGS[@]}"
     "${BRANCH_TRACE_ARGS[@]}"
+    "${DATA_TRACE_ARGS[@]}"
   )
 fi
 

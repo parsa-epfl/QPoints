@@ -1,0 +1,5 @@
+# Extra gem5 CLI arguments for the QPoints classic AtomicSimpleCPU run path.
+# Keep one argument per line and use native gem5 option syntax.
+
+--mem-channels=1
+--mem-ranks=4
