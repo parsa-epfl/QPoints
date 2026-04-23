@@ -3,6 +3,7 @@
 import argparse
 import json
 import re
+import shutil
 import subprocess
 import sys
 from collections import defaultdict
@@ -47,7 +48,12 @@ def parse_args():
 
 
 def load_qflex_json(path):
-    raw = subprocess.check_output(["zstd", "-dc", path])
+    zstd = shutil.which("zstd")
+    if zstd is None:
+        raise RuntimeError(
+            "zstd is required to read QFlex LLC dumps; please install zstd and retry."
+        )
+    raw = subprocess.check_output([zstd, "-dc", path])
     return json.loads(raw)
 
 

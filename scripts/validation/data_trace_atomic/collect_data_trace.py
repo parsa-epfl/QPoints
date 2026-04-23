@@ -3,6 +3,7 @@
 import argparse
 import glob
 import json
+import os
 import shutil
 import signal
 import subprocess
@@ -69,20 +70,41 @@ def remove_matching_logs(directory: Path, pattern: str):
             path.unlink()
 
 
-def count_trace_lines(path: Path) -> int:
-    count = 0
-    with path.open("r", encoding="utf-8", errors="replace") as infile:
-        for line in infile:
-            if line.strip():
-                count += 1
-    return count
+class IncrementalLineCounter:
+    def __init__(self):
+        self._state = {}
+
+    def count(self, path: Path) -> int:
+        size = path.stat().st_size
+        state = self._state.get(path)
+        if state is None or size < state["offset"]:
+            state = {"offset": 0, "count": 0, "partial": ""}
+
+        with path.open("r", encoding="utf-8", errors="replace") as infile:
+            infile.seek(state["offset"])
+            chunk = infile.read()
+            state["offset"] = infile.tell()
+
+        if chunk:
+            text = state["partial"] + chunk
+            lines = text.splitlines(keepends=True)
+            state["partial"] = ""
+            for line in lines:
+                if line.endswith("\n") or line.endswith("\r"):
+                    if line.strip():
+                        state["count"] += 1
+                else:
+                    state["partial"] = line
+
+        self._state[path] = state
+        return state["count"]
 
 
-def current_counts(directory: Path, pattern: str):
+def current_counts(directory: Path, pattern: str, line_counter: IncrementalLineCounter):
     counts = {}
     for path_str in sorted(glob.glob(str(directory / pattern))):
         path = Path(path_str)
-        counts[path.name] = count_trace_lines(path)
+        counts[path.name] = line_counter.count(path)
     return counts
 
 
@@ -96,9 +118,10 @@ def wait_for_threshold(
     phase_name: str,
 ):
     start = time.time()
+    line_counter = IncrementalLineCounter()
 
     while True:
-        counts = current_counts(log_dir, pattern)
+        counts = current_counts(log_dir, pattern, line_counter)
         if counts:
             top_name, top_count = max(counts.items(), key=lambda item: item[1])
             if top_count >= threshold:
@@ -126,12 +149,12 @@ def wait_for_threshold(
         time.sleep(poll_seconds)
 
 
-def stop_process_group(proc: subprocess.Popen, name: str):
+def stop_process_group(proc: subprocess.Popen):
     if proc.poll() is not None:
         return
 
     try:
-        proc.send_signal(signal.SIGINT)
+        os.killpg(proc.pid, signal.SIGINT)
     except ProcessLookupError:
         return
 
@@ -142,7 +165,7 @@ def stop_process_group(proc: subprocess.Popen, name: str):
         pass
 
     try:
-        proc.terminate()
+        os.killpg(proc.pid, signal.SIGTERM)
     except ProcessLookupError:
         return
 
@@ -153,7 +176,7 @@ def stop_process_group(proc: subprocess.Popen, name: str):
         pass
 
     try:
-        proc.kill()
+        os.killpg(proc.pid, signal.SIGKILL)
     except ProcessLookupError:
         return
 
@@ -553,7 +576,7 @@ def main():
                 phase_name="gem5 data-trace run",
             )
             metadata["gem5"]["threshold_result"] = threshold_result
-            stop_process_group(gem5_proc, "gem5 data-trace run")
+            stop_process_group(gem5_proc)
             exit_code = gem5_proc.returncode if gem5_proc.returncode is not None else 0
         else:
             exit_code = gem5_proc.wait()
@@ -574,7 +597,7 @@ def main():
 
     except Exception:
         if gem5_proc is not None:
-            stop_process_group(gem5_proc, "gem5 data-trace run")
+            stop_process_group(gem5_proc)
         raise
 
     with (output_dir / "manifest.json").open("w", encoding="utf-8") as outfile:
