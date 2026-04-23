@@ -74,6 +74,8 @@ load_gem5_args_file() {
   mapfile -t out_array_ref < <(
     sed \
       -e 's/[[:space:]]*#.*$//' \
+      -e 's/^[[:space:]]*//' \
+      -e 's/[[:space:]]*$//' \
       -e '/^[[:space:]]*$/d' \
       "$args_file"
   )

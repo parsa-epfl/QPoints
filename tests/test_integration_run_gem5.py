@@ -190,7 +190,7 @@ def test_run_gem5_classic_sim_config_override(
 ):
     sim_config = tmp_path / "classic_override.args"
     sim_config.write_text(
-        "# exercise additive classic sim-config path\n\n--mem-ranks=4\n",
+        "# exercise additive classic sim-config path\n\n  --mem-ranks=4  \n",
         encoding="utf-8",
     )
 
