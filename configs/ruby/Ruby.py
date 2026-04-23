@@ -65,6 +65,10 @@ def define_options(parser):
         "--access-backing-store", action="store_true", default=False,
         help="Should ruby maintain a second copy of memory")
 
+    parser.add_argument(
+        "--dump-cache-state", action="store_true", default=False,
+        help="Dump Ruby cache contents at simulator exit")
+
     # Options related to cache structure
     parser.add_argument(
         "--ports", action="store", type=int, default=4,
@@ -139,6 +143,11 @@ def setup_memory_controllers(system, ruby, dir_cntrls, options):
                 int(math.log(options.num_dirs, 2)),
                 intlv_size, options.xor_low_bit)
             if issubclass(mem_type, DRAMInterface):
+                mem_ranks = getattr(options, "mem_ranks", None)
+                if mem_ranks is not None:
+                    if mem_ranks <= 0:
+                        fatal("--mem-ranks must be greater than 0")
+                    dram_intf.ranks_per_channel = mem_ranks
                 mem_ctrl = m5.objects.MemCtrl(dram = dram_intf)
             else:
                 mem_ctrl = dram_intf

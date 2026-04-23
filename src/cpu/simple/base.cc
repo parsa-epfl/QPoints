@@ -89,6 +89,8 @@ BaseSimpleCPU::BaseSimpleCPU(const BaseSimpleCPUParams &p)
       traceData(NULL),
       branchTraceEnable(p.branch_trace_enable),
       branchTraceStream(nullptr),
+      dataTraceEnable(p.data_trace_enable),
+      dataTraceStream(nullptr),
       lastInstAddr(0),
       _status(Idle)
 {
@@ -127,6 +129,31 @@ BaseSimpleCPU::BaseSimpleCPU(const BaseSimpleCPUParams &p)
             "branch_trace_core_%d.log", cpuId());
         branchTraceStream = simout.findOrCreate(fname)->stream();
     }
+
+    if (dataTraceEnable) {
+        const std::string fname = csprintf(
+            "data_trace_core_%d.log", cpuId());
+        dataTraceStream = simout.findOrCreate(fname)->stream();
+    }
+}
+
+void
+BaseSimpleCPU::logDataTrace(const char *accessType, Addr pc, Addr vaddr,
+                            Addr paddr, unsigned size)
+{
+    if (!dataTraceEnable || !dataTraceStream) {
+        return;
+    }
+
+    ccprintf(
+        *dataTraceStream,
+        "%s pc=0x%llx vaddr=0x%llx paddr=0x%llx size=%u\n",
+        accessType,
+        static_cast<unsigned long long>(pc),
+        static_cast<unsigned long long>(vaddr),
+        static_cast<unsigned long long>(paddr),
+        size
+    );
 }
 
 void

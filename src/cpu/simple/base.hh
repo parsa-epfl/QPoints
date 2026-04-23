@@ -90,7 +90,11 @@ class BaseSimpleCPU : public BaseCPU
     const RegIndex zeroReg;
     bool branchTraceEnable;
     std::ostream *branchTraceStream;
+    bool dataTraceEnable;
+    std::ostream *dataTraceStream;
     Addr lastInstAddr;
+    void logDataTrace(const char *accessType, Addr pc, Addr vaddr,
+                      Addr paddr, unsigned size);
 
     void checkPcEventQueue();
     void swapActiveThread();

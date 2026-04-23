@@ -46,4 +46,10 @@ class RubyCache(SimObject):
     dataAccessLatency = Param.Cycles(1, "cycles for a data array access")
     tagAccessLatency = Param.Cycles(1, "cycles for a tag array access")
     resourceStalls = Param.Bool(False, "stall if there is a resource failure")
+    dump_cache_state = Param.Bool(
+        False, "dump cache contents at simulator exit"
+    )
+    dump_cache_state_path = Param.String(
+        "", "output path for cache-state dump"
+    )
     ruby_system = Param.RubySystem(Parent.any, "")

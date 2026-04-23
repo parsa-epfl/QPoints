@@ -26,6 +26,7 @@
 # OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
 
 import math
+import os
 import m5
 from m5.objects import *
 from m5.defines import buildEnv
@@ -129,7 +130,16 @@ def create_system(options, full_system, system, dma_ports, bootmem,
         #
         l2_cache = L2Cache(size = options.l2_size,
                            assoc = options.l2_assoc,
-                           start_index_bit = l2_index_start)
+                           start_index_bit = l2_index_start,
+                           dump_cache_state=(
+                               getattr(options, "dump_cache_state", False) and
+                               i == 0
+                           ),
+                           dump_cache_state_path=
+                               os.path.join(
+                                   m5.options.outdir,
+                                   "ruby_l2cache{}_dump.txt".format(i),
+                               ))
 
         l2_cntrl = L2Cache_Controller(version = i,
                                       L2cache = l2_cache,

@@ -51,3 +51,6 @@ class BaseSimpleCPU(BaseCPU):
 
     branchPred = Param.BranchPredictor(NULL, "Branch Predictor")
     branch_trace_enable = Param.Bool(False, "Enable branch trace logging")
+    data_trace_enable = Param.Bool(
+        False, "Enable per-core data access trace logging"
+    )

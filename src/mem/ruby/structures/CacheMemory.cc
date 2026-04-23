@@ -41,6 +41,8 @@
 
 #include "mem/ruby/structures/CacheMemory.hh"
 
+#include <fstream>
+
 #include "base/compiler.hh"
 #include "base/intmath.hh"
 #include "base/logging.hh"
@@ -52,6 +54,7 @@
 #include "mem/cache/replacement_policies/weighted_lru_rp.hh"
 #include "mem/ruby/protocol/AccessPermission.hh"
 #include "mem/ruby/system/RubySystem.hh"
+#include "sim/core.hh"
 
 namespace gem5
 {
@@ -80,10 +83,22 @@ CacheMemory::CacheMemory(const Params &p)
     m_replacementPolicy_ptr = p.replacement_policy;
     m_start_index_bit = p.start_index_bit;
     m_is_instruction_only_cache = p.is_icache;
+    m_dump_cache_state = p.dump_cache_state;
+    m_dump_cache_state_path = p.dump_cache_state_path;
     m_resource_stalls = p.resourceStalls;
     m_block_size = p.block_size;  // may be 0 at this point. Updated in init()
     m_use_occupancy = dynamic_cast<replacement_policy::WeightedLRU*>(
                                     m_replacementPolicy_ptr) ? true : false;
+
+    if (m_dump_cache_state) {
+        if (!m_dump_cache_state_path.empty()) {
+            registerExitCallback([this]() { dumpCacheState(); });
+        } else {
+            warn("Cache state dumping enabled for %s, but "
+                 "dump_cache_state_path is empty; no cache state will be "
+                 "dumped.", name());
+        }
+    }
 }
 
 void
@@ -473,6 +488,47 @@ void
 CacheMemory::printData(std::ostream& out) const
 {
     out << "printData() not supported" << std::endl;
+}
+
+void
+CacheMemory::dumpCacheState() const
+{
+    std::ofstream out(m_dump_cache_state_path);
+    if (!out.is_open()) {
+        warn(
+            "Unable to open Ruby cache dump path %s",
+            m_dump_cache_state_path
+        );
+        return;
+    }
+
+    out << "cache_name " << name() << "\n";
+    out << "sets " << m_cache_num_sets << "\n";
+    out << "ways " << m_cache_assoc << "\n";
+    out << "block_size " << m_block_size << "\n";
+
+    for (int set = 0; set < m_cache_num_sets; ++set) {
+        for (int way = 0; way < m_cache_assoc; ++way) {
+            AbstractCacheEntry *entry = m_cache[set][way];
+            out << "set " << set
+                << " way " << way;
+
+            if (entry == nullptr) {
+                out << " valid 0 entry NULL\n";
+                continue;
+            }
+
+            const auto perm = entry->m_Permission;
+            const bool valid = perm != AccessPermission_Invalid &&
+                               perm != AccessPermission_NotPresent;
+
+            out << " valid " << (valid ? 1 : 0)
+                << " addr " << entry->m_Address
+                << " permission " << perm
+                << " last_access " << entry->getLastAccess()
+                << "\n";
+        }
+    }
 }
 
 void

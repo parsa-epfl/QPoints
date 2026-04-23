@@ -140,6 +140,9 @@ class CpuCluster(SubSystem):
             if hasattr(cpu, "branch_trace_enable"):
                 cpu.branch_trace_enable = args.branch_trace
 
+            if hasattr(cpu, "data_trace_enable"):
+                cpu.data_trace_enable = args.data_trace
+
             print(cpu_type)
             if cpu_type == O3CPU:
                 if args.fdip:

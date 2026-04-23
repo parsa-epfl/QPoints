@@ -403,6 +403,13 @@ AtomicSimpleCPU::readMem(Addr addr, uint8_t *data, unsigned size,
                 dcache_latency += sendPacket(dcachePort, &pkt);
             }
             dcache_access = true;
+            logDataTrace(
+                "R",
+                thread->pcState().instAddr(),
+                frag_addr,
+                req->getPaddr(),
+                frag_size
+            );
 
             assert(!pkt.isError());
 
@@ -507,6 +514,13 @@ AtomicSimpleCPU::writeMem(uint8_t *data, unsigned size, Addr addr,
                     threadSnoop(&pkt, curThread);
                 }
                 dcache_access = true;
+                logDataTrace(
+                    "W",
+                    thread->pcState().instAddr(),
+                    frag_addr,
+                    req->getPaddr(),
+                    frag_size
+                );
                 assert(!pkt.isError());
 
                 if (req->isSwap()) {
@@ -595,6 +609,13 @@ AtomicSimpleCPU::amoMem(Addr addr, uint8_t* data, unsigned size,
         }
 
         dcache_access = true;
+        logDataTrace(
+            "A",
+            thread->pcState().instAddr(),
+            addr,
+            req->getPaddr(),
+            size
+        );
 
         assert(!pkt.isError());
         assert(!req->isLLSC());

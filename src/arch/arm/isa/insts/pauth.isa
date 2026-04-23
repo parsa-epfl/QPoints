@@ -60,23 +60,35 @@ let {{
 
     def buildPauthObject(mnem, templateBase, opcode, hint, optArgs=[]):
         global header_output, decoder_output, exec_output
-        pac_code = '''
-            %(enabled)s
-
-            uint64_t res;
-            fault = %(op)s(xc->tcBase(), %(op1)s, %(op2)s, &res);
-            XDest = res;
-            '''
-        if templateBase=='DataX2Reg':
-            code = pac_code % {"enabled": pacEnabledCode(hint),
-                               "op1": 'Op164',
-                               "op2": 'Op264',
-                               "op":  opcode }
+        if hint and templateBase == 'DataX1Reg':
+            code = '''
+                uint64_t res;
+                if (!HavePACExt(xc->tcBase())) {
+                    res = XDest;
+                    fault = NoFault;
+                } else {
+                    fault = %(op)s(xc->tcBase(), XDest, Op164, &res);
+                }
+                XDest = res;
+                ''' % {"op": opcode}
         else:
-            code = pac_code % {"enabled": pacEnabledCode(hint),
-                               "op1": 'XDest',
-                               "op2": 'Op164',
-                               "op":  opcode }
+            pac_code = '''
+                %(enabled)s
+
+                uint64_t res;
+                fault = %(op)s(xc->tcBase(), %(op1)s, %(op2)s, &res);
+                XDest = res;
+                '''
+            if templateBase=='DataX2Reg':
+                code = pac_code % {"enabled": pacEnabledCode(hint),
+                                   "op1": 'Op164',
+                                   "op2": 'Op264',
+                                   "op":  opcode }
+            else:
+                code = pac_code % {"enabled": pacEnabledCode(hint),
+                                   "op1": 'XDest',
+                                   "op2": 'Op164',
+                                   "op":  opcode }
 
         iop = ArmInstObjParams(mnem, mnem, templateBase+"Op", code, optArgs)
         header_output += eval(templateBase + "Declare").subst(iop)

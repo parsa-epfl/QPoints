@@ -604,15 +604,20 @@ Sequencer::hitCallback(SequencerRequest* srequest, DataBlock& data,
             pkt->setData(
                 data.getData(getOffset(request_address), pkt->getSize()));
             DPRINTF(RubySequencer, "read data %s\n", data);
-        } else if (pkt->req->isSwap()) {
+        } else if (pkt->cmd == MemCmd::SwapReq) {
             assert(!pkt->isMaskedWrite());
-            std::vector<uint8_t> overwrite_val(pkt->getSize());
-            pkt->writeData(&overwrite_val[0]);
-            pkt->setData(
-                data.getData(getOffset(request_address), pkt->getSize()));
-            data.setData(&overwrite_val[0],
-                         getOffset(request_address), pkt->getSize());
-            DPRINTF(RubySequencer, "swap data %s\n", data);
+            const int offset = getOffset(request_address);
+            pkt->setData(data.getData(offset, pkt->getSize()));
+
+            if (pkt->isAtomicOp()) {
+                (*(pkt->getAtomicOp()))(data.getDataMod(offset));
+                DPRINTF(RubySequencer, "atomic swap data %s\n", data);
+            } else {
+                std::vector<uint8_t> overwrite_val(pkt->getSize());
+                pkt->writeData(&overwrite_val[0]);
+                data.setData(&overwrite_val[0], offset, pkt->getSize());
+                DPRINTF(RubySequencer, "swap data %s\n", data);
+            }
         } else if (type != RubyRequestType_Store_Conditional || llscSuccess) {
             // Types of stores set the actual data here, apart from
             // failed Store Conditional requests
