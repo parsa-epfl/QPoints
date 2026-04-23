@@ -1,0 +1,24 @@
+llc_resident_rw is a validation microbenchmark for the checkpoint-conversion
+flow.
+
+Intent:
+- Create a data footprint that is larger than the 64 KiB L1-D cache.
+- Keep that footprint smaller than the 1 MiB shared LLC.
+- Touch one 64 B cache line per inner-loop iteration.
+- Perform a read-modify-write so the benchmark creates real load and store
+  traffic instead of a read-only stream.
+
+Why this benchmark exists:
+- The earlier 16 KiB microbenchmark is expected to stay mostly inside L1-D,
+  which makes LLC comparison weak.
+- This 512 KiB benchmark should produce a more stable LLC-resident footprint,
+  which is better for validating whether QFlex and gem5 converge on similar
+  shared-cache contents.
+
+Compiler-behavior guardrails:
+- The array is globally allocated and 64 B aligned.
+- The loop uses one word per cache line.
+- A volatile sink consumes the checksum from each full pass so the compiler
+  cannot discard the loop body as dead work.
+- The Makefile disables some aggressive loop transformations to keep the access
+  pattern closer to the intended cache behavior.

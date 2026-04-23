@@ -1,0 +1,25 @@
+This folder holds validation tooling for Ruby-mode data tracing.
+
+Purpose:
+- run gem5 in timing-Ruby mode with Ruby-side L1D data tracing enabled
+- stage the raw per-core trace logs into one output folder
+- replay the observed access stream through simple software cache models
+- summarize whether the traced stream matches the intended benchmark pattern
+
+Why this exists:
+- AtomicSimpleCPU tracing already showed the benchmark's architectural memory
+  stream looks sane.
+- Ruby/O3 still reports cache behavior and LLC residency that do not match our
+  expectations.
+- This tool is meant to answer the next question: what request stream does the
+  Ruby L1D controller actually see?
+
+Current scope:
+- one gem5 timing-Ruby run to normal completion
+- replay against:
+  - 64 KiB, 8-way, 64 B L1D
+  - 1 MiB, 16-way, 64 B LLC
+- basic pattern checks:
+  - alternating read/write same-line pairs
+  - read stride distribution
+  - working-set footprint

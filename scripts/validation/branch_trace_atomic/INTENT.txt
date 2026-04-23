@@ -1,0 +1,10 @@
+Collect comparable raw branch-trace logs from QFlex and gem5 AtomicSimpleCPU.
+
+This validation helper runs the existing qflex CLI in branch-trace mode on the
+QFlex side, then runs the existing qflex QPoints gem5 wrapper in branch-trace
+mode on the gem5 AtomicSimpleCPU side. Each run is stopped once at least one
+core log reaches a user-specified branch-count threshold, and the raw logs are
+copied into a single output folder for later post-processing.
+
+The goal is to make the data collection step repeatable and careful before we
+start interpreting or transforming the branch traces themselves.
