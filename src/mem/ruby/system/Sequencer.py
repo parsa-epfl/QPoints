@@ -92,6 +92,9 @@ class RubySequencer(RubyPort):
    cxx_header = "mem/ruby/system/Sequencer.hh"
 
    dcache = Param.RubyCache("")
+   data_trace_enable = Param.Bool(
+       False, "Enable per-core Ruby data access trace logging"
+   )
 
    max_outstanding_requests = Param.Int(16,
        "max requests (incl. prefetches) outstanding")

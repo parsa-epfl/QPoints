@@ -94,7 +94,10 @@ def create_system(options, full_system, system, dma_ports, bootmem,
                                       enable_prefetch = False)
 
         cpu_seq = RubySequencer(version = i,
-                                dcache = l1d_cache, clk_domain = clk_domain,
+                                dcache = l1d_cache,
+                                data_trace_enable =
+                                    getattr(options, "data_trace", False),
+                                clk_domain = clk_domain,
                                 ruby_system = ruby_system)
 
 

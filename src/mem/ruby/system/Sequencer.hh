@@ -43,6 +43,7 @@
 
 #include <iostream>
 #include <list>
+#include <ostream>
 #include <unordered_map>
 
 #include "mem/ruby/common/Address.hh"
@@ -192,7 +193,10 @@ class Sequencer : public RubyPort
     { return m_IncompleteTimes[t]; }
 
   private:
+    void logDataTrace(PacketPtr pkt, RubyRequestType trace_type) const;
     void issueRequest(PacketPtr pkt, RubyRequestType type);
+    void issueRequest(PacketPtr pkt, RubyRequestType secondary_type,
+                      RubyRequestType trace_type);
 
     void hitCallback(SequencerRequest* srequest, DataBlock& data,
                      bool llscSuccess,
@@ -241,6 +245,8 @@ class Sequencer : public RubyPort
     int m_coreId;
 
     bool m_runningGarnetStandalone;
+    bool m_dataTraceEnable;
+    std::ostream *m_dataTraceStream;
 
     //! Histogram for number of outstanding requests per cycle.
     statistics::Histogram m_outstandReqHist;

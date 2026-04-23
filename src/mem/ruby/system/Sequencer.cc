@@ -42,6 +42,7 @@
 #include "mem/ruby/system/Sequencer.hh"
 
 #include "arch/x86/ldstflags.hh"
+#include "base/cprintf.hh"
 #include "base/logging.hh"
 #include "base/str.hh"
 #include "cpu/testers/rubytest/RubyTester.hh"
@@ -66,7 +67,9 @@ namespace ruby
 {
 
 Sequencer::Sequencer(const Params &p)
-    : RubyPort(p), m_IncompleteTimes(MachineType_NUM),
+    : RubyPort(p), m_dataTraceEnable(p.data_trace_enable),
+      m_dataTraceStream(nullptr),
+      m_IncompleteTimes(MachineType_NUM),
       deadlockCheckEvent([this]{ wakeup(); }, "Sequencer deadlock check")
 {
     m_outstanding_count = 0;
@@ -80,6 +83,12 @@ Sequencer::Sequencer(const Params &p)
     assert(m_deadlock_threshold > 0);
 
     m_runningGarnetStandalone = p.garnet_standalone;
+
+    if (m_dataTraceEnable) {
+        const std::string fname = csprintf(
+            "data_trace_core_%d.log", m_version);
+        m_dataTraceStream = simout.findOrCreate(fname)->stream();
+    }
 
 
     // These statistical variables are not for display.
@@ -143,6 +152,40 @@ Sequencer::Sequencer(const Params &p)
 
 Sequencer::~Sequencer()
 {
+}
+
+void
+Sequencer::logDataTrace(PacketPtr pkt, RubyRequestType trace_type) const
+{
+    if (!m_dataTraceEnable || !m_dataTraceStream) {
+        return;
+    }
+
+    if (trace_type == RubyRequestType_IFETCH ||
+        trace_type == RubyRequestType_FLUSH) {
+        return;
+    }
+
+    const char *access_type = "R";
+    if (pkt->isLLSC() || pkt->cmd == MemCmd::SwapReq) {
+        access_type = "A";
+    } else if (pkt->isWrite()) {
+        access_type = "W";
+    }
+
+    const Addr pc = pkt->req->hasPC() ? pkt->req->getPC() : 0;
+    const Addr vaddr = pkt->req->hasVaddr() ? pkt->req->getVaddr() : 0;
+
+    ccprintf(
+        *m_dataTraceStream,
+        "%s pc=0x%llx vaddr=0x%llx paddr=0x%llx size=%u type=%s\n",
+        access_type,
+        static_cast<unsigned long long>(pc),
+        static_cast<unsigned long long>(vaddr),
+        static_cast<unsigned long long>(pkt->getAddr()),
+        pkt->getSize(),
+        RubyRequestType_to_string(trace_type)
+    );
 }
 
 void
@@ -433,7 +476,7 @@ Sequencer::writeCallback(Addr address, DataBlock& data,
             // Do not process follow-up requests
             // (e.g. if full line no present)
             // Reissue to the cache hierarchy
-            issueRequest(seq_req.pkt, seq_req.m_second_type);
+            issueRequest(seq_req.pkt, seq_req.m_second_type, seq_req.m_type);
             break;
         }
 
@@ -539,7 +582,7 @@ Sequencer::readCallback(Addr address, DataBlock& data,
             (seq_req.m_type != RubyRequestType_Load_Linked) &&
             (seq_req.m_type != RubyRequestType_IFETCH)) {
             // Write request: reissue request to the cache hierarchy
-            issueRequest(seq_req.pkt, seq_req.m_second_type);
+            issueRequest(seq_req.pkt, seq_req.m_second_type, seq_req.m_type);
             break;
         }
         if (ruby_request) {
@@ -768,7 +811,7 @@ Sequencer::makeRequest(PacketPtr pkt)
     // non-aliased with any existing request in the request table, just issue
     // to the cache
     if (status != RequestStatus_Aliased)
-        issueRequest(pkt, secondary_type);
+        issueRequest(pkt, secondary_type, primary_type);
 
     // TODO: issue hardware prefetches here
     return RequestStatus_Issued;
@@ -776,6 +819,13 @@ Sequencer::makeRequest(PacketPtr pkt)
 
 void
 Sequencer::issueRequest(PacketPtr pkt, RubyRequestType secondary_type)
+{
+    issueRequest(pkt, secondary_type, secondary_type);
+}
+
+void
+Sequencer::issueRequest(PacketPtr pkt, RubyRequestType secondary_type,
+                        RubyRequestType trace_type)
 {
     assert(pkt != NULL);
     ContextID proc_id = pkt->req->hasContextId() ?
@@ -796,6 +846,8 @@ Sequencer::issueRequest(PacketPtr pkt, RubyRequestType secondary_type)
                                       pkt->getSize(), pc, secondary_type,
                                       RubyAccessMode_Supervisor, pkt,
                                       PrefetchBit_No, proc_id, core_id);
+
+    logDataTrace(pkt, trace_type);
 
     DPRINTFR(ProtocolTrace, "%15s %3s %10s%20s %6s>%-6s %#x %s\n",
             curTick(), m_version, "Seq", "Begin", "", "",
