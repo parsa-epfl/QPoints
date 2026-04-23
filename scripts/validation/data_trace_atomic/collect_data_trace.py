@@ -255,13 +255,20 @@ def parse_trace_line(line: str):
         key, value = token.split("=", 1)
         fields[key] = value
 
-    return Access(
-        access_type=access_type,
-        pc=int(fields["pc"], 0),
-        vaddr=int(fields["vaddr"], 0),
-        paddr=int(fields["paddr"], 0),
-        size=int(fields["size"], 0),
-    )
+    required_fields = ("pc", "vaddr", "paddr", "size")
+    if any(field not in fields for field in required_fields):
+        return None
+
+    try:
+        return Access(
+            access_type=access_type,
+            pc=int(fields["pc"], 0),
+            vaddr=int(fields["vaddr"], 0),
+            paddr=int(fields["paddr"], 0),
+            size=int(fields["size"], 0),
+        )
+    except ValueError:
+        return None
 
 
 def read_trace_lines(path: Path):
@@ -552,6 +559,8 @@ def main():
     }
 
     gem5_proc = None
+    gem5_stdout_file = None
+    gem5_stderr_file = None
     try:
         gem5_proc, gem5_stdout_file, gem5_stderr_file, gem5_cmd = launch_gem5_data_trace(
             qflex_root=qflex_root,
@@ -580,8 +589,6 @@ def main():
             exit_code = gem5_proc.returncode if gem5_proc.returncode is not None else 0
         else:
             exit_code = gem5_proc.wait()
-        gem5_stdout_file.close()
-        gem5_stderr_file.close()
         if args.access_threshold <= 0 and exit_code != 0:
             raise RuntimeError(f"gem5 data-trace run failed with exit code {exit_code}")
 
@@ -599,6 +606,11 @@ def main():
         if gem5_proc is not None:
             stop_process_group(gem5_proc)
         raise
+    finally:
+        if gem5_stdout_file is not None:
+            gem5_stdout_file.close()
+        if gem5_stderr_file is not None:
+            gem5_stderr_file.close()
 
     with (output_dir / "manifest.json").open("w", encoding="utf-8") as outfile:
         json.dump(metadata, outfile, indent=2, sort_keys=True)

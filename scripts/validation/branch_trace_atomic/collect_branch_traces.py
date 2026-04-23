@@ -603,6 +603,10 @@ def main():
 
     qflex_proc = None
     gem5_proc = None
+    qflex_stdout_file = None
+    qflex_stderr_file = None
+    gem5_stdout_file = None
+    gem5_stderr_file = None
 
     try:
         qflex_proc, qflex_stdout_file, qflex_stderr_file, qflex_cmd = launch_qflex_trace(
@@ -629,8 +633,6 @@ def main():
             stop_process_group(qflex_proc)
         else:
             qflex_proc.wait(timeout=10)
-        qflex_stdout_file.close()
-        qflex_stderr_file.close()
 
         metadata["qflex"]["threshold_result"] = qflex_result
         metadata["qflex"]["copied_logs"] = copy_logs(
@@ -661,9 +663,7 @@ def main():
             poll_seconds=args.poll_seconds,
             phase_name="gem5 AtomicSimpleCPU branch-trace run",
         )
-        stop_process_group(gem5_proc, "gem5 AtomicSimpleCPU branch-trace run")
-        gem5_stdout_file.close()
-        gem5_stderr_file.close()
+        stop_process_group(gem5_proc)
 
         metadata["gem5"]["threshold_result"] = gem5_result
         metadata["gem5"]["copied_logs"] = copy_logs(
@@ -680,6 +680,15 @@ def main():
         if gem5_proc is not None:
             stop_process_group(gem5_proc)
         raise
+    finally:
+        if qflex_stdout_file is not None:
+            qflex_stdout_file.close()
+        if qflex_stderr_file is not None:
+            qflex_stderr_file.close()
+        if gem5_stdout_file is not None:
+            gem5_stdout_file.close()
+        if gem5_stderr_file is not None:
+            gem5_stderr_file.close()
 
     with (output_dir / "manifest.json").open("w", encoding="utf-8") as outfile:
         json.dump(metadata, outfile, indent=2, sort_keys=True)
