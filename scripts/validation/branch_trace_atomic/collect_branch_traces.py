@@ -370,7 +370,7 @@ def build_rolling_hash(seq, base, mask):
     prefix = [0] * (len(seq) + 1)
     powers = [1] * (len(seq) + 1)
     for i, token in enumerate(seq, start=1):
-        value = int(token) & mask
+        value = int(token, 0) & mask
         prefix[i] = ((prefix[i - 1] * base) + value + 1) & mask
         powers[i] = (powers[i - 1] * base) & mask
     return prefix, powers

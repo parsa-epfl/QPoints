@@ -70,7 +70,6 @@ def converted_snapshot(
     snapshot_dir = Path(integration_env.get("gem5_ckp_dir")) / snapshot
     disk_image = snapshot_dir / f"{snapshot}.img"
     if snapshot_dir.is_dir() and disk_image.is_file():
-        artifact_paths.append(snapshot_dir)
         return snapshot
 
     qflex_script = qflex_root / "qflex"
