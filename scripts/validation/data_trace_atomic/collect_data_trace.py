@@ -271,20 +271,12 @@ def parse_trace_line(line: str):
         return None
 
 
-def read_trace_lines(path: Path):
-    return [line.strip() for line in path.read_text(encoding="utf-8", errors="replace").splitlines() if line.strip()]
-
-
-def read_accesses_from_lines(lines):
-    accesses = []
-    for line in lines:
-        line = line.strip()
-        if not line:
-            continue
-        access = parse_trace_line(line)
-        if access is not None:
-            accesses.append(access)
-    return accesses
+def iter_trace_lines(path: Path):
+    with path.open("r", encoding="utf-8", errors="replace") as infile:
+        for line in infile:
+            stripped = line.strip()
+            if stripped:
+                yield stripped
 
 
 def iter_cache_lines(base_addr: int, size: int, line_size: int):
@@ -308,7 +300,7 @@ def replay_lru_cache(accesses, cache_size_bytes: int, assoc: int, line_size: int
         "assoc": assoc,
         "line_size": line_size,
         "num_sets": num_sets,
-        "raw_trace_entries": len(accesses),
+        "parsed_access_count": len(accesses),
         "model_accesses": 0,
         "hits": 0,
         "misses": 0,
@@ -462,8 +454,19 @@ def summarize_working_set(accesses, line_size: int):
 
 
 def analyze_data_trace(path: Path, cache_size_bytes: int, assoc: int, line_size: int):
-    raw_lines = read_trace_lines(path)
-    accesses = read_accesses_from_lines(raw_lines)
+    raw_line_count = 0
+    first_entries = []
+    accesses = []
+
+    for line in iter_trace_lines(path):
+        raw_line_count += 1
+        if len(first_entries) < 10:
+            first_entries.append(line)
+
+        access = parse_trace_line(line)
+        if access is not None:
+            accesses.append(access)
+
     replay = replay_lru_cache(accesses, cache_size_bytes, assoc, line_size)
     access_type_counts = {}
     unique_pcs = set()
@@ -479,12 +482,13 @@ def analyze_data_trace(path: Path, cache_size_bytes: int, assoc: int, line_size:
 
     return {
         "log_name": path.name,
-        "raw_trace_entries": len(accesses),
+        "raw_line_count": raw_line_count,
+        "parsed_access_count": len(accesses),
         "access_type_counts": access_type_counts,
         "unique_pc_count": len(unique_pcs),
         "unique_vaddr_line_count": len(unique_vaddr_lines),
         "unique_paddr_line_count": len(unique_paddr_lines),
-        "first_entries": raw_lines[:10],
+        "first_entries": first_entries,
         "cache_replay": replay,
         "pattern_summary": {
             "rw_pairs": summarize_rw_pairs(accesses, line_size),
@@ -503,9 +507,10 @@ def print_summary(metadata):
         strides = pattern["stride_distribution"]
         working_set = pattern["working_set"]
         print(
-            "{}: {} raw accesses, {} modeled line accesses, hit rate {:.2f}%".format(
+            "{}: {} parsed accesses ({} raw lines), {} modeled line accesses, hit rate {:.2f}%".format(
                 log_name,
-                analysis["raw_trace_entries"],
+                analysis["parsed_access_count"],
+                analysis["raw_line_count"],
                 replay["model_accesses"],
                 replay["hit_rate_pct"],
             )

@@ -9,7 +9,7 @@ import sys
 from collections import defaultdict
 
 
-GEM5_LINE_RE = re.compile(r"^set (\d+) way (\d+) valid 1 addr (\d+)\b")
+GEM5_LINE_RE = re.compile(r"^set (\d+) way (\d+) valid 1 addr (0x[0-9a-fA-F]+|\d+)\b")
 
 
 def parse_args():
@@ -65,7 +65,7 @@ def parse_gem5_dump(path):
             match = GEM5_LINE_RE.match(line.strip())
             if match:
                 set_idx = int(match.group(1))
-                addr = int(match.group(3))
+                addr = int(match.group(3), 0)
                 addresses.add(addr)
                 per_set[set_idx].add(addr)
     return addresses, per_set

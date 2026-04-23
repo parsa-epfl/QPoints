@@ -1,5 +1,10 @@
 #!/usr/bin/env bash
 
+if [[ -z "${BASH_VERSINFO:-}" || "${BASH_VERSINFO[0]}" -lt 4 || ( "${BASH_VERSINFO[0]}" -eq 4 && "${BASH_VERSINFO[1]}" -lt 3 ) ]]; then
+  echo "Error: run_gem5.sh requires Bash 4.3 or newer." >&2
+  exit 1
+fi
+
 usage() {
   cat <<'EOF'
 Usage: run_gem5.sh --gem5-ckp-dir DIR --experiment NAME --snapshot NAME --inst N --cores N [--branch-trace] [--data-trace] [--timing-ruby] [--sim-config FILE]
