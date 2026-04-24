@@ -46,6 +46,7 @@ import slicc.generate.html as html
 import re
 
 python_class_map = {
+                    "Addr": "Addr",
                     "int": "Int",
                     "NodeID": "Int",
                     "uint32_t" : "UInt32",

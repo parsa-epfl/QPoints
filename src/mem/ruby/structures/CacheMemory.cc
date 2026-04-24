@@ -325,6 +325,7 @@ void
 CacheMemory::deallocate(Addr address)
 {
     DPRINTF(RubyCache, "address: %#x\n", address);
+    noteCheckpointLoadDead(address);
     AbstractCacheEntry* entry = lookup(address);
     assert(entry != nullptr);
     m_replacementPolicy_ptr->invalidate(entry->replacementData);
@@ -600,6 +601,18 @@ CacheMemoryStats::CacheMemoryStats(statistics::Group *parent)
       ADD_STAT(m_prefetch_misses, "Number of cache prefetch misses"),
       ADD_STAT(m_prefetch_accesses, "Number of cache prefetch accesses",
                m_prefetch_hits + m_prefetch_misses),
+      ADD_STAT(m_checkpoint_load_total,
+               "Number of LLC lines restored from checkpoint metadata"),
+      ADD_STAT(m_checkpoint_load_hits,
+               "Checkpoint-restored LLC lines touched before eviction"),
+      ADD_STAT(m_checkpoint_load_dead_blocks,
+               "Checkpoint-restored LLC lines evicted before useful touch"),
+      ADD_STAT(m_checkpoint_load_still_pending,
+               "Checkpoint-restored LLC lines still pending at end of run"),
+      ADD_STAT(m_checkpoint_load_accounted,
+               "Checkpoint-restored LLC lines accounted for by fate",
+               m_checkpoint_load_hits + m_checkpoint_load_dead_blocks +
+                   m_checkpoint_load_still_pending),
       ADD_STAT(m_accessModeType, "")
 {
     numDataArrayReads
@@ -647,6 +660,21 @@ CacheMemoryStats::CacheMemoryStats(statistics::Group *parent)
         .flags(statistics::nozero);
 
     m_prefetch_accesses
+        .flags(statistics::nozero);
+
+    m_checkpoint_load_total
+        .flags(statistics::nozero);
+
+    m_checkpoint_load_hits
+        .flags(statistics::nozero);
+
+    m_checkpoint_load_dead_blocks
+        .flags(statistics::nozero);
+
+    m_checkpoint_load_still_pending
+        .flags(statistics::nozero);
+
+    m_checkpoint_load_accounted
         .flags(statistics::nozero);
 
     m_accessModeType
@@ -825,6 +853,44 @@ void
 CacheMemory::profilePrefetchMiss()
 {
     cacheMemoryStats.m_prefetch_misses++;
+}
+
+void
+CacheMemory::markCheckpointLoad(Addr address)
+{
+    const Addr line_addr = makeLineAddress(address);
+    if (m_checkpointLoadPending.insert(line_addr).second) {
+        cacheMemoryStats.m_checkpoint_load_total++;
+        cacheMemoryStats.m_checkpoint_load_still_pending++;
+    }
+}
+
+void
+CacheMemory::noteCheckpointLoadHit(Addr address)
+{
+    const Addr line_addr = makeLineAddress(address);
+    auto it = m_checkpointLoadPending.find(line_addr);
+    if (it == m_checkpointLoadPending.end()) {
+        return;
+    }
+
+    m_checkpointLoadPending.erase(it);
+    cacheMemoryStats.m_checkpoint_load_hits++;
+    cacheMemoryStats.m_checkpoint_load_still_pending--;
+}
+
+void
+CacheMemory::noteCheckpointLoadDead(Addr address)
+{
+    const Addr line_addr = makeLineAddress(address);
+    auto it = m_checkpointLoadPending.find(line_addr);
+    if (it == m_checkpointLoadPending.end()) {
+        return;
+    }
+
+    m_checkpointLoadPending.erase(it);
+    cacheMemoryStats.m_checkpoint_load_dead_blocks++;
+    cacheMemoryStats.m_checkpoint_load_still_pending--;
 }
 
 } // namespace ruby

@@ -44,6 +44,7 @@
 
 #include <string>
 #include <unordered_map>
+#include <unordered_set>
 #include <vector>
 
 #include "base/statistics.hh"
@@ -241,16 +242,30 @@ class CacheMemory : public SimObject
           statistics::Scalar m_prefetch_misses;
           statistics::Formula m_prefetch_accesses;
 
+          statistics::Scalar m_checkpoint_load_total;
+          statistics::Scalar m_checkpoint_load_hits;
+          statistics::Scalar m_checkpoint_load_dead_blocks;
+          statistics::Scalar m_checkpoint_load_still_pending;
+          statistics::Formula m_checkpoint_load_accounted;
+
           statistics::Vector m_accessModeType;
       } cacheMemoryStats;
 
     public:
       // These function increment the number of demand hits/misses by one
       // each time they are called
-      void profileDemandHit();
-      void profileDemandMiss();
-      void profilePrefetchHit();
-      void profilePrefetchMiss();
+    void profileDemandHit();
+    void profileDemandMiss();
+    void profilePrefetchHit();
+    void profilePrefetchMiss();
+    void markCheckpointLoad(Addr address);
+    void noteCheckpointLoadHit(Addr address);
+
+  private:
+    void noteCheckpointLoadDead(Addr address);
+
+  private:
+    std::unordered_set<Addr> m_checkpointLoadPending;
 };
 
 std::ostream& operator<<(std::ostream& out, const CacheMemory& obj);

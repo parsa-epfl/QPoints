@@ -40,6 +40,10 @@
 
 #include "mem/ruby/slicc_interface/AbstractController.hh"
 
+#include <algorithm>
+#include <cctype>
+
+#include "base/logging.hh"
 #include "debug/RubyQueue.hh"
 #include "mem/ruby/network/Network.hh"
 #include "mem/ruby/protocol/MemoryMsg.hh"
@@ -56,7 +60,8 @@ namespace ruby
 AbstractController::AbstractController(const Params &p)
     : ClockedObject(p), Consumer(this), m_version(p.version),
       m_clusterID(p.cluster_id),
-      m_id(p.system->getRequestorId(this)), m_is_blocking(false),
+      m_id(p.system->getRequestorId(this)), m_system(p.system),
+      m_is_blocking(false),
       m_number_of_TBEs(p.number_of_TBEs),
       m_transitions_per_cycle(p.transitions_per_cycle),
       m_buffer_size(p.buffer_size), m_recycle_latency(p.recycle_latency),
@@ -108,6 +113,61 @@ AbstractController::init()
         downstreamDestinations.add(mid);
     }
 
+}
+
+void
+AbstractController::startup()
+{
+    ClockedObject::startup();
+    startupWarmState();
+}
+
+void
+AbstractController::startupWarmStateFromFile(const std::string &path)
+{
+    if (path.empty()) {
+        warn(
+            "%s: LLC warm-state restore enabled but no restore file was "
+            "provided.",
+            name()
+        );
+        return;
+    }
+
+    std::ifstream infile(path);
+    if (!infile.is_open()) {
+        warn("%s: could not open LLC warm-state restore file %s.",
+             name(), path);
+        return;
+    }
+
+    auto trim = [](std::string &text) {
+        auto not_space = [](unsigned char c) { return !std::isspace(c); };
+        text.erase(text.begin(),
+                   std::find_if(text.begin(), text.end(), not_space));
+        text.erase(std::find_if(text.rbegin(), text.rend(), not_space).base(),
+                   text.end());
+    };
+
+    std::string line;
+    while (std::getline(infile, line)) {
+        auto comment = line.find('#');
+        if (comment != std::string::npos) {
+            line.erase(comment);
+        }
+        trim(line);
+        if (line.empty()) {
+            continue;
+        }
+
+        try {
+            Addr addr = static_cast<Addr>(std::stoull(line, nullptr, 0));
+            applyWarmLineAddr(addr);
+        } catch (const std::exception &exc) {
+            warn("%s: failed to parse LLC restore line '%s' from %s: %s",
+                 name(), line, path, exc.what());
+        }
+    }
 }
 
 void
@@ -349,6 +409,20 @@ AbstractController::functionalMemoryRead(PacketPtr pkt)
     MessageBuffer *req_queue = getMemReqQueue();
     if (!req_queue || !req_queue->functionalRead(pkt))
         memoryPort.sendFunctional(pkt);
+}
+
+void
+AbstractController::readDataFromMemory(Addr addr, DataBlock &data_blk)
+{
+    const Addr line_addr = makeLineAddress(addr);
+    RequestPtr req = std::make_shared<Request>(
+        line_addr, RubySystem::getBlockSizeBytes(), 0,
+        Request::funcRequestorId);
+    PacketPtr pkt = Packet::createRead(req);
+    pkt->allocate();
+    m_system->getPhysMem().functionalAccess(pkt);
+    data_blk.setData(pkt);
+    delete pkt;
 }
 
 int

@@ -68,6 +68,12 @@ def define_options(parser):
     parser.add_argument(
         "--dump-cache-state", action="store_true", default=False,
         help="Dump Ruby cache contents at simulator exit")
+    parser.add_argument(
+        "--restore-llc-state", action="store_true", default=False,
+        help=(
+            "Restore LLC warm-state lines discovered from checkpoint "
+            "metadata if available"
+        ))
 
     # Options related to cache structure
     parser.add_argument(

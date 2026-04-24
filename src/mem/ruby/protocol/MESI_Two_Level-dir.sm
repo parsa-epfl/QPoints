@@ -28,6 +28,8 @@
 
 machine(MachineType:Directory, "MESI Two Level directory protocol")
  : DirectoryMemory * directory;
+   bool restore_llc_state := "False";
+   std::string llc_restore_file := "";
    Cycles to_mem_ctrl_latency := 1;
    Cycles directory_latency := 6;
 
@@ -105,6 +107,32 @@ machine(MachineType:Directory, "MESI Two Level directory protocol")
   void set_tbe(TBE tbe);
   void unset_tbe();
   void wakeUpBuffers(Addr a);
+  MachineID mapAddressToMachine(Addr addr, MachineType mtype);
+  void startupWarmStateFromFile(std::string path);
+
+  void applyWarmLineAddr(Addr addr) {
+    if (directory.isPresent(addr)) {
+      Entry dir_entry := static_cast(Entry, "pointer", directory[addr]);
+      if (is_invalid(dir_entry)) {
+        dir_entry := static_cast(Entry, "pointer",
+                                 directory.allocate(addr, new Entry));
+      }
+
+      dir_entry.DirectoryState := State:M;
+      dir_entry.Owner := mapAddressToMachine(addr, MachineType:L2Cache);
+      dir_entry.changePermission(Directory_State_to_permission(State:M));
+
+      DPRINTF(RubySlicc,
+              "Seeded directory warm-state for %#x owner %s state %s\n",
+              addr, dir_entry.Owner, dir_entry.DirectoryState);
+    }
+  }
+
+  void startupWarmState() {
+    if (restore_llc_state) {
+      startupWarmStateFromFile(llc_restore_file);
+    }
+  }
 
   Entry getDirectoryEntry(Addr addr), return_by_pointer="yes" {
     Entry dir_entry := static_cast(Entry, "pointer", directory[addr]);

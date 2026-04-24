@@ -42,6 +42,7 @@
 #define __MEM_RUBY_SLICC_INTERFACE_ABSTRACTCONTROLLER_HH__
 
 #include <exception>
+#include <fstream>
 #include <iostream>
 #include <string>
 #include <unordered_map>
@@ -85,6 +86,7 @@ class AbstractController : public ClockedObject, public Consumer
     PARAMS(RubyController);
     AbstractController(const Params &p);
     void init();
+    void startup() override;
 
     NodeID getVersion() const { return m_machineID.getNum(); }
     MachineType getType() const { return m_machineID.getType(); }
@@ -106,6 +108,9 @@ class AbstractController : public ClockedObject, public Consumer
     virtual void wakeup() = 0;
     virtual void resetStats() = 0;
     virtual void regStats();
+    virtual void startupWarmState() { }
+    virtual void applyWarmLineAddr(Addr addr) { }
+    void startupWarmStateFromFile(const std::string &path);
 
     virtual void recordCacheTrace(int cntrl, CacheRecorder* tr) = 0;
     virtual Sequencer* getCPUSequencer() const = 0;
@@ -133,6 +138,7 @@ class AbstractController : public ClockedObject, public Consumer
     { panic("functionalRead(Addr,PacketPtr,WriteMask) not implemented"); }
 
     void functionalMemoryRead(PacketPtr);
+    void readDataFromMemory(Addr addr, DataBlock &data_blk);
     //! The return value indicates the number of messages written with the
     //! data from the packet.
     virtual int functionalWriteBuffers(PacketPtr&) = 0;
@@ -311,6 +317,7 @@ class AbstractController : public ClockedObject, public Consumer
 
     // RequestorID used by some components of gem5.
     const RequestorID m_id;
+    System *m_system;
 
     Network *m_net_ptr;
     bool m_is_blocking;

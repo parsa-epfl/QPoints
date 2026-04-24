@@ -36,4 +36,5 @@ Cycles recycle_latency;
 // making functional access to the memory maintained by the
 // memory controllers.
 void functionalMemoryRead(Packet *pkt);
+void readDataFromMemory(Addr addr, DataBlock &data_blk);
 bool functionalMemoryWrite(Packet *pkt);

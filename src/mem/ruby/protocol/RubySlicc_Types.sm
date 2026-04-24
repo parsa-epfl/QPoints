@@ -217,6 +217,8 @@ structure (CacheMemory, external = "yes") {
   void profileDemandMiss();
   void profilePrefetchHit();
   void profilePrefetchMiss();
+  void markCheckpointLoad(Addr);
+  void noteCheckpointLoadHit(Addr);
 }
 
 structure (WireBuffer, inport="yes", outport="yes", external = "yes") {

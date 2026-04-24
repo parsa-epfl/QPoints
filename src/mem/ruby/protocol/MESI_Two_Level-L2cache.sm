@@ -43,6 +43,8 @@ machine(MachineType:L2Cache, "MESI Directory L2 Cache CMP")
    Cycles l2_request_latency := 2;
    Cycles l2_response_latency := 2;
    Cycles to_l1_latency := 1;
+   bool restore_llc_state := "False";
+   std::string llc_restore_file := "";
 
   // Message Queues
   // From local bank of L2 cache TO the network
@@ -168,6 +170,7 @@ machine(MachineType:L2Cache, "MESI Directory L2 Cache CMP")
   void unset_cache_entry();
   void set_tbe(TBE a);
   void unset_tbe();
+  void startupWarmStateFromFile(std::string path);
   void wakeUpBuffers(Addr a);
   void profileMsgDelay(int virtualNetworkType, Cycles c);
   MachineID mapAddressToMachine(Addr addr, MachineType mtype);
@@ -259,8 +262,39 @@ machine(MachineType:L2Cache, "MESI Directory L2 Cache CMP")
     }
   }
 
+  void preloadWarmLine(Addr addr) {
+    Entry cache_entry := getCacheEntry(addr);
+    if (is_invalid(cache_entry)) {
+      cache_entry := static_cast(Entry, "pointer",
+          L2cache.allocate(addr, new Entry));
+    }
+
+    assert(is_valid(cache_entry));
+    readDataFromMemory(addr, cache_entry.DataBlk);
+    cache_entry.Dirty := false;
+    cache_entry.Sharers.clear();
+    cache_entry.CacheState := State:M;
+    setAccessPermission(cache_entry, addr, State:M);
+    L2cache.setMRU(addr);
+    L2cache.markCheckpointLoad(addr);
+  }
+
+  void applyWarmLineAddr(Addr addr) {
+    preloadWarmLine(makeLineAddress(addr));
+  }
+
+  void startupWarmState() {
+    if (restore_llc_state) {
+      startupWarmStateFromFile(llc_restore_file);
+    }
+  }
+
   Event L1Cache_request_type_to_event(CoherenceRequestType type, Addr addr,
                                       MachineID requestor, Entry cache_entry) {
+    if (is_valid(cache_entry)) {
+      L2cache.noteCheckpointLoadHit(addr);
+    }
+
     if(type == CoherenceRequestType:GETS) {
       return Event:L1_GETS;
     } else if(type == CoherenceRequestType:GET_INSTR) {
