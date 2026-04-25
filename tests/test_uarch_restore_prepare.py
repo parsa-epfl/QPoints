@@ -155,9 +155,9 @@ def test_prepare_snapshot_gem5_uarch_writes_outputs_and_manifest(tmp_path: Path)
     assert manifest["components"]["llc"]["stats"]["private_modified_lines"] == 1
     assert manifest["components"]["llc"]["stats"]["private_writeable_lines"] == 1
     assert manifest["components"]["llc"]["selected_modified_lines"] == 0
-    assert manifest["components"]["llc"]["stats"]["candidate_restoreable_llc_lines"] == 3
-    assert manifest["components"]["llc"]["stats"]["candidate_restoreable_clean_lines"] == 2
-    assert manifest["components"]["llc"]["stats"]["candidate_restoreable_modified_lines"] == 1
+    assert manifest["components"]["llc"]["stats"]["candidate_restorable_llc_lines"] == 3
+    assert manifest["components"]["llc"]["stats"]["candidate_restorable_clean_lines"] == 2
+    assert manifest["components"]["llc"]["stats"]["candidate_restorable_modified_lines"] == 1
 
 
 def test_prepare_snapshot_gem5_uarch_can_append_controlled_modified_lines(
@@ -207,7 +207,7 @@ def test_prepare_snapshot_gem5_uarch_can_append_controlled_modified_lines(
         gem5_workload_root=gem5_workload_root,
         snapshot="snapshot_0",
         overwrite=True,
-        llc_debug_modified_count=1,
+        llc_debug_modified_count=5,
     )
 
     output_file = gem5_workload_root / "snapshot_0.gem5_uarch" / "llc_restore_addrs.txt"
@@ -265,4 +265,48 @@ def test_prepare_snapshot_gem5_uarch_refuses_to_overwrite_without_flag(
             gem5_workload_root=gem5_workload_root,
             snapshot="snapshot_0",
             overwrite=False,
+        )
+
+
+def test_prepare_snapshot_gem5_uarch_requires_architectural_checkpoint_dir(
+    tmp_path: Path,
+):
+    module = _load_prepare_module()
+
+    qflex_run_dir = tmp_path / "qflex-run"
+    gem5_workload_root = tmp_path / "gem5-workload"
+    source_dir = qflex_run_dir / "snapshot_0.uarch"
+    source_dir.mkdir(parents=True)
+    gem5_workload_root.mkdir()
+
+    _write_zstd_json(
+        source_dir / "llc-0.json.zstd",
+        {
+            "blocks": [
+                {
+                    "blocks": [
+                        {
+                            "block_id_with_v": _encode_block_id_with_v(0x100),
+                            "ts": 10,
+                            "modified": False,
+                        }
+                    ]
+                }
+            ]
+        },
+    )
+    _write_zstd_json(source_dir / "directory-0.json.zstd", {"entries": [{}]})
+    _write_zstd_json(
+        source_dir / "harvard-0.json.zstd",
+        [{"i_cache": [{"lines": []}], "d_cache": [{"lines": []}]}],
+    )
+
+    with pytest.raises(
+        FileNotFoundError, match="gem5 architectural checkpoint directory not found"
+    ):
+        module.prepare_snapshot_gem5_uarch(
+            qflex_run_dir=qflex_run_dir,
+            gem5_workload_root=gem5_workload_root,
+            snapshot="snapshot_0",
+            overwrite=True,
         )

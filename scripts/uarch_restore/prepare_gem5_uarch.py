@@ -55,7 +55,7 @@ def parse_args() -> argparse.Namespace:
         type=int,
         default=0,
         help=(
-            "Append the first N restoreable LLC-modified lines to the default "
+            "Append the first N restorable LLC-modified lines to the default "
             "clean-line restore file for controlled debugging experiments."
         ),
     )
@@ -81,7 +81,10 @@ def _write_addr_file(path: Path, addrs: list[int], overwrite: bool) -> None:
             f"Refusing to overwrite existing gem5 uarch artifact: {path}. "
             "Pass --overwrite to replace it."
         )
-    path.write_text("".join(f"{addr:#x}\n" for addr in addrs))
+    path.write_text(
+        "".join(f"{addr:#x}\n" for addr in addrs),
+        encoding="utf-8",
+    )
 
 
 def _write_manifest(path: Path, payload: dict, overwrite: bool) -> None:
@@ -90,7 +93,10 @@ def _write_manifest(path: Path, payload: dict, overwrite: bool) -> None:
             f"Refusing to overwrite existing gem5 uarch manifest: {path}. "
             "Pass --overwrite to replace it."
         )
-    path.write_text(json.dumps(payload, indent=2, sort_keys=True) + "\n")
+    path.write_text(
+        json.dumps(payload, indent=2, sort_keys=True) + "\n",
+        encoding="utf-8",
+    )
 
 
 def _load_qflex_json(path: Path):
@@ -166,9 +172,9 @@ def _select_llc_restore_lines(
         "llc_modified_lines": 0,
         "private_modified_lines": 0,
         "private_writeable_lines": 0,
-        "candidate_restoreable_llc_lines": 0,
-        "candidate_restoreable_clean_lines": 0,
-        "candidate_restoreable_modified_lines": 0,
+        "candidate_restorable_llc_lines": 0,
+        "candidate_restorable_clean_lines": 0,
+        "candidate_restorable_modified_lines": 0,
     }
 
     clean_sortable = []
@@ -191,16 +197,16 @@ def _select_llc_restore_lines(
         if private_writeable:
             stats["private_writeable_lines"] += 1
 
-        restoreable = not private_modified and not private_writeable
-        if not restoreable:
+        restorable = not private_modified and not private_writeable
+        if not restorable:
             continue
 
-        stats["candidate_restoreable_llc_lines"] += 1
+        stats["candidate_restorable_llc_lines"] += 1
         if line["llc_modified"]:
-            stats["candidate_restoreable_modified_lines"] += 1
+            stats["candidate_restorable_modified_lines"] += 1
             modified_sortable.append((-(line["ts"]), line["line_addr"]))
         else:
-            stats["candidate_restoreable_clean_lines"] += 1
+            stats["candidate_restorable_clean_lines"] += 1
             clean_sortable.append((-(line["ts"]), line["line_addr"]))
 
     clean_sortable.sort()
@@ -224,6 +230,7 @@ def prepare_snapshot_gem5_uarch(
     qflex_run_dir = qflex_run_dir.resolve()
     gem5_workload_root = gem5_workload_root.resolve()
 
+    gem5_snapshot_dir = gem5_workload_root / snapshot
     qflex_uarch_dir = qflex_run_dir / f"{snapshot}{QFLEX_UARCH_SUFFIX}"
     gem5_uarch_dir = gem5_workload_root / f"{snapshot}{GEM5_UARCH_SUFFIX}"
 
@@ -238,6 +245,11 @@ def prepare_snapshot_gem5_uarch(
     for required in (llc_source_file, directory_source_file, harvard_source_file):
         if not required.is_file():
             raise FileNotFoundError(f"Missing QFlex uarch source file: {required}")
+    if not gem5_snapshot_dir.is_dir():
+        raise FileNotFoundError(
+            f"gem5 architectural checkpoint directory not found: "
+            f"{gem5_snapshot_dir}"
+        )
 
     gem5_uarch_dir.mkdir(parents=True, exist_ok=True)
 
@@ -248,7 +260,9 @@ def prepare_snapshot_gem5_uarch(
         llc_lines, directory, harvard
     )
     selected_modified = max(0, llc_debug_modified_count)
-    addrs = clean_addrs + modified_addrs[:selected_modified]
+    selected_modified_addrs = modified_addrs[:selected_modified]
+    effective_selected_modified = len(selected_modified_addrs)
+    addrs = clean_addrs + selected_modified_addrs
     if not addrs:
         raise RuntimeError(
             "No LLC restore addresses were derived from the raw "
@@ -273,10 +287,10 @@ def prepare_snapshot_gem5_uarch(
                 "line_count": len(addrs),
                 "selection_policy": (
                     "clean LLC lines with no private modified/writeable copy, "
-                    "plus the first N restoreable LLC-modified lines for "
+                    "plus the first N restorable LLC-modified lines for "
                     "controlled debugging, ordered by descending LLC timestamp"
                 ),
-                "selected_modified_lines": selected_modified,
+                "selected_modified_lines": effective_selected_modified,
                 "stats": stats,
             }
         },
