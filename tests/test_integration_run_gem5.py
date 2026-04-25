@@ -256,6 +256,7 @@ def test_run_gem5_ruby_restore_sentinel(
     gem5_ckp_dir = Path(integration_env.get("gem5_ckp_dir"))
     qflex_uarch_dir = qflex_run_dir / f"{converted_snapshot}.uarch"
     gem5_uarch_dir = gem5_ckp_dir / f"{converted_snapshot}.gem5_uarch"
+    gem5_uarch_preexisting = gem5_uarch_dir.exists()
 
     if not qflex_uarch_dir.is_dir():
         pytest.skip(f"QFlex uarch inputs not found for restore sentinel: {qflex_uarch_dir}")
@@ -288,7 +289,7 @@ def test_run_gem5_ruby_restore_sentinel(
         check=True,
         cwd=repo_root,
     )
-    if gem5_uarch_dir not in artifact_paths:
+    if not gem5_uarch_preexisting and gem5_uarch_dir not in artifact_paths:
         artifact_paths.append(gem5_uarch_dir)
 
     sim_config = tmp_path / "restore_llc_state.args"
