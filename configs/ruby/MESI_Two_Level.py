@@ -178,6 +178,7 @@ def create_system(options, full_system, system, dma_ports, bootmem,
         #
         l2_cache = L2Cache(size = options.l2_size,
                            assoc = options.l2_assoc,
+                           replacement_policy = LRURP(),
                            start_index_bit = l2_index_start,
                            dump_cache_state=(
                                getattr(options, "dump_cache_state", False) and
