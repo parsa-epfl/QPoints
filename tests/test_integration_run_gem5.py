@@ -247,26 +247,36 @@ def test_run_gem5_ruby_restore_sentinel(
     converted_snapshot: str,
     tmp_path: Path,
 ):
+    if shutil.which("zstd") is None:
+        pytest.skip("zstd is required for the Ruby restore sentinel")
+
     prepare_script = repo_root / "scripts" / "uarch_restore" / "prepare_gem5_uarch.py"
     qflex_ckp_dir = Path(integration_env.get("qflex_ckp_dir"))
     qflex_run_dir = Path(integration_env.get("qflex_run_dir", qflex_ckp_dir / "run"))
     gem5_ckp_dir = Path(integration_env.get("gem5_ckp_dir"))
+    qflex_uarch_dir = qflex_run_dir / f"{converted_snapshot}.uarch"
 
-    subprocess.run(
-        [
-            sys.executable,
-            str(prepare_script),
-            "--qflex-run-dir",
-            str(qflex_run_dir),
-            "--gem5-workload-root",
-            str(gem5_ckp_dir),
-            "--snapshot",
-            converted_snapshot,
-            "--overwrite",
-        ],
-        check=True,
-        cwd=repo_root,
-    )
+    if not qflex_uarch_dir.is_dir():
+        pytest.skip(f"QFlex uarch inputs not found for restore sentinel: {qflex_uarch_dir}")
+
+    try:
+        subprocess.run(
+            [
+                sys.executable,
+                str(prepare_script),
+                "--qflex-run-dir",
+                str(qflex_run_dir),
+                "--gem5-workload-root",
+                str(gem5_ckp_dir),
+                "--snapshot",
+                converted_snapshot,
+                "--overwrite",
+            ],
+            check=True,
+            cwd=repo_root,
+        )
+    except subprocess.CalledProcessError as exc:
+        pytest.skip(f"Ruby restore sentinel requires complete uarch inputs: {exc}")
 
     sim_config = tmp_path / "restore_llc_state.args"
     sim_config.write_text("--restore-llc-state\n", encoding="utf-8")

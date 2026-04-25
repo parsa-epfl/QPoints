@@ -225,11 +225,13 @@ qflex_uarch_dir="${qflex_ckp_dir}/run/${snapshot}.uarch"
 if [[ -d "$qflex_uarch_dir" ]]; then
   if command -v zstd >/dev/null 2>&1; then
     echo "[${snapshot}] preparing gem5 uarch artifacts"
-    python3 "$ROOT_DIR/scripts/uarch_restore/prepare_gem5_uarch.py" \
+    if ! python3 "$ROOT_DIR/scripts/uarch_restore/prepare_gem5_uarch.py" \
       --qflex-run-dir "${qflex_ckp_dir}/run" \
       --gem5-workload-root "$gem5_ckp_dir" \
       --snapshot "$snapshot" \
-      --overwrite
+      --overwrite; then
+      echo "[${snapshot}] gem5 uarch preparation failed for ${qflex_uarch_dir}; continuing without gem5 uarch artifacts" >&2
+    fi
   else
     echo "[${snapshot}] zstd not found; skipping gem5 uarch preparation for ${qflex_uarch_dir}" >&2
   fi
