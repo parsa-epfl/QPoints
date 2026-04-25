@@ -118,6 +118,7 @@ def _run_gem5(
     snapshot: str,
     experiment: str,
     *extra_args: str,
+    insts: int | None = None,
 ) -> Path:
     outdir = repo_root / "sim_outs" / experiment / snapshot
     if outdir.exists():
@@ -133,7 +134,7 @@ def _run_gem5(
         "--snapshot",
         snapshot,
         "--inst",
-        str(integration_env.insts()),
+        str(integration_env.insts() if insts is None else insts),
         "--cores",
         str(integration_env.get("core_count")),
         *extra_args,
@@ -141,6 +142,14 @@ def _run_gem5(
     subprocess.run(cmd, check=True, cwd=repo_root)
     artifact_paths.append(outdir.parent)
     return outdir
+
+
+def _stat_value(stats_path: Path, stat_name: str) -> int:
+    for line in stats_path.read_text(encoding="utf-8").splitlines():
+        fields = line.split()
+        if len(fields) >= 2 and fields[0] == stat_name:
+            return int(fields[1])
+    raise AssertionError(f"Missing stat {stat_name} in {stats_path}")
 
 
 def test_run_gem5_classic_branch_trace(
@@ -229,3 +238,64 @@ def test_run_gem5_ruby_data_trace_and_cache_dump(
     assert (outdir / "stats.txt").is_file()
     assert (outdir / "data_trace_core_0.log").is_file()
     assert (outdir / "ruby_l2cache0_dump.txt").is_file()
+
+
+def test_run_gem5_ruby_restore_sentinel(
+    repo_root: Path,
+    integration_env,
+    artifact_paths,
+    converted_snapshot: str,
+    tmp_path: Path,
+):
+    prepare_script = repo_root / "scripts" / "uarch_restore" / "prepare_gem5_uarch.py"
+    qflex_ckp_dir = Path(integration_env.get("qflex_ckp_dir"))
+    qflex_run_dir = Path(integration_env.get("qflex_run_dir", qflex_ckp_dir / "run"))
+    gem5_ckp_dir = Path(integration_env.get("gem5_ckp_dir"))
+
+    subprocess.run(
+        [
+            sys.executable,
+            str(prepare_script),
+            "--qflex-run-dir",
+            str(qflex_run_dir),
+            "--gem5-workload-root",
+            str(gem5_ckp_dir),
+            "--snapshot",
+            converted_snapshot,
+            "--overwrite",
+        ],
+        check=True,
+        cwd=repo_root,
+    )
+
+    sim_config = tmp_path / "restore_llc_state.args"
+    sim_config.write_text("--restore-llc-state\n", encoding="utf-8")
+
+    outdir = _run_gem5(
+        repo_root,
+        integration_env,
+        artifact_paths,
+        converted_snapshot,
+        "pytest_qpoints_ruby_restore_sentinel_1k",
+        "--timing-ruby",
+        "--sim-config",
+        str(sim_config),
+        insts=1000,
+    )
+
+    stats_path = outdir / "stats.txt"
+    assert stats_path.is_file()
+    assert (
+        _stat_value(
+            stats_path,
+            "system.ruby.l2_cntrl0.L2cache.m_checkpoint_load_total",
+        )
+        > 0
+    )
+    assert (
+        _stat_value(
+            stats_path,
+            "system.ruby.l2_cntrl0.L2cache.m_demand_hits",
+        )
+        > 0
+    )

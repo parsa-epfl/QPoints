@@ -143,7 +143,7 @@ def test_prepare_snapshot_gem5_uarch_writes_outputs_and_manifest(tmp_path: Path)
     output_file = gem5_uarch_dir / "llc_restore_addrs.txt"
     manifest_file = gem5_uarch_dir / "manifest.json"
 
-    assert output_file.read_text(encoding="utf-8") == "0x140\n0x100\n"
+    assert output_file.read_text(encoding="utf-8") == "0x100\n0x140\n"
 
     manifest_disk = json.loads(manifest_file.read_text(encoding="utf-8"))
     assert manifest_disk == manifest
@@ -213,6 +213,71 @@ def test_prepare_snapshot_gem5_uarch_can_append_controlled_modified_lines(
     output_file = gem5_workload_root / "snapshot_0.gem5_uarch" / "llc_restore_addrs.txt"
     assert output_file.read_text(encoding="utf-8") == "0x100\n0x180\n"
     assert manifest["components"]["llc"]["selected_modified_lines"] == 1
+
+
+def test_prepare_snapshot_gem5_uarch_orders_selected_lines_by_set_and_age(
+    tmp_path: Path,
+):
+    module = _load_prepare_module()
+
+    qflex_run_dir = tmp_path / "qflex-run"
+    gem5_workload_root = tmp_path / "gem5-workload"
+    source_dir = qflex_run_dir / "snapshot_0.uarch"
+    source_dir.mkdir(parents=True)
+    gem5_workload_root.mkdir()
+    (gem5_workload_root / "snapshot_0").mkdir()
+
+    set0_clean_newer = 0x100
+    set0_modified_older = 0x180
+    set1_clean_only = 0x40
+
+    _write_zstd_json(
+        source_dir / "llc-0.json.zstd",
+        {
+            "blocks": [
+                {
+                    "blocks": [
+                        {
+                            "block_id_with_v": _encode_block_id_with_v(set0_clean_newer),
+                            "ts": 20,
+                            "modified": False,
+                        },
+                        {
+                            "block_id_with_v": _encode_block_id_with_v(set0_modified_older),
+                            "ts": 10,
+                            "modified": True,
+                        },
+                    ]
+                },
+                {
+                    "blocks": [
+                        {
+                            "block_id_with_v": _encode_block_id_with_v(set1_clean_only),
+                            "ts": 15,
+                            "modified": False,
+                        }
+                    ]
+                },
+            ]
+        },
+    )
+    _write_zstd_json(source_dir / "directory-0.json.zstd", {"entries": [{}, {}]})
+    _write_zstd_json(
+        source_dir / "harvard-0.json.zstd",
+        [{"i_cache": [{"lines": []}], "d_cache": [{"lines": []}]}],
+    )
+
+    manifest = module.prepare_snapshot_gem5_uarch(
+        qflex_run_dir=qflex_run_dir,
+        gem5_workload_root=gem5_workload_root,
+        snapshot="snapshot_0",
+        overwrite=True,
+        llc_debug_modified_count=1,
+    )
+
+    output_file = gem5_workload_root / "snapshot_0.gem5_uarch" / "llc_restore_addrs.txt"
+    assert output_file.read_text(encoding="utf-8") == "0x180\n0x100\n0x40\n"
+    assert "ascending LLC timestamp" in manifest["components"]["llc"]["selection_policy"]
 
 
 def test_prepare_snapshot_gem5_uarch_refuses_to_overwrite_without_flag(

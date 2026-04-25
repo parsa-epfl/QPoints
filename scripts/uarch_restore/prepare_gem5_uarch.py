@@ -62,16 +62,16 @@ def parse_args() -> argparse.Namespace:
     return parser.parse_args()
 
 
-def _normalize_line_addrs(addrs: list[int]) -> list[int]:
+def _normalize_restore_lines(lines: list[dict]) -> list[dict]:
     line_mask = ~(CACHE_LINE_SIZE - 1)
     normalized = []
     seen = set()
-    for addr in addrs:
-        line_addr = addr & line_mask
+    for line in lines:
+        line_addr = line["line_addr"] & line_mask
         if line_addr in seen:
             continue
         seen.add(line_addr)
-        normalized.append(line_addr)
+        normalized.append({**line, "line_addr": line_addr})
     return normalized
 
 
@@ -96,6 +96,17 @@ def _write_manifest(path: Path, payload: dict, overwrite: bool) -> None:
     path.write_text(
         json.dumps(payload, indent=2, sort_keys=True) + "\n",
         encoding="utf-8",
+    )
+
+
+def _order_restore_lines(lines: list[dict]) -> list[dict]:
+    # gem5 warm restore inserts lines sequentially and marks each insertion as
+    # most recently used. Emitting oldest-to-newest lines within each set lets
+    # startup insertion reconstruct a reasonable warm replacement state using
+    # the current replacement policy's native "touch on insert" behavior.
+    return sorted(
+        lines,
+        key=lambda line: (line["set"], line["ts"], line["way"], line["line_addr"]),
     )
 
 
@@ -165,7 +176,7 @@ def _select_llc_restore_lines(
     llc_lines: list[dict],
     directory: dict,
     harvard: dict,
-) -> tuple[list[int], list[int], dict]:
+) -> tuple[list[dict], list[dict], dict]:
     stats = {
         "total_llc_lines": 0,
         "lines_with_directory_entry": 0,
@@ -177,8 +188,8 @@ def _select_llc_restore_lines(
         "candidate_restorable_modified_lines": 0,
     }
 
-    clean_sortable = []
-    modified_sortable = []
+    clean_lines = []
+    modified_lines = []
     for line in llc_lines:
         stats["total_llc_lines"] += 1
         block_id = line["block_id"]
@@ -204,18 +215,14 @@ def _select_llc_restore_lines(
         stats["candidate_restorable_llc_lines"] += 1
         if line["llc_modified"]:
             stats["candidate_restorable_modified_lines"] += 1
-            modified_sortable.append((-(line["ts"]), line["line_addr"]))
+            modified_lines.append(line)
         else:
             stats["candidate_restorable_clean_lines"] += 1
-            clean_sortable.append((-(line["ts"]), line["line_addr"]))
+            clean_lines.append(line)
 
-    clean_sortable.sort()
-    modified_sortable.sort()
-    clean_addrs = [addr for _, addr in clean_sortable]
-    modified_addrs = [addr for _, addr in modified_sortable]
     return (
-        _normalize_line_addrs(clean_addrs),
-        _normalize_line_addrs(modified_addrs),
+        _normalize_restore_lines(_order_restore_lines(clean_lines)),
+        _normalize_restore_lines(_order_restore_lines(modified_lines)),
         stats,
     )
 
@@ -256,13 +263,14 @@ def prepare_snapshot_gem5_uarch(
     llc_lines = _parse_llc_lines(llc_source_file)
     directory = _parse_directory(directory_source_file)
     harvard = _parse_harvard(harvard_source_file)
-    clean_addrs, modified_addrs, stats = _select_llc_restore_lines(
+    clean_lines, modified_lines, stats = _select_llc_restore_lines(
         llc_lines, directory, harvard
     )
     selected_modified = max(0, llc_debug_modified_count)
-    selected_modified_addrs = modified_addrs[:selected_modified]
-    effective_selected_modified = len(selected_modified_addrs)
-    addrs = clean_addrs + selected_modified_addrs
+    selected_modified_lines = modified_lines[:selected_modified]
+    effective_selected_modified = len(selected_modified_lines)
+    selected_lines = _order_restore_lines(clean_lines + selected_modified_lines)
+    addrs = [line["line_addr"] for line in selected_lines]
     if not addrs:
         raise RuntimeError(
             "No LLC restore addresses were derived from the raw "
@@ -288,7 +296,9 @@ def prepare_snapshot_gem5_uarch(
                 "selection_policy": (
                     "clean LLC lines with no private modified/writeable copy, "
                     "plus the first N restorable LLC-modified lines for "
-                    "controlled debugging, ordered by descending LLC timestamp"
+                    "controlled debugging, ordered per-set by ascending LLC "
+                    "timestamp so startup insertion reconstructs warm "
+                    "replacement state oldest-to-newest"
                 ),
                 "selected_modified_lines": effective_selected_modified,
                 "stats": stats,
