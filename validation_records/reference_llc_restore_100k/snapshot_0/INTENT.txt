@@ -1,0 +1,21 @@
+Title: Reference LLC restore 100K
+
+Question:
+Does the merged LLC restore path, together with the current LLC LRU replacement
+policy, remain active and warm for a 100K timing-Ruby run from snapshot_0?
+
+Why this package exists:
+- preserve a clean, tracked validation record for the merged LLC feature set
+- give future work a stable reference experiment for comparison
+- make the runtime input and acceptance checks self-contained inside the
+  validation package itself
+
+Acceptance:
+- checkpoint restore must be active
+- LLC demand hits must be nonzero
+- the run must complete successfully
+
+Notes:
+- this package captures the direct experiment evidence
+- auxiliary postprocessing for deeper replacement-order proof can be added as
+  manifest analyses in a follow-up validation step
