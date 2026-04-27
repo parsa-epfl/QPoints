@@ -1,0 +1,76 @@
+{
+  "result": "passed",
+  "checked_replacements": 10,
+  "matches": [
+    {
+      "set": 487,
+      "incoming": "0x43dbd79c0",
+      "predicted_victim": "0x3d3a879c0",
+      "actual_victim": "0x3d3a879c0",
+      "match": true
+    },
+    {
+      "set": 886,
+      "incoming": "0x3d335dd80",
+      "predicted_victim": "0x102e3dd80",
+      "actual_victim": "0x102e3dd80",
+      "match": true
+    },
+    {
+      "set": 487,
+      "incoming": "0x3d33979c0",
+      "predicted_victim": "0x3d45779c0",
+      "actual_victim": "0x3d45779c0",
+      "match": true
+    },
+    {
+      "set": 464,
+      "incoming": "0x1067c7400",
+      "predicted_victim": "0x43f5f7400",
+      "actual_victim": "0x43f5f7400",
+      "match": true
+    },
+    {
+      "set": 486,
+      "incoming": "0x1067c7980",
+      "predicted_victim": "0x3d3c47980",
+      "actual_victim": "0x3d3c47980",
+      "match": true
+    },
+    {
+      "set": 487,
+      "incoming": "0x1067c79c0",
+      "predicted_victim": "0x1003479c0",
+      "actual_victim": "0x1003479c0",
+      "match": true
+    },
+    {
+      "set": 488,
+      "incoming": "0x1067c7a00",
+      "predicted_victim": "0x3d3a87a00",
+      "actual_victim": "0x3d3a87a00",
+      "match": true
+    },
+    {
+      "set": 489,
+      "incoming": "0x1067c7a40",
+      "predicted_victim": "0x3d3587a40",
+      "actual_victim": "0x3d3587a40",
+      "match": true
+    },
+    {
+      "set": 493,
+      "incoming": "0x1067c7b40",
+      "predicted_victim": "0x3d3587b40",
+      "actual_victim": "0x3d3587b40",
+      "match": true
+    },
+    {
+      "set": 832,
+      "incoming": "0x10866d000",
+      "predicted_victim": "0x3d337d000",
+      "actual_victim": "0x3d337d000",
+      "match": true
+    }
+  ]
+}

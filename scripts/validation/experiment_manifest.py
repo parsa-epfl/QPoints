@@ -1,0 +1,373 @@
+#!/usr/bin/env python3
+
+import copy
+import json
+import shutil
+import subprocess
+from datetime import datetime, timezone
+from pathlib import Path
+from typing import Any
+
+
+SCHEMA_VERSION = 2
+MANIFEST_FILENAME = "experiment_manifest.json"
+LEGACY_MANIFEST_FILENAME = "manifest.json"
+
+
+def utc_now_iso() -> str:
+    return datetime.now(timezone.utc).replace(microsecond=0).isoformat()
+
+
+def git_output(repo_path: Path, *args: str) -> str | None:
+    try:
+        result = subprocess.run(
+            ["git", *args],
+            cwd=str(repo_path),
+            check=True,
+            capture_output=True,
+            text=True,
+        )
+    except (subprocess.CalledProcessError, FileNotFoundError):
+        return None
+    return result.stdout.strip()
+
+
+def git_stdout_lines(repo_path: Path, *args: str) -> list[str]:
+    try:
+        result = subprocess.run(
+            ["git", *args],
+            cwd=str(repo_path),
+            check=True,
+            capture_output=True,
+            text=True,
+        )
+    except (subprocess.CalledProcessError, FileNotFoundError):
+        return []
+    return result.stdout.splitlines()
+
+
+def normalize_relpath(path: str) -> str:
+    normalized = path.strip().strip("/")
+    if normalized.startswith("./"):
+        normalized = normalized[2:]
+    return normalized
+
+
+def path_matches_prefix(path: str, prefix: str) -> bool:
+    normalized_path = normalize_relpath(path)
+    normalized_prefix = normalize_relpath(prefix)
+    if not normalized_prefix:
+        return False
+    return normalized_path == normalized_prefix or normalized_path.startswith(
+        normalized_prefix + "/"
+    )
+
+
+def parse_status_paths(line: str) -> list[str]:
+    payload = line[3:].strip()
+    if " -> " in payload:
+        old_path, new_path = payload.split(" -> ", 1)
+        return [old_path.strip(), new_path.strip()]
+    return [payload]
+
+
+def git_status_lines(repo_path: Path) -> list[str]:
+    return git_stdout_lines(repo_path, "status", "--short", "--untracked-files=all")
+
+
+def capture_repo_state(
+    repo_path: Path, allowed_dirty_relpaths: list[str] | None = None
+) -> dict[str, Any]:
+    head = git_output(repo_path, "rev-parse", "HEAD")
+    branch = git_output(repo_path, "symbolic-ref", "--short", "HEAD")
+    allowed_dirty_relpaths = [normalize_relpath(path) for path in (allowed_dirty_relpaths or [])]
+    status_lines = git_status_lines(repo_path)
+    dirty_entries = []
+    ignored_dirty_entries = []
+    for line in status_lines:
+        paths = parse_status_paths(line)
+        if allowed_dirty_relpaths and all(
+            any(path_matches_prefix(path, prefix) for prefix in allowed_dirty_relpaths)
+            for path in paths
+        ):
+            ignored_dirty_entries.append(line)
+        else:
+            dirty_entries.append(line)
+    raw_dirty = bool(status_lines)
+    return {
+        "path": str(repo_path),
+        "head": head,
+        "branch": branch,
+        "dirty": bool(dirty_entries),
+        "raw_dirty": raw_dirty,
+        "dirty_entries": dirty_entries,
+        "ignored_dirty_entries": ignored_dirty_entries,
+        "allowed_dirty_paths": allowed_dirty_relpaths,
+    }
+
+
+def prepare_output_dir(output_dir: Path, clean: bool = False) -> None:
+    if clean and output_dir.exists():
+        shutil.rmtree(output_dir)
+    output_dir.mkdir(parents=True, exist_ok=True)
+
+
+def manifest_path(manifest: dict[str, Any], path: str | Path | None) -> str | None:
+    if path is None:
+        return None
+    path_obj = Path(path).expanduser()
+    if not path_obj.is_absolute():
+        return str(path_obj)
+    path_roots = manifest.get("_path_roots", {})
+    output_dir = Path(path_roots.get("output_dir", manifest["provenance"]["output_dir"]))
+    resolved_path: Path | None = None
+    try:
+        resolved_path = path_obj.resolve()
+        resolved_output_dir = output_dir.resolve()
+        relative_to_output = resolved_path.relative_to(resolved_output_dir)
+        return "." if not relative_to_output.parts else str(relative_to_output)
+    except (RuntimeError, ValueError, FileNotFoundError):
+        pass
+    if resolved_path is None:
+        try:
+            resolved_path = path_obj.resolve()
+        except (RuntimeError, FileNotFoundError):
+            return str(path_obj)
+    repo_roots = sorted(
+        path_roots.get("repo_roots", {}).items(),
+        key=lambda item: len(item[1]),
+        reverse=True,
+    )
+    for repo_name, repo_root_text in repo_roots:
+        try:
+            resolved_repo_root = Path(repo_root_text).resolve()
+            relative_to_repo = resolved_path.relative_to(resolved_repo_root)
+            return (
+                f"<{repo_name}>"
+                if not relative_to_repo.parts
+                else f"<{repo_name}>/{relative_to_repo}"
+            )
+        except (RuntimeError, ValueError, FileNotFoundError):
+            continue
+    return str(path_obj)
+
+
+def portable_value(manifest: dict[str, Any], value: Any) -> Any:
+    if isinstance(value, Path):
+        return manifest_path(manifest, value)
+    if isinstance(value, str):
+        return manifest_path(manifest, value) if value.startswith("/") else value
+    if isinstance(value, list):
+        return [portable_value(manifest, item) for item in value]
+    if isinstance(value, dict):
+        return {key: portable_value(manifest, item) for key, item in value.items()}
+    return value
+
+
+def build_manifest(
+    *,
+    title: str,
+    component: str,
+    question: str,
+    output_dir: Path,
+    script_path: Path,
+    repo_roots: dict[str, Path],
+    repo_states: dict[str, Any] | None = None,
+    inputs: dict[str, Any] | None = None,
+    tags: list[str] | None = None,
+    acceptance: list[dict[str, Any]] | None = None,
+    lifecycle_state: str = "active",
+    retention_policy: str = "normal",
+) -> dict[str, Any]:
+    created_at = utc_now_iso()
+    repo_root_paths = {name: str(path.resolve()) for name, path in repo_roots.items()}
+    captured_repo_states = (
+        repo_states
+        if repo_states is not None
+        else {name: capture_repo_state(path) for name, path in repo_roots.items()}
+    )
+    manifest = {
+        "schema_version": SCHEMA_VERSION,
+        "kind": "experiment",
+        "title": title,
+        "component": component,
+        "question": question,
+        "tags": tags or [],
+        "lifecycle": {
+            "state": lifecycle_state,
+            "retention_policy": retention_policy,
+        },
+        "intent": {},
+        "_path_roots": {
+            "output_dir": str(output_dir.resolve()),
+            "repo_roots": repo_root_paths,
+        },
+        "provenance": {
+            "created_at_utc": created_at,
+            "updated_at_utc": created_at,
+            "script": None,
+            "output_dir": ".",
+            "path_aliases": {name: f"<{name}>" for name in repo_roots},
+            "repo_states": {},
+        },
+        "inputs": {},
+        "commands": [],
+        "artifacts": [],
+        "acceptance": acceptance or [],
+        "analyses": [],
+        "result": {
+            "outcome": "running",
+            "summary": "",
+            "metrics": {},
+        },
+        "lessons": [],
+        "details": {},
+        "supersedes": [],
+    }
+    manifest["provenance"]["script"] = manifest_path(manifest, script_path)
+    manifest["provenance"]["repo_states"] = {
+        name: {
+            **state,
+            "path": manifest_path(manifest, repo_roots[name]),
+        }
+        for name, state in captured_repo_states.items()
+    }
+    manifest["inputs"] = portable_value(manifest, inputs or {})
+    return manifest
+
+
+def stage_intent(
+    manifest: dict[str, Any], output_dir: Path, intent_path: Path | None
+) -> None:
+    if intent_path is None or not intent_path.is_file():
+        return
+    staged_path = output_dir / intent_path.name
+    protected = manifest.get("lifecycle", {}).get("state") == "reference"
+    if intent_path.resolve() != staged_path.resolve():
+        shutil.copy2(intent_path, staged_path)
+    intent_text = intent_path.read_text(encoding="utf-8")
+    manifest["intent"] = {
+        "source_path": manifest_path(manifest, intent_path),
+        "staged_path": manifest_path(manifest, staged_path),
+        "text": intent_text,
+    }
+    add_artifact(
+        manifest,
+        label="intent",
+        path=staged_path,
+        category="intent",
+        description="Captured experiment intent for this run.",
+        retention="keep" if protected else "normal",
+        protected=protected,
+    )
+
+
+def add_command(
+    manifest: dict[str, Any],
+    *,
+    label: str,
+    argv: list[str],
+    cwd: str | Path | None = None,
+    stdout_path: str | Path | None = None,
+    stderr_path: str | Path | None = None,
+    exit_code: int | None = None,
+) -> None:
+    manifest["commands"].append(
+        {
+            "label": label,
+            "argv": portable_value(manifest, argv),
+            "cwd": manifest_path(manifest, cwd),
+            "stdout_path": manifest_path(manifest, stdout_path),
+            "stderr_path": manifest_path(manifest, stderr_path),
+            "exit_code": exit_code,
+        }
+    )
+
+
+def add_artifact(
+    manifest: dict[str, Any],
+    *,
+    label: str,
+    path: str | Path,
+    category: str,
+    description: str | None = None,
+    required: bool = True,
+    retention: str = "normal",
+    protected: bool = False,
+) -> None:
+    manifest["artifacts"].append(
+        {
+            "label": label,
+            "path": manifest_path(manifest, path),
+            "category": category,
+            "description": description,
+            "required": required,
+            "retention": retention,
+            "protected": protected,
+        }
+    )
+
+
+def add_lesson(
+    manifest: dict[str, Any],
+    *,
+    text: str,
+    status: str = "active",
+) -> None:
+    manifest["lessons"].append({"status": status, "text": text})
+
+
+def add_analysis(
+    manifest: dict[str, Any],
+    *,
+    label: str,
+    question: str,
+    script: str | Path,
+    inputs: list[str | Path] | None = None,
+    outputs: list[str | Path] | None = None,
+    status: str = "active",
+    conclusion: str = "",
+) -> None:
+    manifest["analyses"].append(
+        {
+            "label": label,
+            "question": question,
+            "script": manifest_path(manifest, script),
+            "inputs": [manifest_path(manifest, path) for path in (inputs or [])],
+            "outputs": [manifest_path(manifest, path) for path in (outputs or [])],
+            "status": status,
+            "conclusion": conclusion,
+        }
+    )
+
+
+def set_details(manifest: dict[str, Any], details: dict[str, Any]) -> None:
+    manifest["details"] = details
+
+
+def set_result(
+    manifest: dict[str, Any],
+    *,
+    outcome: str,
+    summary: str,
+    metrics: dict[str, Any] | None = None,
+) -> None:
+    manifest["result"] = {
+        "outcome": outcome,
+        "summary": summary,
+        "metrics": metrics or {},
+    }
+
+
+def write_manifest(output_dir: Path, manifest: dict[str, Any]) -> Path:
+    manifest["provenance"]["updated_at_utc"] = utc_now_iso()
+    persisted_manifest = copy.deepcopy(manifest)
+    persisted_manifest.pop("_path_roots", None)
+    manifest_path = output_dir / MANIFEST_FILENAME
+    with manifest_path.open("w", encoding="utf-8") as outfile:
+        json.dump(persisted_manifest, outfile, indent=2, sort_keys=True)
+
+    legacy_path = output_dir / LEGACY_MANIFEST_FILENAME
+    with legacy_path.open("w", encoding="utf-8") as outfile:
+        json.dump(persisted_manifest, outfile, indent=2, sort_keys=True)
+    return manifest_path

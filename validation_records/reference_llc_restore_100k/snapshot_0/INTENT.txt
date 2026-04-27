@@ -1,0 +1,29 @@
+Run the validated timing-Ruby LLC restore path for `100000` instructions and
+capture it as a reference experiment, not a transient probe.
+
+Purpose:
+- confirm that the merged LLC restore implementation is active in gem5
+- confirm that the merged LLC replacement-policy alignment remains warm under a
+  representative `100K` run
+- produce a stable reference output that later experiments can compare against
+
+Reference status:
+- lifecycle state: `reference`
+- retention policy: `keep`
+- protected artifacts include:
+  - `stats.txt`
+  - `config.ini`
+  - `debug.insts`
+  - the experiment manifest itself
+
+Acceptance criteria:
+1. the gem5 run completes successfully
+2. `system.ruby.l2_cntrl0.L2cache.m_checkpoint_load_total > 0`
+3. `system.ruby.l2_cntrl0.L2cache.m_demand_hits > 0`
+
+What this experiment validates:
+- LLC warm restore is active, not silently bypassed
+- the current merged gem5 mainline still reflects the repaired restore
+  dispatch and the LRU-aligned LLC replacement policy
+- this output should remain available as a comparison target for future
+  restore phases such as private `L1D`

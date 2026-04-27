@@ -2,7 +2,6 @@
 
 import argparse
 import glob
-import json
 import os
 import shlex
 import shutil
@@ -13,6 +12,20 @@ import sys
 import time
 from collections import Counter
 from pathlib import Path
+
+VALIDATION_ROOT = Path(__file__).resolve().parents[1]
+if str(VALIDATION_ROOT) not in sys.path:
+    sys.path.insert(0, str(VALIDATION_ROOT))
+
+from experiment_manifest import (  # noqa: E402
+    add_artifact,
+    add_command,
+    build_manifest,
+    set_details,
+    set_result,
+    stage_intent,
+    write_manifest,
+)
 
 
 def parse_args():
@@ -245,7 +258,7 @@ def quit_qemu_via_monitor(host: str, port: int) -> bool:
             sock.sendall(b"quit\n")
         time.sleep(0.5)
         return True
-    except Exception:
+    except Exception as exc:
         return False
 
 
@@ -600,6 +613,59 @@ def main():
         "qflex": {},
         "gem5": {},
     }
+    manifest = build_manifest(
+        title="Atomic branch-trace comparison",
+        component="validation.branch_trace_atomic",
+        question=(
+            "Do QFlex and gem5 AtomicSimpleCPU produce comparable raw branch "
+            "traces when stopped at the same threshold?"
+        ),
+        output_dir=output_dir,
+        script_path=Path(__file__).resolve(),
+        repo_roots={
+            "qflex": qflex_root,
+            "QPoints": qflex_root / "QPoints",
+            "gem5": qflex_root / "QPoints" / "gem5",
+        },
+        inputs={
+            "snapshot": args.snapshot,
+            "core_count": args.core_count,
+            "branch_threshold": args.branch_threshold,
+            "qflex_run_dir": str(qflex_run_dir),
+            "gem5_ckp_dir": args.gem5_ckp_dir,
+            "gem5_experiment": args.gem5_experiment,
+        },
+        tags=["atomic", "branch-trace", "comparison"],
+        acceptance=[
+            {
+                "name": "qflex_threshold_reached",
+                "kind": "min_trace_entries",
+                "expected": args.branch_threshold,
+            },
+            {
+                "name": "gem5_threshold_reached",
+                "kind": "min_trace_entries",
+                "expected": args.branch_threshold,
+            },
+        ],
+    )
+    stage_intent(manifest, output_dir, Path(__file__).with_name("INTENT.txt"))
+    for label, path, category, description in (
+        ("qflex_stdout", qflex_stdout, "log", "Stdout from the QFlex branch-trace run."),
+        ("qflex_stderr", qflex_stderr, "log", "Stderr from the QFlex branch-trace run."),
+        ("gem5_stdout", gem5_stdout, "log", "Stdout from the gem5 branch-trace run."),
+        ("gem5_stderr", gem5_stderr, "log", "Stderr from the gem5 branch-trace run."),
+        ("qflex_stage_dir", qflex_stage_dir, "directory", "Staged QFlex branch-trace logs."),
+        ("gem5_stage_dir", gem5_stage_dir, "directory", "Staged gem5 branch-trace logs."),
+    ):
+        add_artifact(
+            manifest,
+            label=label,
+            path=path,
+            category=category,
+            description=description,
+        )
+    write_manifest(output_dir, manifest)
 
     qflex_proc = None
     gem5_proc = None
@@ -607,6 +673,7 @@ def main():
     qflex_stderr_file = None
     gem5_stdout_file = None
     gem5_stderr_file = None
+    gem5_exit_code = None
 
     try:
         qflex_proc, qflex_stdout_file, qflex_stderr_file, qflex_cmd = launch_qflex_trace(
@@ -664,6 +731,7 @@ def main():
             phase_name="gem5 AtomicSimpleCPU branch-trace run",
         )
         stop_process_group(gem5_proc)
+        gem5_exit_code = gem5_proc.returncode
 
         metadata["gem5"]["threshold_result"] = gem5_result
         metadata["gem5"]["copied_logs"] = copy_logs(
@@ -679,6 +747,32 @@ def main():
                 stop_process_group(qflex_proc)
         if gem5_proc is not None:
             stop_process_group(gem5_proc)
+        if metadata["qflex"].get("command"):
+            add_command(
+                manifest,
+                label="qflex_branch_trace",
+                argv=metadata["qflex"]["command"],
+                cwd=qflex_root,
+                stdout_path=qflex_stdout,
+                stderr_path=qflex_stderr,
+            )
+        if metadata["gem5"].get("command"):
+            add_command(
+                manifest,
+                label="gem5_branch_trace",
+                argv=metadata["gem5"]["command"],
+                cwd=qflex_root / "QPoints",
+                stdout_path=gem5_stdout,
+                stderr_path=gem5_stderr,
+                exit_code=gem5_exit_code,
+            )
+        set_details(manifest, metadata)
+        set_result(
+            manifest,
+            outcome="failed",
+            summary=f"Atomic branch-trace comparison failed: {exc}",
+        )
+        write_manifest(output_dir, manifest)
         raise
     finally:
         if qflex_stdout_file is not None:
@@ -690,8 +784,51 @@ def main():
         if gem5_stderr_file is not None:
             gem5_stderr_file.close()
 
-    with (output_dir / "manifest.json").open("w", encoding="utf-8") as outfile:
-        json.dump(metadata, outfile, indent=2, sort_keys=True)
+    add_command(
+        manifest,
+        label="qflex_branch_trace",
+        argv=metadata["qflex"]["command"],
+        cwd=qflex_root,
+        stdout_path=qflex_stdout,
+        stderr_path=qflex_stderr,
+    )
+    add_command(
+        manifest,
+        label="gem5_branch_trace",
+        argv=metadata["gem5"]["command"],
+        cwd=qflex_root / "QPoints",
+        stdout_path=gem5_stdout,
+        stderr_path=gem5_stderr,
+        exit_code=gem5_exit_code,
+    )
+    for log_name in metadata["qflex"]["copied_logs"]:
+        add_artifact(
+            manifest,
+            label=f"qflex_trace_{log_name}",
+            path=qflex_stage_dir / log_name,
+            category="trace-log",
+            description="Staged QFlex branch-trace log.",
+        )
+    for log_name in metadata["gem5"]["copied_logs"]:
+        add_artifact(
+            manifest,
+            label=f"gem5_trace_{log_name}",
+            path=gem5_stage_dir / log_name,
+            category="trace-log",
+            description="Staged gem5 branch-trace log.",
+        )
+    set_details(manifest, metadata)
+    set_result(
+        manifest,
+        outcome="completed",
+        summary="Collected and compared Atomic branch traces from QFlex and gem5.",
+        metrics={
+            "qflex_logs": len(metadata["qflex"]["copied_logs"]),
+            "gem5_logs": len(metadata["gem5"]["copied_logs"]),
+            "branch_threshold": args.branch_threshold,
+        },
+    )
+    write_manifest(output_dir, manifest)
 
     print_summary(metadata)
 

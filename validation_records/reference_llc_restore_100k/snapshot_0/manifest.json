@@ -1,0 +1,282 @@
+{
+  "acceptance": [
+    {
+      "expected": 0,
+      "kind": "process_exit_code",
+      "name": "command_exit_zero"
+    },
+    {
+      "expected": 0,
+      "kind": "stats_check",
+      "name": "system.ruby.l2_cntrl0.L2cache.m_checkpoint_load_total",
+      "operator": "gt"
+    },
+    {
+      "expected": 0,
+      "kind": "stats_check",
+      "name": "system.ruby.l2_cntrl0.L2cache.m_demand_hits",
+      "operator": "gt"
+    }
+  ],
+  "analyses": [
+    {
+      "conclusion": "The first ten recorded replacement probes matched the replayed LRU victim.",
+      "inputs": [
+        "analyses/lru_replay/lru_replay_trace.log",
+        "analyses/lru_replay/lru_replay_initial_state.json"
+      ],
+      "label": "lru-replay",
+      "outputs": [
+        "analyses/lru_replay/lru_replay_report.json"
+      ],
+      "question": "Does the recorded LLC victim sequence match the replayed LRU order from the staged initial state and trace?",
+      "script": "analyses/lru_replay/verify_lru_replay.py",
+      "status": "validated"
+    }
+  ],
+  "artifacts": [
+    {
+      "category": "intent",
+      "description": "Captured experiment intent for this run.",
+      "label": "intent",
+      "path": "INTENT.txt",
+      "protected": true,
+      "required": true,
+      "retention": "keep"
+    },
+    {
+      "category": "log",
+      "description": "Captured stdout from the experiment command.",
+      "label": "stdout",
+      "path": "experiment_stdout.log",
+      "protected": true,
+      "required": true,
+      "retention": "keep"
+    },
+    {
+      "category": "log",
+      "description": "Captured stderr from the experiment command.",
+      "label": "stderr",
+      "path": "experiment_stderr.log",
+      "protected": true,
+      "required": true,
+      "retention": "keep"
+    },
+    {
+      "category": "file",
+      "description": "Protected reference artifact.",
+      "label": "protected:stats.txt",
+      "path": "stats.txt",
+      "protected": true,
+      "required": true,
+      "retention": "keep"
+    },
+    {
+      "category": "file",
+      "description": "Protected reference artifact.",
+      "label": "protected:config.ini",
+      "path": "config.ini",
+      "protected": true,
+      "required": true,
+      "retention": "keep"
+    },
+    {
+      "category": "file",
+      "description": "Protected reference artifact.",
+      "label": "protected:debug.insts",
+      "path": "debug.insts",
+      "protected": true,
+      "required": true,
+      "retention": "keep"
+    },
+    {
+      "category": "stats",
+      "description": "Stats file used for acceptance checks.",
+      "label": "stats",
+      "path": "stats.txt",
+      "protected": true,
+      "required": true,
+      "retention": "keep"
+    },
+    {
+      "category": "analysis",
+      "description": "Packaged replacement-order replay verifier.",
+      "label": "analysis:verify_lru_replay.py",
+      "path": "analyses/lru_replay/verify_lru_replay.py",
+      "protected": true,
+      "required": true,
+      "retention": "keep"
+    },
+    {
+      "category": "analysis",
+      "description": "Curated LLC replacement trace slice used for replay validation.",
+      "label": "analysis:lru_replay_trace.log",
+      "path": "analyses/lru_replay/lru_replay_trace.log",
+      "protected": true,
+      "required": true,
+      "retention": "keep"
+    },
+    {
+      "category": "analysis",
+      "description": "Initial per-set LLC ordering extracted for replay validation.",
+      "label": "analysis:lru_replay_initial_state.json",
+      "path": "analyses/lru_replay/lru_replay_initial_state.json",
+      "protected": true,
+      "required": true,
+      "retention": "keep"
+    },
+    {
+      "category": "analysis",
+      "description": "Replay report comparing predicted and recorded LLC victims.",
+      "label": "analysis:lru_replay_report.json",
+      "path": "analyses/lru_replay/lru_replay_report.json",
+      "protected": true,
+      "required": true,
+      "retention": "keep"
+    }
+  ],
+  "commands": [
+    {
+      "argv": [
+        "bash",
+        "run_gem5.sh",
+        "--gem5-ckp-dir",
+        "/mnt/sdb/aansari/checkpoints/single-core",
+        "--experiment",
+        "reference_llc_restore_100k",
+        "--snapshot",
+        "snapshot_0",
+        "--inst",
+        "100000",
+        "--cores",
+        "1",
+        "--timing-ruby",
+        "--sim-config",
+        "restore_llc_state.args"
+      ],
+      "cwd": "<QPoints>",
+      "exit_code": 0,
+      "label": "experiment",
+      "stderr_path": "experiment_stderr.log",
+      "stdout_path": "experiment_stdout.log"
+    }
+  ],
+  "component": "restore.llc",
+  "details": {},
+  "inputs": {
+    "command": [
+      "bash",
+      "run_gem5.sh",
+      "--gem5-ckp-dir",
+      "/mnt/sdb/aansari/checkpoints/single-core",
+      "--experiment",
+      "reference_llc_restore_100k",
+      "--snapshot",
+      "snapshot_0",
+      "--inst",
+      "100000",
+      "--cores",
+      "1",
+      "--timing-ruby",
+      "--sim-config",
+      "restore_llc_state.args"
+    ]
+  },
+  "intent": {
+    "source_path": "<QPoints>/sim_outs/reference_llc_restore_100k/snapshot_0/INTENT.txt",
+    "staged_path": "INTENT.txt",
+    "text": "Run the validated timing-Ruby LLC restore path for `100000` instructions and\ncapture it as a reference experiment, not a transient probe.\n\nPurpose:\n- confirm that the merged LLC restore implementation is active in gem5\n- confirm that the merged LLC replacement-policy alignment remains warm under a\n  representative `100K` run\n- produce a stable reference output that later experiments can compare against\n\nReference status:\n- lifecycle state: `reference`\n- retention policy: `keep`\n- protected artifacts include:\n  - `stats.txt`\n  - `config.ini`\n  - `debug.insts`\n  - the experiment manifest itself\n\nAcceptance criteria:\n1. the gem5 run completes successfully\n2. `system.ruby.l2_cntrl0.L2cache.m_checkpoint_load_total > 0`\n3. `system.ruby.l2_cntrl0.L2cache.m_demand_hits > 0`\n\nWhat this experiment validates:\n- LLC warm restore is active, not silently bypassed\n- the current merged gem5 mainline still reflects the repaired restore\n  dispatch and the LRU-aligned LLC replacement policy\n- this output should remain available as a comparison target for future\n  restore phases such as private `L1D`\n"
+  },
+  "kind": "experiment",
+  "lessons": [],
+  "lifecycle": {
+    "retention_policy": "keep",
+    "state": "reference"
+  },
+  "provenance": {
+    "clean_run_policy": {
+      "allowed_dirty_paths": {
+        "QPoints": [
+          "validation_records/reference_llc_restore_100k/snapshot_0"
+        ],
+        "gem5": [],
+        "qflex": [
+          "QPoints"
+        ]
+      },
+      "enforced": true
+    },
+    "created_at_utc": "2026-04-27T12:59:49+00:00",
+    "output_dir": ".",
+    "path_aliases": {
+      "QPoints": "<QPoints>",
+      "gem5": "<gem5>",
+      "qflex": "<qflex>"
+    },
+    "repo_states": {
+      "QPoints": {
+        "allowed_dirty_paths": [
+          "validation_records/reference_llc_restore_100k/snapshot_0"
+        ],
+        "branch": "gem5-integration/uarch/ali/validation-llc-reference",
+        "dirty": false,
+        "dirty_entries": [],
+        "head": "bfbc146ce360a5e4c200a008de53f3fc05dc8d82",
+        "ignored_dirty_entries": [
+          " M validation_records/reference_llc_restore_100k/snapshot_0/INTENT.txt",
+          " M validation_records/reference_llc_restore_100k/snapshot_0/experiment_manifest.json",
+          " M validation_records/reference_llc_restore_100k/snapshot_0/experiment_stdout.log",
+          " M validation_records/reference_llc_restore_100k/snapshot_0/manifest.json",
+          " M validation_records/reference_llc_restore_100k/snapshot_0/stats.txt"
+        ],
+        "path": "<QPoints>",
+        "raw_dirty": true
+      },
+      "gem5": {
+        "allowed_dirty_paths": [],
+        "branch": "gem5-integration/main",
+        "dirty": false,
+        "dirty_entries": [],
+        "head": "5b258405567f978e0fe24e027ed75a2ad9669364",
+        "ignored_dirty_entries": [],
+        "path": "<gem5>",
+        "raw_dirty": false
+      },
+      "qflex": {
+        "allowed_dirty_paths": [
+          "QPoints"
+        ],
+        "branch": "gem5-integration/main",
+        "dirty": false,
+        "dirty_entries": [],
+        "head": "0e46cf034fd0356542e9433e549200045505cf19",
+        "ignored_dirty_entries": [
+          " M QPoints"
+        ],
+        "path": "<qflex>",
+        "raw_dirty": true
+      }
+    },
+    "script": "<QPoints>/scripts/validation/run_experiment.py",
+    "updated_at_utc": "2026-04-27T13:01:47+00:00"
+  },
+  "question": "Does the merged LLC restore plus LRU-aligned replacement path remain active and warm for a 100K timing-Ruby run?",
+  "result": {
+    "metrics": {
+      "exit_code": 0,
+      "system.ruby.l2_cntrl0.L2cache.m_checkpoint_load_total": 11265,
+      "system.ruby.l2_cntrl0.L2cache.m_demand_hits": 15373
+    },
+    "outcome": "passed",
+    "summary": "Experiment command completed successfully."
+  },
+  "schema_version": 2,
+  "supersedes": [],
+  "tags": [
+    "reference",
+    "llc",
+    "timing-ruby",
+    "snapshot_0"
+  ],
+  "title": "Reference LLC restore 100K"
+}
