@@ -81,6 +81,7 @@ def test_experiment_manifest_stages_intent_and_writes_files(tmp_path: Path):
     assert manifest_disk["title"] == "Validation smoke"
     assert manifest_disk["intent"]["text"] == "Why this experiment exists.\n"
     assert manifest_disk["artifacts"][0]["label"] == "intent"
+    assert manifest_disk["artifacts"][0]["path"] == "INTENT.txt"
     assert "status" not in manifest_disk
     assert manifest_disk["result"]["outcome"] == "completed"
 
@@ -109,7 +110,7 @@ def test_experiment_manifest_reuses_in_place_reference_intent(tmp_path: Path):
     )
     module.stage_intent(manifest, output_dir, intent_path)
 
-    assert manifest["intent"]["staged_path"] == str(intent_path)
+    assert manifest["intent"]["staged_path"] == "INTENT.txt"
     assert manifest["artifacts"][0]["protected"] is True
     assert manifest["artifacts"][0]["retention"] == "keep"
     assert intent_path.read_text(encoding="utf-8") == "Reference intent.\n"
@@ -237,6 +238,7 @@ def test_run_experiment_writes_manifest_and_logs(tmp_path: Path):
     )
     assert manifest["result"]["outcome"] == "passed"
     assert manifest["commands"][0]["argv"][0] == sys.executable
+    assert manifest["commands"][0]["stdout_path"] == "experiment_stdout.log"
     assert (output_dir / "copied" / "source.txt").read_text(encoding="utf-8") == (
         "staged artifact\n"
     )
@@ -253,3 +255,73 @@ def test_validation_records_readme_exists():
     assert "sim_outs/" in text
     assert "self-contained" in text
     assert "reproduce" in text
+
+
+def test_run_experiment_requires_stats_file_for_stat_checks(tmp_path: Path):
+    repo_root = Path(__file__).resolve().parents[1]
+    runner = repo_root / "scripts" / "validation" / "run_experiment.py"
+    output_dir = tmp_path / "output"
+
+    result = subprocess.run(
+        [
+            sys.executable,
+            str(runner),
+            "--output-dir",
+            str(output_dir),
+            "--title",
+            "Runner stats contract",
+            "--component",
+            "validation.runner",
+            "--question",
+            "Do stat checks require an explicit stats file?",
+            "--require-stat",
+            "some.stat,gt,0",
+            "--",
+            sys.executable,
+            "-c",
+            "print('hello')",
+        ],
+        cwd=str(repo_root),
+        check=False,
+        text=True,
+        capture_output=True,
+    )
+
+    assert result.returncode != 0
+    assert "--require-stat requires --stats-file" in result.stderr
+
+
+def test_run_experiment_rejects_escape_in_staged_artifact_dest(tmp_path: Path):
+    repo_root = Path(__file__).resolve().parents[1]
+    runner = repo_root / "scripts" / "validation" / "run_experiment.py"
+    output_dir = tmp_path / "output"
+    source_artifact = tmp_path / "source.txt"
+    source_artifact.write_text("data\n", encoding="utf-8")
+
+    result = subprocess.run(
+        [
+            sys.executable,
+            str(runner),
+            "--output-dir",
+            str(output_dir),
+            "--title",
+            "Runner stage path guard",
+            "--component",
+            "validation.runner",
+            "--question",
+            "Does staged artifact validation reject path escape attempts?",
+            "--stage-artifact-from",
+            f"{source_artifact}:../outside.txt",
+            "--",
+            sys.executable,
+            "-c",
+            "print('hello')",
+        ],
+        cwd=str(repo_root),
+        check=False,
+        text=True,
+        capture_output=True,
+    )
+
+    assert result.returncode != 0
+    assert "destination must be a clean relative path" in result.stderr

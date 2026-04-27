@@ -650,7 +650,7 @@ def main():
         ],
     )
     stage_intent(manifest, output_dir, Path(__file__).with_name("INTENT.txt"))
-    for label, path, description in (
+    for label, path, category, description in (
         ("qflex_stdout", qflex_stdout, "log", "Stdout from the QFlex branch-trace run."),
         ("qflex_stderr", qflex_stderr, "log", "Stderr from the QFlex branch-trace run."),
         ("gem5_stdout", gem5_stdout, "log", "Stdout from the gem5 branch-trace run."),

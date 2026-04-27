@@ -111,6 +111,19 @@ def prepare_output_dir(output_dir: Path, clean: bool = False) -> None:
     output_dir.mkdir(parents=True, exist_ok=True)
 
 
+def manifest_path(manifest: dict[str, Any], path: str | Path | None) -> str | None:
+    if path is None:
+        return None
+    path_obj = Path(path)
+    output_dir = Path(manifest["provenance"]["output_dir"])
+    try:
+        resolved_path = path_obj.resolve()
+        resolved_output_dir = output_dir.resolve()
+        return str(resolved_path.relative_to(resolved_output_dir))
+    except (RuntimeError, ValueError, FileNotFoundError):
+        return str(path_obj)
+
+
 def build_manifest(
     *,
     title: str,
@@ -175,8 +188,8 @@ def stage_intent(
         shutil.copy2(intent_path, staged_path)
     intent_text = intent_path.read_text(encoding="utf-8")
     manifest["intent"] = {
-        "source_path": str(intent_path),
-        "staged_path": str(staged_path),
+        "source_path": manifest_path(manifest, intent_path),
+        "staged_path": manifest_path(manifest, staged_path),
         "text": intent_text,
     }
     add_artifact(
@@ -205,8 +218,8 @@ def add_command(
             "label": label,
             "argv": argv,
             "cwd": str(cwd) if cwd is not None else None,
-            "stdout_path": str(stdout_path) if stdout_path is not None else None,
-            "stderr_path": str(stderr_path) if stderr_path is not None else None,
+            "stdout_path": manifest_path(manifest, stdout_path),
+            "stderr_path": manifest_path(manifest, stderr_path),
             "exit_code": exit_code,
         }
     )
@@ -226,7 +239,7 @@ def add_artifact(
     manifest["artifacts"].append(
         {
             "label": label,
-            "path": str(path),
+            "path": manifest_path(manifest, path),
             "category": category,
             "description": description,
             "required": required,
@@ -260,9 +273,9 @@ def add_analysis(
         {
             "label": label,
             "question": question,
-            "script": str(script),
-            "inputs": [str(path) for path in (inputs or [])],
-            "outputs": [str(path) for path in (outputs or [])],
+            "script": manifest_path(manifest, script),
+            "inputs": [manifest_path(manifest, path) for path in (inputs or [])],
+            "outputs": [manifest_path(manifest, path) for path in (outputs or [])],
             "status": status,
             "conclusion": conclusion,
         }

@@ -78,9 +78,9 @@ def parse_stage_spec(spec: str) -> tuple[Path, Path]:
         )
     source = Path(source_text).expanduser().resolve()
     dest = Path(dest_text) if sep and dest_text.strip() else Path(source.name)
-    if dest.is_absolute():
+    if dest.is_absolute() or ".." in dest.parts:
         raise SystemExit(
-            f"Invalid staged destination in {spec!r}; destination must be relative."
+            f"Invalid staged destination in {spec!r}; destination must be a clean relative path."
         )
     return source, dest
 
@@ -230,6 +230,10 @@ def main() -> int:
     if not command:
         raise SystemExit("No command provided. Pass the experiment command after '--'.")
     stat_requirements = [parse_stat_requirement(spec) for spec in args.require_stat]
+    if stat_requirements and not args.stats_file:
+        raise SystemExit(
+            "--require-stat requires --stats-file so stat acceptance checks can be evaluated."
+        )
 
     output_dir = Path(args.output_dir).resolve()
     repo_roots = {

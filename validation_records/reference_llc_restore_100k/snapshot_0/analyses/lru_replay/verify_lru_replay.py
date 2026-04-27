@@ -64,6 +64,20 @@ def main() -> int:
         incoming = int(probe_match.group(1), 16)
         victim = int(probe_match.group(2), 16)
         set_idx = cache_set(incoming, args.line_size, args.num_sets)
+        if set_idx not in state or not state[set_idx]:
+            matches.append(
+                {
+                    "set": set_idx,
+                    "incoming": hex(incoming),
+                    "predicted_victim": None,
+                    "actual_victim": hex(victim),
+                    "match": False,
+                    "message": (
+                        f"replacement probe targeted untracked or empty set {set_idx}"
+                    ),
+                }
+            )
+            continue
         predicted = state[set_idx][0]
         matched = predicted == victim
         matches.append(
