@@ -182,9 +182,14 @@ def test_prepare_snapshot_gem5_uarch_writes_outputs_and_manifest(tmp_path: Path)
     gem5_uarch_dir = gem5_workload_root / "snapshot_0.gem5_uarch"
     output_file = gem5_uarch_dir / "llc_restore_addrs.txt"
     l1d_file = gem5_uarch_dir / "l1d_restore_candidates.json"
+    l1d_restore_file = gem5_uarch_dir / "l1d_restore_addrs.core0.txt"
     manifest_file = gem5_uarch_dir / "manifest.json"
 
     assert output_file.read_text(encoding="utf-8") == "0x100\n0x140\n"
+    assert (
+        l1d_restore_file.read_text(encoding="utf-8")
+        == "0x1c0\n0x200\n0x240\n0x280\n"
+    )
     l1d_candidates = json.loads(l1d_file.read_text(encoding="utf-8"))
     assert l1d_candidates == {
         "schema_version": 1,
@@ -243,7 +248,10 @@ def test_prepare_snapshot_gem5_uarch_writes_outputs_and_manifest(tmp_path: Path)
     assert manifest["components"]["llc"]["stats"]["candidate_restorable_llc_lines"] == 3
     assert manifest["components"]["llc"]["stats"]["candidate_restorable_clean_lines"] == 2
     assert manifest["components"]["llc"]["stats"]["candidate_restorable_modified_lines"] == 1
-    assert manifest["components"]["l1d"]["output_file"] == str(l1d_file)
+    assert manifest["components"]["l1d"]["candidate_file"] == str(l1d_file)
+    assert manifest["components"]["l1d"]["restore_files"] == {
+        "0": str(l1d_restore_file)
+    }
     assert manifest["components"]["l1d"]["line_count"] == 4
     assert (
         manifest["components"]["l1d"]["stats"]["total_private_lines"] == 5
@@ -527,6 +535,22 @@ def test_prepare_snapshot_gem5_uarch_preserves_per_core_l1d_candidates(
             "writeable": True,
         },
     ]
+    assert (
+        (
+            gem5_workload_root
+            / "snapshot_0.gem5_uarch"
+            / "l1d_restore_addrs.core0.txt"
+        ).read_text(encoding="utf-8")
+        == "0x300\n"
+    )
+    assert (
+        (
+            gem5_workload_root
+            / "snapshot_0.gem5_uarch"
+            / "l1d_restore_addrs.core1.txt"
+        ).read_text(encoding="utf-8")
+        == "0x300\n"
+    )
 
 
 def test_prepare_snapshot_gem5_uarch_requires_architectural_checkpoint_dir(

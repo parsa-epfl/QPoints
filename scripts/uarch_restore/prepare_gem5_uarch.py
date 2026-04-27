@@ -15,6 +15,7 @@ GEM5_UARCH_SUFFIX = ".gem5_uarch"
 QFLEX_UARCH_SUFFIX = ".uarch"
 LLC_RESTORE_FILE = "llc_restore_addrs.txt"
 L1D_CANDIDATE_FILE = "l1d_restore_candidates.json"
+L1D_RESTORE_FILE_TEMPLATE = "l1d_restore_addrs.core{core}.txt"
 LLC_SOURCE_FILE = "llc-0.json.zstd"
 DIRECTORY_SOURCE_FILE = "directory-0.json.zstd"
 HARVARD_SOURCE_FILE = "harvard-0.json.zstd"
@@ -110,6 +111,21 @@ def _write_json_file(path: Path, payload: object, overwrite: bool) -> None:
         json.dumps(payload, indent=2, sort_keys=True) + "\n",
         encoding="utf-8",
     )
+
+
+def _write_l1d_restore_files(
+    root: Path, candidates: list[dict], overwrite: bool
+) -> dict[int, Path]:
+    per_core = {}
+    for candidate in candidates:
+        per_core.setdefault(candidate["core"], []).append(int(candidate["line_addr"], 16))
+
+    outputs = {}
+    for core, addrs in per_core.items():
+        target = root / L1D_RESTORE_FILE_TEMPLATE.format(core=core)
+        _write_addr_file(target, addrs, overwrite)
+        outputs[core] = target
+    return outputs
 
 
 def _order_restore_lines(lines: list[dict]) -> list[dict]:
@@ -362,6 +378,9 @@ def prepare_snapshot_gem5_uarch(
         },
         overwrite,
     )
+    l1d_restore_files = _write_l1d_restore_files(
+        gem5_uarch_dir, l1d_candidates, overwrite
+    )
 
     manifest = {
         "schema_version": 1,
@@ -389,7 +408,11 @@ def prepare_snapshot_gem5_uarch(
             },
             "l1d": {
                 "source_file": str(harvard_source_file),
-                "output_file": str(l1d_candidate_file),
+                "candidate_file": str(l1d_candidate_file),
+                "restore_files": {
+                    str(core): str(path)
+                    for core, path in sorted(l1d_restore_files.items())
+                },
                 "line_count": len(l1d_candidates),
                 "selection_policy": (
                     "all valid private L1D lines from the QFlex Harvard state, "

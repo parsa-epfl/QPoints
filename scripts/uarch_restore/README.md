@@ -22,6 +22,7 @@ Today, the restore-prep artifacts we materialize are:
 
 - `llc_restore_addrs.txt`
 - `l1d_restore_candidates.json`
+- `l1d_restore_addrs.coreN.txt`
 
 Later, this directory can grow to include richer postprocessing for:
 
@@ -60,7 +61,11 @@ Current behavior:
    - `gem5-workload-root/snapshot_0.gem5_uarch/llc_restore_addrs.txt`
 5. Writes an ordered L1D candidate inventory for the next restore phase:
    - `gem5-workload-root/snapshot_0.gem5_uarch/l1d_restore_candidates.json`
-6. Writes a small manifest:
+6. Writes per-core L1D warm-restore inputs for gem5:
+   - `gem5-workload-root/snapshot_0.gem5_uarch/l1d_restore_addrs.core0.txt`
+   - `gem5-workload-root/snapshot_0.gem5_uarch/l1d_restore_addrs.core1.txt`
+   - etc.
+7. Writes a small manifest:
    - `gem5-workload-root/snapshot_0.gem5_uarch/manifest.json`
 
 This is intentionally small and boring for the first phase. The shape is the
