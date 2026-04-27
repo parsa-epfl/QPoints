@@ -1,0 +1,27 @@
+l1d_resident_rw is a validation microbenchmark for the checkpoint-conversion
+flow.
+
+Intent:
+- Create a data footprint that fits comfortably inside the 64 KiB private
+  L1-D cache.
+- Touch one 64 B cache line per inner-loop iteration.
+- Perform a read-modify-write so the benchmark creates real load and store
+  traffic instead of a read-only stream.
+- Revisit the same footprint repeatedly so restored private-cache warmth
+  should matter immediately after checkpoint restore.
+
+Why this benchmark exists:
+- The LLC-resident benchmark intentionally exceeds L1-D capacity so demand
+  misses fall through to the shared cache.
+- That makes it a poor detector for private L1-D checkpoint restoration.
+- This 32 KiB benchmark should keep its working set resident in L1-D once
+  warmed, which is better for validating whether restored private-cache state
+  is preserved across checkpoint conversion and gem5 restore.
+
+Compiler-behavior guardrails:
+- The array is globally allocated and 64 B aligned.
+- The loop uses one word per cache line.
+- A volatile sink consumes the checksum from each full pass so the compiler
+  cannot discard the loop body as dead work.
+- The Makefile disables some aggressive loop transformations to keep the access
+  pattern closer to the intended cache behavior.
