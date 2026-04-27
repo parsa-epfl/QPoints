@@ -2,12 +2,25 @@
 
 import argparse
 import glob
-import json
 import shutil
 import subprocess
 import sys
 from dataclasses import dataclass
 from pathlib import Path
+
+VALIDATION_ROOT = Path(__file__).resolve().parents[1]
+if str(VALIDATION_ROOT) not in sys.path:
+    sys.path.insert(0, str(VALIDATION_ROOT))
+
+from experiment_manifest import (  # noqa: E402
+    add_artifact,
+    add_command,
+    build_manifest,
+    set_details,
+    set_result,
+    stage_intent,
+    write_manifest,
+)
 
 
 def parse_args():
@@ -450,9 +463,68 @@ def main():
             "analysis": {},
         },
     }
+    manifest = build_manifest(
+        title="Ruby data-trace cache replay",
+        component="validation.data_trace_ruby",
+        question=(
+            "What request stream does the Ruby L1D controller actually see, "
+            "and does it match the benchmark pattern we expect?"
+        ),
+        output_dir=output_dir,
+        script_path=Path(__file__).resolve(),
+        repo_roots={
+            "qflex": qpoints_root.parent,
+            "QPoints": qpoints_root,
+            "gem5": qpoints_root / "gem5",
+        },
+        inputs={
+            "snapshot": args.snapshot,
+            "core_count": args.core_count,
+            "inst": args.inst,
+            "gem5_ckp_dir": args.gem5_ckp_dir,
+            "gem5_experiment": args.gem5_experiment,
+            "cache_line_size": args.cache_line_size,
+            "l1d_size_bytes": args.l1d_size_bytes,
+            "l1d_assoc": args.l1d_assoc,
+            "llc_size_bytes": args.llc_size_bytes,
+            "llc_assoc": args.llc_assoc,
+        },
+        tags=["ruby", "data-trace", "cache-replay"],
+        acceptance=[
+            {
+                "name": "gem5_run_completes",
+                "kind": "process_exit_code",
+                "expected": 0,
+            }
+        ],
+    )
+    stage_intent(manifest, output_dir, Path(__file__).with_name("INTENT.txt"))
+    add_artifact(
+        manifest,
+        label="gem5_stdout",
+        path=gem5_stdout,
+        category="log",
+        description="Stdout from the gem5 timing-Ruby data-trace run.",
+    )
+    add_artifact(
+        manifest,
+        label="gem5_stderr",
+        path=gem5_stderr,
+        category="log",
+        description="Stderr from the gem5 timing-Ruby data-trace run.",
+    )
+    add_artifact(
+        manifest,
+        label="gem5_stage_dir",
+        path=gem5_stage_dir,
+        category="directory",
+        description="Staged Ruby data-trace logs for this experiment.",
+    )
+    write_manifest(output_dir, manifest)
 
     stdout_file = None
     stderr_file = None
+    exit_code = None
     try:
         proc, stdout_file, stderr_file, command = launch_gem5_data_trace(
             qpoints_root=qpoints_root,
@@ -470,6 +542,26 @@ def main():
         exit_code = proc.wait()
         if exit_code != 0:
             raise RuntimeError(f"gem5 Ruby data-trace run failed with exit code {exit_code}")
+    except Exception as exc:
+        if metadata["gem5"].get("command"):
+            add_command(
+                manifest,
+                label="gem5_ruby_data_trace",
+                argv=metadata["gem5"]["command"],
+                cwd=qpoints_root,
+                stdout_path=gem5_stdout,
+                stderr_path=gem5_stderr,
+                exit_code=exit_code,
+            )
+        set_details(manifest, metadata)
+        set_result(
+            manifest,
+            outcome="failed",
+            summary=f"Ruby data-trace experiment failed: {exc}",
+            metrics={"exit_code": exit_code},
+        )
+        write_manifest(output_dir, manifest)
+        raise
     finally:
         if stdout_file is not None:
             stdout_file.close()
@@ -488,8 +580,34 @@ def main():
         )
         metadata["gem5"]["analysis"][log_name] = analysis
 
-    with (output_dir / "manifest.json").open("w", encoding="utf-8") as outfile:
-        json.dump(metadata, outfile, indent=2, sort_keys=True)
+    add_command(
+        manifest,
+        label="gem5_ruby_data_trace",
+        argv=metadata["gem5"]["command"],
+        cwd=qpoints_root,
+        stdout_path=gem5_stdout,
+        stderr_path=gem5_stderr,
+        exit_code=exit_code,
+    )
+    for log_name in metadata["gem5"]["copied_logs"]:
+        add_artifact(
+            manifest,
+            label=f"gem5_trace_{log_name}",
+            path=gem5_stage_dir / log_name,
+            category="trace-log",
+            description="Staged gem5 timing-Ruby data-trace log.",
+        )
+    set_details(manifest, metadata)
+    set_result(
+        manifest,
+        outcome="completed",
+        summary="Collected and analyzed timing-Ruby data traces.",
+        metrics={
+            "copied_logs": len(metadata["gem5"]["copied_logs"]),
+            "exit_code": exit_code,
+        },
+    )
+    write_manifest(output_dir, manifest)
 
     print_summary(metadata)
     return 0
