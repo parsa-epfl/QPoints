@@ -20,17 +20,17 @@
   ],
   "analyses": [
     {
-      "conclusion": "The first ten recorded replacement probes matched the replayed LRU victim for every checked set.",
+      "conclusion": "The first ten recorded replacement probes matched the replayed LRU victim.",
       "inputs": [
-        "/home/dev/qflex_git/QPoints/validation_records/reference_llc_restore_100k/snapshot_0/analyses/lru_replay/lru_replay_trace.log",
-        "/home/dev/qflex_git/QPoints/validation_records/reference_llc_restore_100k/snapshot_0/analyses/lru_replay/lru_replay_initial_state.json"
+        "analyses/lru_replay/lru_replay_trace.log",
+        "analyses/lru_replay/lru_replay_initial_state.json"
       ],
       "label": "lru-replay",
       "outputs": [
-        "/home/dev/qflex_git/QPoints/validation_records/reference_llc_restore_100k/snapshot_0/analyses/lru_replay/lru_replay_report.json"
+        "analyses/lru_replay/lru_replay_report.json"
       ],
-      "question": "Does the recorded LLC replacement victim match the replayed LRU victim for the first ten replacement events?",
-      "script": "/home/dev/qflex_git/QPoints/validation_records/reference_llc_restore_100k/snapshot_0/analyses/lru_replay/verify_lru_replay.py",
+      "question": "Does the recorded LLC victim sequence match the replayed LRU order from the staged initial state and trace?",
+      "script": "analyses/lru_replay/verify_lru_replay.py",
       "status": "validated"
     }
   ],
@@ -39,7 +39,7 @@
       "category": "intent",
       "description": "Captured experiment intent for this run.",
       "label": "intent",
-      "path": "/home/dev/qflex_git/QPoints/validation_records/reference_llc_restore_100k/snapshot_0/INTENT.txt",
+      "path": "INTENT.txt",
       "protected": true,
       "required": true,
       "retention": "keep"
@@ -48,7 +48,7 @@
       "category": "log",
       "description": "Captured stdout from the experiment command.",
       "label": "stdout",
-      "path": "/home/dev/qflex_git/QPoints/validation_records/reference_llc_restore_100k/snapshot_0/experiment_stdout.log",
+      "path": "experiment_stdout.log",
       "protected": true,
       "required": true,
       "retention": "keep"
@@ -57,43 +57,16 @@
       "category": "log",
       "description": "Captured stderr from the experiment command.",
       "label": "stderr",
-      "path": "/home/dev/qflex_git/QPoints/validation_records/reference_llc_restore_100k/snapshot_0/experiment_stderr.log",
+      "path": "experiment_stderr.log",
       "protected": true,
       "required": true,
       "retention": "keep"
     },
     {
       "category": "file",
-      "description": "Tracked experiment artifact.",
-      "label": "artifact:stats.txt",
-      "path": "/home/dev/qflex_git/QPoints/validation_records/reference_llc_restore_100k/snapshot_0/stats.txt",
-      "protected": false,
-      "required": true,
-      "retention": "normal"
-    },
-    {
-      "category": "file",
-      "description": "Tracked experiment artifact.",
-      "label": "artifact:config.ini",
-      "path": "/home/dev/qflex_git/QPoints/validation_records/reference_llc_restore_100k/snapshot_0/config.ini",
-      "protected": false,
-      "required": true,
-      "retention": "normal"
-    },
-    {
-      "category": "file",
-      "description": "Tracked experiment artifact.",
-      "label": "artifact:debug.insts",
-      "path": "/home/dev/qflex_git/QPoints/validation_records/reference_llc_restore_100k/snapshot_0/debug.insts",
-      "protected": false,
-      "required": true,
-      "retention": "normal"
-    },
-    {
-      "category": "file",
       "description": "Protected reference artifact.",
       "label": "protected:stats.txt",
-      "path": "/home/dev/qflex_git/QPoints/validation_records/reference_llc_restore_100k/snapshot_0/stats.txt",
+      "path": "stats.txt",
       "protected": true,
       "required": true,
       "retention": "keep"
@@ -102,7 +75,7 @@
       "category": "file",
       "description": "Protected reference artifact.",
       "label": "protected:config.ini",
-      "path": "/home/dev/qflex_git/QPoints/validation_records/reference_llc_restore_100k/snapshot_0/config.ini",
+      "path": "config.ini",
       "protected": true,
       "required": true,
       "retention": "keep"
@@ -111,43 +84,7 @@
       "category": "file",
       "description": "Protected reference artifact.",
       "label": "protected:debug.insts",
-      "path": "/home/dev/qflex_git/QPoints/validation_records/reference_llc_restore_100k/snapshot_0/debug.insts",
-      "protected": true,
-      "required": true,
-      "retention": "keep"
-    },
-    {
-      "category": "file",
-      "description": "Protected reference artifact.",
-      "label": "protected:experiment_manifest.json",
-      "path": "/home/dev/qflex_git/QPoints/validation_records/reference_llc_restore_100k/snapshot_0/experiment_manifest.json",
-      "protected": true,
-      "required": true,
-      "retention": "keep"
-    },
-    {
-      "category": "file",
-      "description": "Protected reference artifact.",
-      "label": "protected:manifest.json",
-      "path": "/home/dev/qflex_git/QPoints/validation_records/reference_llc_restore_100k/snapshot_0/manifest.json",
-      "protected": true,
-      "required": true,
-      "retention": "keep"
-    },
-    {
-      "category": "file",
-      "description": "Protected reference artifact.",
-      "label": "protected:INTENT.txt",
-      "path": "/home/dev/qflex_git/QPoints/validation_records/reference_llc_restore_100k/snapshot_0/INTENT.txt",
-      "protected": true,
-      "required": true,
-      "retention": "keep"
-    },
-    {
-      "category": "file",
-      "description": "Protected reference artifact.",
-      "label": "protected:restore_llc_state.args",
-      "path": "/home/dev/qflex_git/QPoints/validation_records/reference_llc_restore_100k/snapshot_0/restore_llc_state.args",
+      "path": "debug.insts",
       "protected": true,
       "required": true,
       "retention": "keep"
@@ -156,43 +93,43 @@
       "category": "stats",
       "description": "Stats file used for acceptance checks.",
       "label": "stats",
-      "path": "/home/dev/qflex_git/QPoints/validation_records/reference_llc_restore_100k/snapshot_0/stats.txt",
+      "path": "stats.txt",
       "protected": true,
       "required": true,
       "retention": "keep"
     },
     {
-      "category": "analysis-script",
-      "description": "Script used to replay LLC LRU state against the staged replacement trace.",
-      "label": "analysis-script",
-      "path": "/home/dev/qflex_git/QPoints/validation_records/reference_llc_restore_100k/snapshot_0/analyses/lru_replay/verify_lru_replay.py",
+      "category": "analysis",
+      "description": "Packaged replacement-order replay verifier.",
+      "label": "analysis:verify_lru_replay.py",
+      "path": "analyses/lru_replay/verify_lru_replay.py",
       "protected": true,
       "required": true,
       "retention": "keep"
     },
     {
-      "category": "analysis-input",
-      "description": "Curated L2 trace lines and replacement probes used by the replay script.",
-      "label": "analysis-trace",
-      "path": "/home/dev/qflex_git/QPoints/validation_records/reference_llc_restore_100k/snapshot_0/analyses/lru_replay/lru_replay_trace.log",
+      "category": "analysis",
+      "description": "Curated LLC replacement trace slice used for replay validation.",
+      "label": "analysis:lru_replay_trace.log",
+      "path": "analyses/lru_replay/lru_replay_trace.log",
       "protected": true,
       "required": true,
       "retention": "keep"
     },
     {
-      "category": "analysis-input",
-      "description": "Initial restorable LLC line order for the tracked sets, derived from QFlex timestamps.",
-      "label": "analysis-initial-state",
-      "path": "/home/dev/qflex_git/QPoints/validation_records/reference_llc_restore_100k/snapshot_0/analyses/lru_replay/lru_replay_initial_state.json",
+      "category": "analysis",
+      "description": "Initial per-set LLC ordering extracted for replay validation.",
+      "label": "analysis:lru_replay_initial_state.json",
+      "path": "analyses/lru_replay/lru_replay_initial_state.json",
       "protected": true,
       "required": true,
       "retention": "keep"
     },
     {
-      "category": "analysis-output",
-      "description": "Machine-readable replay result for the first ten replacement probes.",
-      "label": "analysis-report",
-      "path": "/home/dev/qflex_git/QPoints/validation_records/reference_llc_restore_100k/snapshot_0/analyses/lru_replay/lru_replay_report.json",
+      "category": "analysis",
+      "description": "Replay report comparing predicted and recorded LLC victims.",
+      "label": "analysis:lru_replay_report.json",
+      "path": "analyses/lru_replay/lru_replay_report.json",
       "protected": true,
       "required": true,
       "retention": "keep"
@@ -215,13 +152,13 @@
         "1",
         "--timing-ruby",
         "--sim-config",
-        "/home/dev/qflex_git/QPoints/validation_records/reference_llc_restore_100k/snapshot_0/restore_llc_state.args"
+        "restore_llc_state.args"
       ],
-      "cwd": "/home/dev/qflex_git/QPoints",
+      "cwd": "<QPoints>",
       "exit_code": 0,
       "label": "experiment",
-      "stderr_path": "/home/dev/qflex_git/QPoints/validation_records/reference_llc_restore_100k/snapshot_0/experiment_stderr.log",
-      "stdout_path": "/home/dev/qflex_git/QPoints/validation_records/reference_llc_restore_100k/snapshot_0/experiment_stdout.log"
+      "stderr_path": "experiment_stderr.log",
+      "stdout_path": "experiment_stdout.log"
     }
   ],
   "component": "restore.llc",
@@ -242,13 +179,13 @@
       "1",
       "--timing-ruby",
       "--sim-config",
-      "/home/dev/qflex_git/QPoints/validation_records/reference_llc_restore_100k/snapshot_0/restore_llc_state.args"
+      "restore_llc_state.args"
     ]
   },
   "intent": {
-    "source_path": "/home/dev/qflex_git/QPoints/validation_records/reference_llc_restore_100k/snapshot_0/INTENT.txt",
-    "staged_path": "/home/dev/qflex_git/QPoints/validation_records/reference_llc_restore_100k/snapshot_0/INTENT.txt",
-    "text": "Title: Reference LLC restore 100K\n\nQuestion:\nDoes the merged LLC restore path, together with the current LLC LRU replacement\npolicy, remain active and warm for a 100K timing-Ruby run from snapshot_0?\n\nWhy this package exists:\n- preserve a clean, tracked validation record for the merged LLC feature set\n- give future work a stable reference experiment for comparison\n- make the runtime input and acceptance checks self-contained inside the\n  validation package itself\n\nAcceptance:\n- checkpoint restore must be active\n- LLC demand hits must be nonzero\n- the run must complete successfully\n\nNotes:\n- this package captures the direct experiment evidence\n- auxiliary postprocessing for deeper replacement-order proof can be added as\n  manifest analyses in a follow-up validation step\n"
+    "source_path": "<QPoints>/sim_outs/reference_llc_restore_100k/snapshot_0/INTENT.txt",
+    "staged_path": "INTENT.txt",
+    "text": "Run the validated timing-Ruby LLC restore path for `100000` instructions and\ncapture it as a reference experiment, not a transient probe.\n\nPurpose:\n- confirm that the merged LLC restore implementation is active in gem5\n- confirm that the merged LLC replacement-policy alignment remains warm under a\n  representative `100K` run\n- produce a stable reference output that later experiments can compare against\n\nReference status:\n- lifecycle state: `reference`\n- retention policy: `keep`\n- protected artifacts include:\n  - `stats.txt`\n  - `config.ini`\n  - `debug.insts`\n  - the experiment manifest itself\n\nAcceptance criteria:\n1. the gem5 run completes successfully\n2. `system.ruby.l2_cntrl0.L2cache.m_checkpoint_load_total > 0`\n3. `system.ruby.l2_cntrl0.L2cache.m_demand_hits > 0`\n\nWhat this experiment validates:\n- LLC warm restore is active, not silently bypassed\n- the current merged gem5 mainline still reflects the repaired restore\n  dispatch and the LRU-aligned LLC replacement policy\n- this output should remain available as a comparison target for future\n  restore phases such as private `L1D`\n"
   },
   "kind": "experiment",
   "lessons": [],
@@ -269,29 +206,30 @@
       },
       "enforced": true
     },
-    "created_at_utc": "2026-04-27T11:29:34+00:00",
-    "output_dir": "/home/dev/qflex_git/QPoints/validation_records/reference_llc_restore_100k/snapshot_0",
+    "created_at_utc": "2026-04-27T12:59:49+00:00",
+    "output_dir": ".",
+    "path_aliases": {
+      "QPoints": "<QPoints>",
+      "gem5": "<gem5>",
+      "qflex": "<qflex>"
+    },
     "repo_states": {
       "QPoints": {
         "allowed_dirty_paths": [
           "validation_records/reference_llc_restore_100k/snapshot_0"
         ],
-        "branch": "gem5-integration/uarch/ali/uarch-prepare",
+        "branch": "gem5-integration/uarch/ali/validation-llc-reference",
         "dirty": false,
         "dirty_entries": [],
-        "head": "7b5d00c328b6dc6a74b99003885ba864ce945aca",
+        "head": "bfbc146ce360a5e4c200a008de53f3fc05dc8d82",
         "ignored_dirty_entries": [
-          "?? validation_records/reference_llc_restore_100k/snapshot_0/INTENT.txt",
-          "?? validation_records/reference_llc_restore_100k/snapshot_0/config.ini",
-          "?? validation_records/reference_llc_restore_100k/snapshot_0/debug.insts",
-          "?? validation_records/reference_llc_restore_100k/snapshot_0/experiment_manifest.json",
-          "?? validation_records/reference_llc_restore_100k/snapshot_0/experiment_stderr.log",
-          "?? validation_records/reference_llc_restore_100k/snapshot_0/experiment_stdout.log",
-          "?? validation_records/reference_llc_restore_100k/snapshot_0/manifest.json",
-          "?? validation_records/reference_llc_restore_100k/snapshot_0/restore_llc_state.args",
-          "?? validation_records/reference_llc_restore_100k/snapshot_0/stats.txt"
+          " M validation_records/reference_llc_restore_100k/snapshot_0/INTENT.txt",
+          " M validation_records/reference_llc_restore_100k/snapshot_0/experiment_manifest.json",
+          " M validation_records/reference_llc_restore_100k/snapshot_0/experiment_stdout.log",
+          " M validation_records/reference_llc_restore_100k/snapshot_0/manifest.json",
+          " M validation_records/reference_llc_restore_100k/snapshot_0/stats.txt"
         ],
-        "path": "/home/dev/qflex_git/QPoints",
+        "path": "<QPoints>",
         "raw_dirty": true
       },
       "gem5": {
@@ -301,7 +239,7 @@
         "dirty_entries": [],
         "head": "5b258405567f978e0fe24e027ed75a2ad9669364",
         "ignored_dirty_entries": [],
-        "path": "/home/dev/qflex_git/QPoints/gem5",
+        "path": "<gem5>",
         "raw_dirty": false
       },
       "qflex": {
@@ -315,12 +253,12 @@
         "ignored_dirty_entries": [
           " M QPoints"
         ],
-        "path": "/home/dev/qflex_git",
+        "path": "<qflex>",
         "raw_dirty": true
       }
     },
-    "script": "/home/dev/qflex_git/QPoints/scripts/validation/run_experiment.py",
-    "updated_at_utc": "2026-04-27T11:29:46+00:00"
+    "script": "<QPoints>/scripts/validation/run_experiment.py",
+    "updated_at_utc": "2026-04-27T13:01:47+00:00"
   },
   "question": "Does the merged LLC restore plus LRU-aligned replacement path remain active and warm for a 100K timing-Ruby run?",
   "result": {

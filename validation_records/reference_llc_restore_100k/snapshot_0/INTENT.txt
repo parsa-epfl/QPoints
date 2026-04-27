@@ -1,21 +1,29 @@
-Title: Reference LLC restore 100K
+Run the validated timing-Ruby LLC restore path for `100000` instructions and
+capture it as a reference experiment, not a transient probe.
 
-Question:
-Does the merged LLC restore path, together with the current LLC LRU replacement
-policy, remain active and warm for a 100K timing-Ruby run from snapshot_0?
+Purpose:
+- confirm that the merged LLC restore implementation is active in gem5
+- confirm that the merged LLC replacement-policy alignment remains warm under a
+  representative `100K` run
+- produce a stable reference output that later experiments can compare against
 
-Why this package exists:
-- preserve a clean, tracked validation record for the merged LLC feature set
-- give future work a stable reference experiment for comparison
-- make the runtime input and acceptance checks self-contained inside the
-  validation package itself
+Reference status:
+- lifecycle state: `reference`
+- retention policy: `keep`
+- protected artifacts include:
+  - `stats.txt`
+  - `config.ini`
+  - `debug.insts`
+  - the experiment manifest itself
 
-Acceptance:
-- checkpoint restore must be active
-- LLC demand hits must be nonzero
-- the run must complete successfully
+Acceptance criteria:
+1. the gem5 run completes successfully
+2. `system.ruby.l2_cntrl0.L2cache.m_checkpoint_load_total > 0`
+3. `system.ruby.l2_cntrl0.L2cache.m_demand_hits > 0`
 
-Notes:
-- this package captures the direct experiment evidence
-- auxiliary postprocessing for deeper replacement-order proof can be added as
-  manifest analyses in a follow-up validation step
+What this experiment validates:
+- LLC warm restore is active, not silently bypassed
+- the current merged gem5 mainline still reflects the repaired restore
+  dispatch and the LRU-aligned LLC replacement policy
+- this output should remain available as a comparison target for future
+  restore phases such as private `L1D`
