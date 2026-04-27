@@ -1,5 +1,6 @@
 #!/usr/bin/env python3
 
+import copy
 import json
 import shutil
 import subprocess
@@ -114,14 +115,48 @@ def prepare_output_dir(output_dir: Path, clean: bool = False) -> None:
 def manifest_path(manifest: dict[str, Any], path: str | Path | None) -> str | None:
     if path is None:
         return None
-    path_obj = Path(path)
-    output_dir = Path(manifest["provenance"]["output_dir"])
+    path_obj = Path(path).expanduser()
+    if not path_obj.is_absolute():
+        return str(path_obj)
+    path_roots = manifest.get("_path_roots", {})
+    output_dir = Path(path_roots.get("output_dir", manifest["provenance"]["output_dir"]))
+    resolved_path: Path | None = None
     try:
         resolved_path = path_obj.resolve()
         resolved_output_dir = output_dir.resolve()
-        return str(resolved_path.relative_to(resolved_output_dir))
+        relative_to_output = resolved_path.relative_to(resolved_output_dir)
+        return "." if not relative_to_output.parts else str(relative_to_output)
     except (RuntimeError, ValueError, FileNotFoundError):
-        return str(path_obj)
+        pass
+    if resolved_path is None:
+        try:
+            resolved_path = path_obj.resolve()
+        except (RuntimeError, FileNotFoundError):
+            return str(path_obj)
+    for repo_name, repo_root_text in path_roots.get("repo_roots", {}).items():
+        try:
+            resolved_repo_root = Path(repo_root_text).resolve()
+            relative_to_repo = resolved_path.relative_to(resolved_repo_root)
+            return (
+                f"<{repo_name}>"
+                if not relative_to_repo.parts
+                else f"<{repo_name}>/{relative_to_repo}"
+            )
+        except (RuntimeError, ValueError, FileNotFoundError):
+            continue
+    return str(path_obj)
+
+
+def portable_value(manifest: dict[str, Any], value: Any) -> Any:
+    if isinstance(value, Path):
+        return manifest_path(manifest, value)
+    if isinstance(value, str):
+        return manifest_path(manifest, value) if value.startswith("/") else value
+    if isinstance(value, list):
+        return [portable_value(manifest, item) for item in value]
+    if isinstance(value, dict):
+        return {key: portable_value(manifest, item) for key, item in value.items()}
+    return value
 
 
 def build_manifest(
@@ -140,7 +175,13 @@ def build_manifest(
     retention_policy: str = "normal",
 ) -> dict[str, Any]:
     created_at = utc_now_iso()
-    return {
+    repo_root_paths = {name: str(path.resolve()) for name, path in repo_roots.items()}
+    captured_repo_states = (
+        repo_states
+        if repo_states is not None
+        else {name: capture_repo_state(path) for name, path in repo_roots.items()}
+    )
+    manifest = {
         "schema_version": SCHEMA_VERSION,
         "kind": "experiment",
         "title": title,
@@ -152,16 +193,19 @@ def build_manifest(
             "retention_policy": retention_policy,
         },
         "intent": {},
+        "_path_roots": {
+            "output_dir": str(output_dir.resolve()),
+            "repo_roots": repo_root_paths,
+        },
         "provenance": {
             "created_at_utc": created_at,
             "updated_at_utc": created_at,
-            "script": str(script_path),
-            "output_dir": str(output_dir),
-            "repo_states": repo_states
-            if repo_states is not None
-            else {name: capture_repo_state(path) for name, path in repo_roots.items()},
+            "script": None,
+            "output_dir": ".",
+            "path_aliases": {name: f"<{name}>" for name in repo_roots},
+            "repo_states": {},
         },
-        "inputs": inputs or {},
+        "inputs": {},
         "commands": [],
         "artifacts": [],
         "acceptance": acceptance or [],
@@ -175,6 +219,16 @@ def build_manifest(
         "details": {},
         "supersedes": [],
     }
+    manifest["provenance"]["script"] = manifest_path(manifest, script_path)
+    manifest["provenance"]["repo_states"] = {
+        name: {
+            **state,
+            "path": manifest_path(manifest, repo_roots[name]),
+        }
+        for name, state in captured_repo_states.items()
+    }
+    manifest["inputs"] = portable_value(manifest, inputs or {})
+    return manifest
 
 
 def stage_intent(
@@ -216,8 +270,8 @@ def add_command(
     manifest["commands"].append(
         {
             "label": label,
-            "argv": argv,
-            "cwd": str(cwd) if cwd is not None else None,
+            "argv": portable_value(manifest, argv),
+            "cwd": manifest_path(manifest, cwd),
             "stdout_path": manifest_path(manifest, stdout_path),
             "stderr_path": manifest_path(manifest, stderr_path),
             "exit_code": exit_code,
@@ -302,11 +356,13 @@ def set_result(
 
 def write_manifest(output_dir: Path, manifest: dict[str, Any]) -> Path:
     manifest["provenance"]["updated_at_utc"] = utc_now_iso()
+    persisted_manifest = copy.deepcopy(manifest)
+    persisted_manifest.pop("_path_roots", None)
     manifest_path = output_dir / MANIFEST_FILENAME
     with manifest_path.open("w", encoding="utf-8") as outfile:
-        json.dump(manifest, outfile, indent=2, sort_keys=True)
+        json.dump(persisted_manifest, outfile, indent=2, sort_keys=True)
 
     legacy_path = output_dir / LEGACY_MANIFEST_FILENAME
     with legacy_path.open("w", encoding="utf-8") as outfile:
-        json.dump(manifest, outfile, indent=2, sort_keys=True)
+        json.dump(persisted_manifest, outfile, indent=2, sort_keys=True)
     return manifest_path
