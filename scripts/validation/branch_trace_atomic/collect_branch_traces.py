@@ -258,7 +258,7 @@ def quit_qemu_via_monitor(host: str, port: int) -> bool:
             sock.sendall(b"quit\n")
         time.sleep(0.5)
         return True
-    except Exception:
+    except Exception as exc:
         return False
 
 

@@ -94,7 +94,11 @@ def main() -> int:
         state[set_idx].append(incoming)
 
     report = {
-        "result": "passed" if all(item["match"] for item in matches) else "failed",
+        "result": (
+            "passed"
+            if matches and all(item["match"] for item in matches)
+            else "failed"
+        ),
         "checked_replacements": len(matches),
         "matches": matches,
     }
