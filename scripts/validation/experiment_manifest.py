@@ -133,7 +133,12 @@ def manifest_path(manifest: dict[str, Any], path: str | Path | None) -> str | No
             resolved_path = path_obj.resolve()
         except (RuntimeError, FileNotFoundError):
             return str(path_obj)
-    for repo_name, repo_root_text in path_roots.get("repo_roots", {}).items():
+    repo_roots = sorted(
+        path_roots.get("repo_roots", {}).items(),
+        key=lambda item: len(item[1]),
+        reverse=True,
+    )
+    for repo_name, repo_root_text in repo_roots:
         try:
             resolved_repo_root = Path(repo_root_text).resolve()
             relative_to_repo = resolved_path.relative_to(resolved_repo_root)

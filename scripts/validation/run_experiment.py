@@ -97,6 +97,13 @@ def stage_artifact_into_output(source: Path, destination: Path) -> None:
         shutil.copy2(source, destination)
 
 
+def pre_stage_existing_artifacts(output_dir: Path, specs: list[str]) -> None:
+    for spec in specs:
+        source, relative_dest = parse_stage_spec(spec)
+        if source.exists():
+            stage_artifact_into_output(source, output_dir / relative_dest)
+
+
 def parse_allowed_dirty_specs(
     specs: list[str], repo_roots: dict[str, Path], output_dir: Path
 ) -> dict[str, list[str]]:
@@ -299,6 +306,7 @@ def main() -> int:
         output_dir,
         Path(args.intent_file).resolve() if args.intent_file else None,
     )
+    pre_stage_existing_artifacts(output_dir, args.stage_artifact_from)
     add_artifact(
         manifest,
         label="stdout",

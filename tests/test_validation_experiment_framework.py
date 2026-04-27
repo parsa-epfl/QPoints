@@ -247,6 +247,50 @@ def test_run_experiment_writes_manifest_and_logs(tmp_path: Path):
     )
 
 
+def test_run_experiment_pre_stages_existing_inputs_for_the_command(tmp_path: Path):
+    repo_root = Path(__file__).resolve().parents[1]
+    runner = repo_root / "scripts" / "validation" / "run_experiment.py"
+    source_config = tmp_path / "source.args"
+    source_config.write_text("--restore-llc-state\n", encoding="utf-8")
+    output_dir = tmp_path / "output"
+
+    result = subprocess.run(
+        [
+            sys.executable,
+            str(runner),
+            "--output-dir",
+            str(output_dir),
+            "--title",
+            "Pre-stage smoke",
+            "--component",
+            "validation.runner",
+            "--question",
+            "Can the runner stage an input artifact before the command executes?",
+            "--stage-artifact-from",
+            f"{source_config}:staged/restore_llc_state.args",
+            "--",
+            sys.executable,
+            "-c",
+            (
+                "from pathlib import Path; "
+                "target = Path(r'"
+                + str(output_dir / "staged" / "restore_llc_state.args")
+                + "'); "
+                "print(target.read_text(encoding='utf-8').strip())"
+            ),
+        ],
+        cwd=str(repo_root),
+        check=False,
+        text=True,
+        capture_output=True,
+    )
+
+    assert result.returncode == 0
+    assert (
+        output_dir / "experiment_stdout.log"
+    ).read_text(encoding="utf-8").strip() == "--restore-llc-state"
+
+
 def test_validation_records_readme_exists():
     repo_root = Path(__file__).resolve().parents[1]
     readme = repo_root / "validation_records" / "README.md"
