@@ -14,6 +14,7 @@ import subprocess
 GEM5_UARCH_SUFFIX = ".gem5_uarch"
 QFLEX_UARCH_SUFFIX = ".uarch"
 LLC_RESTORE_FILE = "llc_restore_addrs.txt"
+L1D_CANDIDATE_FILE = "l1d_restore_candidates.json"
 LLC_SOURCE_FILE = "llc-0.json.zstd"
 DIRECTORY_SOURCE_FILE = "directory-0.json.zstd"
 HARVARD_SOURCE_FILE = "harvard-0.json.zstd"
@@ -99,6 +100,18 @@ def _write_manifest(path: Path, payload: dict, overwrite: bool) -> None:
     )
 
 
+def _write_json_file(path: Path, payload: object, overwrite: bool) -> None:
+    if path.exists() and not overwrite:
+        raise FileExistsError(
+            f"Refusing to overwrite existing gem5 uarch artifact: {path}. "
+            "Pass --overwrite to replace it."
+        )
+    path.write_text(
+        json.dumps(payload, indent=2, sort_keys=True) + "\n",
+        encoding="utf-8",
+    )
+
+
 def _order_restore_lines(lines: list[dict]) -> list[dict]:
     # gem5 warm restore inserts lines sequentially and marks each insertion as
     # most recently used. Emitting oldest-to-newest lines within each set lets
@@ -154,17 +167,23 @@ def _parse_directory(path: Path) -> dict:
 def _parse_harvard(path: Path) -> dict:
     payload = _load_qflex_json(path)
     result = {}
-    for core in payload:
+    for core_idx, core in enumerate(payload):
         for cache_name in ("i_cache", "d_cache"):
-            for set_rec in core[cache_name]:
-                for line in set_rec["lines"]:
+            for set_idx, set_rec in enumerate(core[cache_name]):
+                for way_idx, line in enumerate(set_rec["lines"]):
                     enc = int(line.get("block_id_with_v", 0))
                     if enc == 0 or (enc & 1) == 0:
                         continue
                     block_id = enc >> 1
                     result.setdefault(block_id, []).append(
                         {
+                            "core": core_idx,
                             "cache": cache_name,
+                            "set": set_idx,
+                            "way": way_idx,
+                            "line_addr": block_id * CACHE_LINE_SIZE,
+                            "ts": int(line.get("ts", 0)),
+                            "is_instruction": bool(line.get("is_instruction", False)),
                             "writeable": bool(line.get("writeable", False)),
                             "modified": bool(line.get("modified", False)),
                         }
@@ -227,6 +246,59 @@ def _select_llc_restore_lines(
     )
 
 
+def _select_l1d_restore_candidates(harvard: dict) -> tuple[list[dict], dict]:
+    stats = {
+        "total_private_lines": 0,
+        "instruction_lines_skipped": 0,
+        "candidate_l1d_lines": 0,
+        "modified_lines": 0,
+        "writeable_lines": 0,
+    }
+
+    candidates = []
+    for entries in harvard.values():
+        for entry in entries:
+            stats["total_private_lines"] += 1
+            if entry["cache"] != "d_cache" or entry["is_instruction"]:
+                stats["instruction_lines_skipped"] += 1
+                continue
+
+            candidate = {
+                "core": entry["core"],
+                "set": entry["set"],
+                "way": entry["way"],
+                "line_addr": entry["line_addr"],
+                "ts": entry["ts"],
+                "writeable": entry["writeable"],
+                "modified": entry["modified"],
+            }
+            candidates.append(candidate)
+            stats["candidate_l1d_lines"] += 1
+            if entry["modified"]:
+                stats["modified_lines"] += 1
+            if entry["writeable"]:
+                stats["writeable_lines"] += 1
+
+    ordered_candidates = sorted(
+        candidates,
+        key=lambda candidate: (
+            candidate["core"],
+            candidate["set"],
+            candidate["ts"],
+            candidate["way"],
+            candidate["line_addr"],
+        ),
+    )
+    serialized_candidates = [
+        {
+            **candidate,
+            "line_addr": f"{candidate['line_addr']:#x}",
+        }
+        for candidate in ordered_candidates
+    ]
+    return serialized_candidates, stats
+
+
 def prepare_snapshot_gem5_uarch(
     qflex_run_dir: Path,
     gem5_workload_root: Path,
@@ -245,6 +317,7 @@ def prepare_snapshot_gem5_uarch(
     directory_source_file = qflex_uarch_dir / DIRECTORY_SOURCE_FILE
     harvard_source_file = qflex_uarch_dir / HARVARD_SOURCE_FILE
     target_file = gem5_uarch_dir / LLC_RESTORE_FILE
+    l1d_candidate_file = gem5_uarch_dir / L1D_CANDIDATE_FILE
     manifest_file = gem5_uarch_dir / MANIFEST_FILE
 
     if not qflex_uarch_dir.is_dir():
@@ -266,6 +339,7 @@ def prepare_snapshot_gem5_uarch(
     clean_lines, modified_lines, stats = _select_llc_restore_lines(
         llc_lines, directory, harvard
     )
+    l1d_candidates, l1d_stats = _select_l1d_restore_candidates(harvard)
     selected_modified = max(0, llc_debug_modified_count)
     selected_modified_lines = modified_lines[:selected_modified]
     effective_selected_modified = len(selected_modified_lines)
@@ -278,6 +352,16 @@ def prepare_snapshot_gem5_uarch(
         )
 
     _write_addr_file(target_file, addrs, overwrite)
+    _write_json_file(
+        l1d_candidate_file,
+        {
+            "schema_version": 1,
+            "snapshot": snapshot,
+            "cache_line_size": CACHE_LINE_SIZE,
+            "candidates": l1d_candidates,
+        },
+        overwrite,
+    )
 
     manifest = {
         "schema_version": 1,
@@ -302,7 +386,19 @@ def prepare_snapshot_gem5_uarch(
                 ),
                 "selected_modified_lines": effective_selected_modified,
                 "stats": stats,
-            }
+            },
+            "l1d": {
+                "source_file": str(harvard_source_file),
+                "output_file": str(l1d_candidate_file),
+                "line_count": len(l1d_candidates),
+                "selection_policy": (
+                    "all valid private L1D lines from the QFlex Harvard state, "
+                    "ordered per-set by ascending L1D timestamp so future "
+                    "restore experiments can preserve source-side recency "
+                    "oldest-to-newest"
+                ),
+                "stats": l1d_stats,
+            },
         },
     }
     _write_manifest(manifest_file, manifest, overwrite)

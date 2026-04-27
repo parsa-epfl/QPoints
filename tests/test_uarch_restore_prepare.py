@@ -38,13 +38,20 @@ def _write_zstd_json(path: Path, payload: object) -> None:
     assert result.returncode == 0
 
 
-def _make_harvard_line(line_addr: int, *, writeable: bool, modified: bool) -> dict:
+def _make_harvard_line(
+    line_addr: int,
+    *,
+    writeable: bool,
+    modified: bool,
+    ts: int = 1,
+    is_instruction: bool = False,
+) -> dict:
     return {
         "block_id_with_v": _encode_block_id_with_v(line_addr),
         "writeable": writeable,
         "modified": modified,
-        "is_instruction": False,
-        "ts": 1,
+        "is_instruction": is_instruction,
+        "ts": ts,
     }
 
 
@@ -61,8 +68,11 @@ def test_prepare_snapshot_gem5_uarch_writes_outputs_and_manifest(tmp_path: Path)
     safe_hot = 0x140
     safe_cold = 0x100
     llc_modified = 0x180
+    l1d_older = 0x240
+    l1d_newer = 0x280
     private_modified = 0x1c0
     private_writeable = 0x200
+    i_side_line = 0x2c0
 
     _write_zstd_json(
         source_dir / "llc-0.json.zstd",
@@ -115,15 +125,45 @@ def test_prepare_snapshot_gem5_uarch_writes_outputs_and_manifest(tmp_path: Path)
         source_dir / "harvard-0.json.zstd",
         [
             {
-                "i_cache": [{"lines": []}],
+                "i_cache": [
+                    {
+                        "lines": [
+                            _make_harvard_line(
+                                i_side_line,
+                                writeable=False,
+                                modified=False,
+                                ts=3,
+                                is_instruction=True,
+                            )
+                        ]
+                    }
+                ],
                 "d_cache": [
                     {
                         "lines": [
                             _make_harvard_line(
-                                private_modified, writeable=False, modified=True
+                                private_modified,
+                                writeable=False,
+                                modified=True,
+                                ts=7,
                             ),
                             _make_harvard_line(
-                                private_writeable, writeable=True, modified=False
+                                private_writeable,
+                                writeable=True,
+                                modified=False,
+                                ts=9,
+                            ),
+                            _make_harvard_line(
+                                l1d_newer,
+                                writeable=True,
+                                modified=True,
+                                ts=20,
+                            ),
+                            _make_harvard_line(
+                                l1d_older,
+                                writeable=False,
+                                modified=True,
+                                ts=10,
                             ),
                         ]
                     }
@@ -141,9 +181,54 @@ def test_prepare_snapshot_gem5_uarch_writes_outputs_and_manifest(tmp_path: Path)
 
     gem5_uarch_dir = gem5_workload_root / "snapshot_0.gem5_uarch"
     output_file = gem5_uarch_dir / "llc_restore_addrs.txt"
+    l1d_file = gem5_uarch_dir / "l1d_restore_candidates.json"
     manifest_file = gem5_uarch_dir / "manifest.json"
 
     assert output_file.read_text(encoding="utf-8") == "0x100\n0x140\n"
+    l1d_candidates = json.loads(l1d_file.read_text(encoding="utf-8"))
+    assert l1d_candidates == {
+        "schema_version": 1,
+        "snapshot": "snapshot_0",
+        "cache_line_size": 64,
+        "candidates": [
+            {
+                "core": 0,
+                "line_addr": "0x1c0",
+                "modified": True,
+                "set": 0,
+                "ts": 7,
+                "way": 0,
+                "writeable": False,
+            },
+            {
+                "core": 0,
+                "line_addr": "0x200",
+                "modified": False,
+                "set": 0,
+                "ts": 9,
+                "way": 1,
+                "writeable": True,
+            },
+            {
+                "core": 0,
+                "line_addr": "0x240",
+                "modified": True,
+                "set": 0,
+                "ts": 10,
+                "way": 3,
+                "writeable": False,
+            },
+            {
+                "core": 0,
+                "line_addr": "0x280",
+                "modified": True,
+                "set": 0,
+                "ts": 20,
+                "way": 2,
+                "writeable": True,
+            },
+        ],
+    }
 
     manifest_disk = json.loads(manifest_file.read_text(encoding="utf-8"))
     assert manifest_disk == manifest
@@ -158,6 +243,17 @@ def test_prepare_snapshot_gem5_uarch_writes_outputs_and_manifest(tmp_path: Path)
     assert manifest["components"]["llc"]["stats"]["candidate_restorable_llc_lines"] == 3
     assert manifest["components"]["llc"]["stats"]["candidate_restorable_clean_lines"] == 2
     assert manifest["components"]["llc"]["stats"]["candidate_restorable_modified_lines"] == 1
+    assert manifest["components"]["l1d"]["output_file"] == str(l1d_file)
+    assert manifest["components"]["l1d"]["line_count"] == 4
+    assert (
+        manifest["components"]["l1d"]["stats"]["total_private_lines"] == 5
+    )
+    assert (
+        manifest["components"]["l1d"]["stats"]["instruction_lines_skipped"] == 1
+    )
+    assert manifest["components"]["l1d"]["stats"]["candidate_l1d_lines"] == 4
+    assert manifest["components"]["l1d"]["stats"]["modified_lines"] == 3
+    assert manifest["components"]["l1d"]["stats"]["writeable_lines"] == 2
 
 
 def test_prepare_snapshot_gem5_uarch_can_append_controlled_modified_lines(
@@ -331,6 +427,106 @@ def test_prepare_snapshot_gem5_uarch_refuses_to_overwrite_without_flag(
             snapshot="snapshot_0",
             overwrite=False,
         )
+
+
+def test_prepare_snapshot_gem5_uarch_preserves_per_core_l1d_candidates(
+    tmp_path: Path,
+):
+    module = _load_prepare_module()
+
+    qflex_run_dir = tmp_path / "qflex-run"
+    gem5_workload_root = tmp_path / "gem5-workload"
+    source_dir = qflex_run_dir / "snapshot_0.uarch"
+    source_dir.mkdir(parents=True)
+    gem5_workload_root.mkdir()
+    (gem5_workload_root / "snapshot_0").mkdir()
+
+    shared_line = 0x300
+
+    _write_zstd_json(
+        source_dir / "llc-0.json.zstd",
+        {
+            "blocks": [
+                {
+                    "blocks": [
+                        {
+                            "block_id_with_v": _encode_block_id_with_v(0x100),
+                            "ts": 10,
+                            "modified": False,
+                        }
+                    ]
+                }
+            ]
+        },
+    )
+    _write_zstd_json(source_dir / "directory-0.json.zstd", {"entries": [{}]})
+    _write_zstd_json(
+        source_dir / "harvard-0.json.zstd",
+        [
+            {
+                "i_cache": [{"lines": []}],
+                "d_cache": [
+                    {
+                        "lines": [
+                            _make_harvard_line(
+                                shared_line,
+                                writeable=False,
+                                modified=True,
+                                ts=5,
+                            )
+                        ]
+                    }
+                ],
+            },
+            {
+                "i_cache": [{"lines": []}],
+                "d_cache": [
+                    {
+                        "lines": [
+                            _make_harvard_line(
+                                shared_line,
+                                writeable=True,
+                                modified=False,
+                                ts=7,
+                            )
+                        ]
+                    }
+                ],
+            },
+        ],
+    )
+
+    module.prepare_snapshot_gem5_uarch(
+        qflex_run_dir=qflex_run_dir,
+        gem5_workload_root=gem5_workload_root,
+        snapshot="snapshot_0",
+        overwrite=True,
+    )
+
+    l1d_file = (
+        gem5_workload_root / "snapshot_0.gem5_uarch" / "l1d_restore_candidates.json"
+    )
+    payload = json.loads(l1d_file.read_text(encoding="utf-8"))
+    assert payload["candidates"] == [
+        {
+            "core": 0,
+            "line_addr": "0x300",
+            "modified": True,
+            "set": 0,
+            "ts": 5,
+            "way": 0,
+            "writeable": False,
+        },
+        {
+            "core": 1,
+            "line_addr": "0x300",
+            "modified": False,
+            "set": 0,
+            "ts": 7,
+            "way": 0,
+            "writeable": True,
+        },
+    ]
 
 
 def test_prepare_snapshot_gem5_uarch_requires_architectural_checkpoint_dir(

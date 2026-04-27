@@ -18,9 +18,10 @@ The guiding rule is:
 - gem5 never consumes those raw files directly in production
 - QPoints prepares whatever gem5 needs inside `snapshot_X.gem5_uarch/`
 
-Today, the first artifact we materialize is:
+Today, the restore-prep artifacts we materialize are:
 
 - `llc_restore_addrs.txt`
+- `l1d_restore_candidates.json`
 
 Later, this directory can grow to include richer postprocessing for:
 
@@ -57,7 +58,9 @@ Current behavior:
    - `gem5-workload-root/snapshot_0.gem5_uarch/`
 4. Writes the normalized gem5-side file:
    - `gem5-workload-root/snapshot_0.gem5_uarch/llc_restore_addrs.txt`
-5. Writes a small manifest:
+5. Writes an ordered L1D candidate inventory for the next restore phase:
+   - `gem5-workload-root/snapshot_0.gem5_uarch/l1d_restore_candidates.json`
+6. Writes a small manifest:
    - `gem5-workload-root/snapshot_0.gem5_uarch/manifest.json`
 
 This is intentionally small and boring for the first phase. The shape is the
