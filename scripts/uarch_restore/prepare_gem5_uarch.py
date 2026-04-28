@@ -11,7 +11,7 @@ import shutil
 import subprocess
 
 
-GEM5_UARCH_SUFFIX = ".gem5_uarch"
+GEM5_UARCH_SUFFIX = "gem5_uarch"
 QFLEX_UARCH_SUFFIX = ".uarch"
 LLC_RESTORE_FILE = "llc_restore_addrs.txt"
 L1D_CANDIDATE_FILE = "l1d_restore_candidates.json"
@@ -40,7 +40,7 @@ def parse_args() -> argparse.Namespace:
         "--gem5-workload-root",
         required=True,
         type=Path,
-        help="gem5 workload root containing snapshot_X/ and snapshot_X.gem5_uarch/.",
+        help="gem5 workload root containing snapshot_X/ directories.",
     )
     parser.add_argument(
         "--snapshot",
@@ -126,6 +126,14 @@ def _write_l1d_restore_files(
         _write_addr_file(target, addrs, overwrite)
         outputs[core] = target
     return outputs
+
+
+def _nested_gem5_uarch_dir(gem5_workload_root: Path, snapshot: str) -> Path:
+    return gem5_workload_root / snapshot / GEM5_UARCH_SUFFIX
+
+
+def _sibling_gem5_uarch_dir(gem5_workload_root: Path, snapshot: str) -> Path:
+    return gem5_workload_root / f"{snapshot}.{GEM5_UARCH_SUFFIX}"
 
 
 def _order_restore_lines(lines: list[dict]) -> list[dict]:
@@ -327,7 +335,8 @@ def prepare_snapshot_gem5_uarch(
 
     gem5_snapshot_dir = gem5_workload_root / snapshot
     qflex_uarch_dir = qflex_run_dir / f"{snapshot}{QFLEX_UARCH_SUFFIX}"
-    gem5_uarch_dir = gem5_workload_root / f"{snapshot}{GEM5_UARCH_SUFFIX}"
+    gem5_uarch_dir = _nested_gem5_uarch_dir(gem5_workload_root, snapshot)
+    sibling_gem5_uarch_dir = _sibling_gem5_uarch_dir(gem5_workload_root, snapshot)
 
     llc_source_file = qflex_uarch_dir / LLC_SOURCE_FILE
     directory_source_file = qflex_uarch_dir / DIRECTORY_SOURCE_FILE
@@ -346,6 +355,18 @@ def prepare_snapshot_gem5_uarch(
             f"gem5 architectural checkpoint directory not found: "
             f"{gem5_snapshot_dir}"
         )
+
+    if sibling_gem5_uarch_dir.exists():
+        if not overwrite:
+            raise FileExistsError(
+                "Refusing to coexist with sibling gem5 uarch directory: "
+                f"{sibling_gem5_uarch_dir}. Pass --overwrite to remove it and "
+                "migrate to the nested snapshot/gem5_uarch layout."
+            )
+        if sibling_gem5_uarch_dir.is_dir():
+            shutil.rmtree(sibling_gem5_uarch_dir)
+        else:
+            sibling_gem5_uarch_dir.unlink()
 
     gem5_uarch_dir.mkdir(parents=True, exist_ok=True)
 

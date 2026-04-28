@@ -179,7 +179,7 @@ def test_prepare_snapshot_gem5_uarch_writes_outputs_and_manifest(tmp_path: Path)
         overwrite=True,
     )
 
-    gem5_uarch_dir = gem5_workload_root / "snapshot_0.gem5_uarch"
+    gem5_uarch_dir = gem5_workload_root / "snapshot_0" / "gem5_uarch"
     output_file = gem5_uarch_dir / "llc_restore_addrs.txt"
     l1d_file = gem5_uarch_dir / "l1d_restore_candidates.json"
     l1d_restore_file = gem5_uarch_dir / "l1d_restore_addrs.core0.txt"
@@ -314,7 +314,7 @@ def test_prepare_snapshot_gem5_uarch_can_append_controlled_modified_lines(
         llc_debug_modified_count=5,
     )
 
-    output_file = gem5_workload_root / "snapshot_0.gem5_uarch" / "llc_restore_addrs.txt"
+    output_file = gem5_workload_root / "snapshot_0" / "gem5_uarch" / "llc_restore_addrs.txt"
     assert output_file.read_text(encoding="utf-8") == "0x100\n0x180\n"
     assert manifest["components"]["llc"]["selected_modified_lines"] == 1
 
@@ -379,7 +379,7 @@ def test_prepare_snapshot_gem5_uarch_orders_selected_lines_by_set_and_age(
         llc_debug_modified_count=1,
     )
 
-    output_file = gem5_workload_root / "snapshot_0.gem5_uarch" / "llc_restore_addrs.txt"
+    output_file = gem5_workload_root / "snapshot_0" / "gem5_uarch" / "llc_restore_addrs.txt"
     assert output_file.read_text(encoding="utf-8") == "0x180\n0x100\n0x40\n"
     assert "ascending LLC timestamp" in manifest["components"]["llc"]["selection_policy"]
 
@@ -435,6 +435,70 @@ def test_prepare_snapshot_gem5_uarch_refuses_to_overwrite_without_flag(
             snapshot="snapshot_0",
             overwrite=False,
         )
+
+
+def test_prepare_snapshot_gem5_uarch_migrates_from_sibling_layout(
+    tmp_path: Path,
+):
+    module = _load_prepare_module()
+
+    qflex_run_dir = tmp_path / "qflex-run"
+    gem5_workload_root = tmp_path / "gem5-workload"
+    source_dir = qflex_run_dir / "snapshot_0.uarch"
+    source_dir.mkdir(parents=True)
+    gem5_workload_root.mkdir()
+    (gem5_workload_root / "snapshot_0").mkdir()
+
+    sibling_dir = gem5_workload_root / "snapshot_0.gem5_uarch"
+    sibling_dir.mkdir()
+    (sibling_dir / "stale.txt").write_text("stale\n", encoding="utf-8")
+
+    _write_zstd_json(
+        source_dir / "llc-0.json.zstd",
+        {
+            "blocks": [
+                {
+                    "blocks": [
+                        {
+                            "block_id_with_v": _encode_block_id_with_v(0x100),
+                            "ts": 10,
+                            "modified": False,
+                        }
+                    ]
+                }
+            ]
+        },
+    )
+    _write_zstd_json(source_dir / "directory-0.json.zstd", {"entries": [{}]})
+    _write_zstd_json(
+        source_dir / "harvard-0.json.zstd",
+        [{"i_cache": [{"lines": []}], "d_cache": [{"lines": []}]}],
+    )
+
+    with pytest.raises(
+        FileExistsError, match="Refusing to coexist with sibling gem5 uarch directory"
+    ):
+        module.prepare_snapshot_gem5_uarch(
+            qflex_run_dir=qflex_run_dir,
+            gem5_workload_root=gem5_workload_root,
+            snapshot="snapshot_0",
+            overwrite=False,
+        )
+
+    module.prepare_snapshot_gem5_uarch(
+        qflex_run_dir=qflex_run_dir,
+        gem5_workload_root=gem5_workload_root,
+        snapshot="snapshot_0",
+        overwrite=True,
+    )
+
+    assert not sibling_dir.exists()
+    assert (
+        gem5_workload_root
+        / "snapshot_0"
+        / "gem5_uarch"
+        / "llc_restore_addrs.txt"
+    ).is_file()
 
 
 def test_prepare_snapshot_gem5_uarch_preserves_per_core_l1d_candidates(
@@ -512,7 +576,7 @@ def test_prepare_snapshot_gem5_uarch_preserves_per_core_l1d_candidates(
     )
 
     l1d_file = (
-        gem5_workload_root / "snapshot_0.gem5_uarch" / "l1d_restore_candidates.json"
+        gem5_workload_root / "snapshot_0" / "gem5_uarch" / "l1d_restore_candidates.json"
     )
     payload = json.loads(l1d_file.read_text(encoding="utf-8"))
     assert payload["candidates"] == [
@@ -538,7 +602,8 @@ def test_prepare_snapshot_gem5_uarch_preserves_per_core_l1d_candidates(
     assert (
         (
             gem5_workload_root
-            / "snapshot_0.gem5_uarch"
+            / "snapshot_0"
+            / "gem5_uarch"
             / "l1d_restore_addrs.core0.txt"
         ).read_text(encoding="utf-8")
         == "0x300\n"
@@ -546,7 +611,8 @@ def test_prepare_snapshot_gem5_uarch_preserves_per_core_l1d_candidates(
     assert (
         (
             gem5_workload_root
-            / "snapshot_0.gem5_uarch"
+            / "snapshot_0"
+            / "gem5_uarch"
             / "l1d_restore_addrs.core1.txt"
         ).read_text(encoding="utf-8")
         == "0x300\n"

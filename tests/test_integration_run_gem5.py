@@ -255,7 +255,7 @@ def test_run_gem5_ruby_restore_sentinel(
     qflex_run_dir = Path(integration_env.get("qflex_run_dir", qflex_ckp_dir / "run"))
     gem5_ckp_dir = Path(integration_env.get("gem5_ckp_dir"))
     qflex_uarch_dir = qflex_run_dir / f"{converted_snapshot}.uarch"
-    gem5_uarch_dir = gem5_ckp_dir / f"{converted_snapshot}.gem5_uarch"
+    gem5_uarch_dir = gem5_ckp_dir / converted_snapshot / "gem5_uarch"
     gem5_uarch_preexisting = gem5_uarch_dir.exists()
 
     if not gem5_uarch_preexisting:
