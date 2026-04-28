@@ -1,0 +1,38 @@
+l1d_frontend_mix is a validation microbenchmark for checkpoint restoration of
+private-data, frontend, and branch-prediction state.
+
+Intent:
+- Keep a 32 KiB data footprint hot in the private L1-D cache.
+- Revisit that footprint continuously with one read-modify-write per 64 B line.
+- Keep the hot code path compact enough that a small repeated instruction
+  footprint should matter for L1-I restoration.
+- Exercise a mix of branch behaviors so restored BTB and branch-direction state
+  can show up quickly after checkpoint restore.
+
+What this benchmark is designed to stress:
+- L1-D:
+  - 32 KiB resident data working set.
+  - Repeated line-granularity read-modify-write traffic.
+- L1-I:
+  - A repeated ring of many noinline stage functions so the hot frontend
+    footprint is materially larger than a single tiny loop body.
+  - Stable recurring execution of that staged code so restored L1-I residency
+    should reduce the initial miss burst measurably.
+- BTB:
+  - Several distinct static conditional branch sites.
+  - Direct loop/control-flow branches.
+  - An indirect call through a 32-entry function-pointer stage table.
+- TAGE / branch-direction prediction:
+  - Always-taken / mostly-taken style branches.
+  - Periodic branches tied to the iteration index.
+  - Correlated branches tied to rolling history and data-dependent state.
+  - Multiple recurring control-flow paths rather than a single simple loop.
+
+Compiler-behavior guardrails:
+- The data array is globally allocated and 64 B aligned.
+- The hot helper functions are marked noinline so their branch sites remain
+  visible and stable.
+- A volatile sink consumes the full-pass checksum and predictor state so the
+  compiler cannot discard the loop body as dead work.
+- The Makefile disables vectorization, loop unrolling, and if-conversion to
+  preserve the intended branch and cache behavior.
