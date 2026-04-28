@@ -16,6 +16,8 @@ QFLEX_UARCH_SUFFIX = ".uarch"
 LLC_RESTORE_FILE = "llc_restore_addrs.txt"
 L1D_CANDIDATE_FILE = "l1d_restore_candidates.json"
 L1D_RESTORE_FILE_TEMPLATE = "l1d_restore_addrs.core{core}.txt"
+L1I_CANDIDATE_FILE = "l1i_restore_candidates.json"
+L1I_RESTORE_FILE_TEMPLATE = "l1i_restore_addrs.core{core}.txt"
 LLC_SOURCE_FILE = "llc-0.json.zstd"
 DIRECTORY_SOURCE_FILE = "directory-0.json.zstd"
 HARVARD_SOURCE_FILE = "harvard-0.json.zstd"
@@ -124,6 +126,34 @@ def _write_l1d_restore_files(
     for core, addrs in per_core.items():
         target = root / L1D_RESTORE_FILE_TEMPLATE.format(core=core)
         _write_addr_file(target, addrs, overwrite)
+def _l1i_restore_state(candidate: dict) -> str:
+    return "S"
+
+
+def _write_l1i_restore_files(
+    root: Path, candidates: list[dict], overwrite: bool
+) -> dict[int, Path]:
+    per_core = {}
+    for candidate in candidates:
+        per_core.setdefault(candidate["core"], []).append(
+            (
+                int(candidate["line_addr"], 16),
+                _l1i_restore_state(candidate),
+            )
+        )
+
+    outputs = {}
+    for core, restore_lines in per_core.items():
+        target = root / L1I_RESTORE_FILE_TEMPLATE.format(core=core)
+        if target.exists() and not overwrite:
+            raise FileExistsError(
+                f"Refusing to overwrite existing gem5 uarch artifact: {target}. "
+                "Pass --overwrite to replace it."
+            )
+        target.write_text(
+            "".join(f"{addr:#x} {state}\n" for addr, state in restore_lines),
+            encoding="utf-8",
+        )
         outputs[core] = target
     return outputs
 
@@ -323,6 +353,60 @@ def _select_l1d_restore_candidates(harvard: dict) -> tuple[list[dict], dict]:
     return serialized_candidates, stats
 
 
+def _select_l1i_restore_candidates(harvard: dict) -> tuple[list[dict], dict]:
+    stats = {
+        "total_private_lines": 0,
+        "data_lines_skipped": 0,
+        "candidate_l1i_lines": 0,
+        "modified_lines": 0,
+        "writeable_lines": 0,
+    }
+
+    candidates = []
+    for entries in harvard.values():
+        for entry in entries:
+            stats["total_private_lines"] += 1
+            if entry["cache"] != "i_cache" or not entry["is_instruction"]:
+                stats["data_lines_skipped"] += 1
+                continue
+
+            candidate = {
+                "core": entry["core"],
+                "set": entry["set"],
+                "way": entry["way"],
+                "line_addr": entry["line_addr"],
+                "ts": entry["ts"],
+                "writeable": entry["writeable"],
+                "modified": entry["modified"],
+            }
+            candidates.append(candidate)
+            stats["candidate_l1i_lines"] += 1
+            if entry["modified"]:
+                stats["modified_lines"] += 1
+            if entry["writeable"]:
+                stats["writeable_lines"] += 1
+
+    ordered_candidates = sorted(
+        candidates,
+        key=lambda candidate: (
+            candidate["core"],
+            candidate["set"],
+            candidate["ts"],
+            candidate["way"],
+            candidate["line_addr"],
+        ),
+    )
+    serialized_candidates = [
+        {
+            **candidate,
+            "line_addr": f"{candidate['line_addr']:#x}",
+            "restore_state": _l1i_restore_state(candidate),
+        }
+        for candidate in ordered_candidates
+    ]
+    return serialized_candidates, stats
+
+
 def prepare_snapshot_gem5_uarch(
     qflex_run_dir: Path,
     gem5_workload_root: Path,
@@ -343,6 +427,7 @@ def prepare_snapshot_gem5_uarch(
     harvard_source_file = qflex_uarch_dir / HARVARD_SOURCE_FILE
     target_file = gem5_uarch_dir / LLC_RESTORE_FILE
     l1d_candidate_file = gem5_uarch_dir / L1D_CANDIDATE_FILE
+    l1i_candidate_file = gem5_uarch_dir / L1I_CANDIDATE_FILE
     manifest_file = gem5_uarch_dir / MANIFEST_FILE
 
     if not qflex_uarch_dir.is_dir():
@@ -377,6 +462,7 @@ def prepare_snapshot_gem5_uarch(
         llc_lines, directory, harvard
     )
     l1d_candidates, l1d_stats = _select_l1d_restore_candidates(harvard)
+    l1i_candidates, l1i_stats = _select_l1i_restore_candidates(harvard)
     selected_modified = max(0, llc_debug_modified_count)
     selected_modified_lines = modified_lines[:selected_modified]
     effective_selected_modified = len(selected_modified_lines)
@@ -399,8 +485,21 @@ def prepare_snapshot_gem5_uarch(
         },
         overwrite,
     )
+    _write_json_file(
+        l1i_candidate_file,
+        {
+            "schema_version": 1,
+            "snapshot": snapshot,
+            "cache_line_size": CACHE_LINE_SIZE,
+            "candidates": l1i_candidates,
+        },
+        overwrite,
+    )
     l1d_restore_files = _write_l1d_restore_files(
         gem5_uarch_dir, l1d_candidates, overwrite
+    )
+    l1i_restore_files = _write_l1i_restore_files(
+        gem5_uarch_dir, l1i_candidates, overwrite
     )
 
     manifest = {
@@ -442,6 +541,22 @@ def prepare_snapshot_gem5_uarch(
                     "oldest-to-newest"
                 ),
                 "stats": l1d_stats,
+            },
+            "l1i": {
+                "source_file": str(harvard_source_file),
+                "candidate_file": str(l1i_candidate_file),
+                "restore_files": {
+                    str(core): str(path)
+                    for core, path in sorted(l1i_restore_files.items())
+                },
+                "line_count": len(l1i_candidates),
+                "selection_policy": (
+                    "all valid private L1I lines from the QFlex Harvard state, "
+                    "ordered per-set by ascending L1I timestamp so restore "
+                    "replays source-side recency oldest-to-newest; staged "
+                    "restore state is always S"
+                ),
+                "stats": l1i_stats,
             },
         },
     }

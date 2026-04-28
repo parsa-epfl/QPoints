@@ -183,6 +183,8 @@ def test_prepare_snapshot_gem5_uarch_writes_outputs_and_manifest(tmp_path: Path)
     output_file = gem5_uarch_dir / "llc_restore_addrs.txt"
     l1d_file = gem5_uarch_dir / "l1d_restore_candidates.json"
     l1d_restore_file = gem5_uarch_dir / "l1d_restore_addrs.core0.txt"
+    l1i_file = gem5_uarch_dir / "l1i_restore_candidates.json"
+    l1i_restore_file = gem5_uarch_dir / "l1i_restore_addrs.core0.txt"
     manifest_file = gem5_uarch_dir / "manifest.json"
 
     assert output_file.read_text(encoding="utf-8") == "0x100\n0x140\n"
@@ -190,7 +192,9 @@ def test_prepare_snapshot_gem5_uarch_writes_outputs_and_manifest(tmp_path: Path)
         l1d_restore_file.read_text(encoding="utf-8")
         == "0x1c0\n0x200\n0x240\n0x280\n"
     )
+    assert l1i_restore_file.read_text(encoding="utf-8") == "0x2c0 S\n"
     l1d_candidates = json.loads(l1d_file.read_text(encoding="utf-8"))
+    l1i_candidates = json.loads(l1i_file.read_text(encoding="utf-8"))
     assert l1d_candidates == {
         "schema_version": 1,
         "snapshot": "snapshot_0",
@@ -234,6 +238,23 @@ def test_prepare_snapshot_gem5_uarch_writes_outputs_and_manifest(tmp_path: Path)
             },
         ],
     }
+    assert l1i_candidates == {
+        "schema_version": 1,
+        "snapshot": "snapshot_0",
+        "cache_line_size": 64,
+        "candidates": [
+            {
+                "core": 0,
+                "line_addr": "0x2c0",
+                "modified": False,
+                "restore_state": "S",
+                "set": 0,
+                "ts": 3,
+                "way": 0,
+                "writeable": False,
+            }
+        ],
+    }
 
     manifest_disk = json.loads(manifest_file.read_text(encoding="utf-8"))
     assert manifest_disk == manifest
@@ -262,6 +283,16 @@ def test_prepare_snapshot_gem5_uarch_writes_outputs_and_manifest(tmp_path: Path)
     assert manifest["components"]["l1d"]["stats"]["candidate_l1d_lines"] == 4
     assert manifest["components"]["l1d"]["stats"]["modified_lines"] == 3
     assert manifest["components"]["l1d"]["stats"]["writeable_lines"] == 2
+    assert manifest["components"]["l1i"]["candidate_file"] == str(l1i_file)
+    assert manifest["components"]["l1i"]["restore_files"] == {
+        "0": str(l1i_restore_file)
+    }
+    assert manifest["components"]["l1i"]["line_count"] == 1
+    assert manifest["components"]["l1i"]["stats"]["total_private_lines"] == 5
+    assert manifest["components"]["l1i"]["stats"]["data_lines_skipped"] == 4
+    assert manifest["components"]["l1i"]["stats"]["candidate_l1i_lines"] == 1
+    assert manifest["components"]["l1i"]["stats"]["modified_lines"] == 0
+    assert manifest["components"]["l1i"]["stats"]["writeable_lines"] == 0
 
 
 def test_prepare_snapshot_gem5_uarch_can_append_controlled_modified_lines(
@@ -617,6 +648,18 @@ def test_prepare_snapshot_gem5_uarch_preserves_per_core_l1d_candidates(
         ).read_text(encoding="utf-8")
         == "0x300\n"
     )
+    assert not (
+        gem5_workload_root
+        / "snapshot_0"
+        / "gem5_uarch"
+        / "l1i_restore_addrs.core0.txt"
+    ).exists()
+    assert not (
+        gem5_workload_root
+        / "snapshot_0"
+        / "gem5_uarch"
+        / "l1i_restore_addrs.core1.txt"
+    ).exists()
 
 
 def test_prepare_snapshot_gem5_uarch_requires_architectural_checkpoint_dir(
