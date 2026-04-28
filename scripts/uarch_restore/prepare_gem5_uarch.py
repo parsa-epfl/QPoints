@@ -113,17 +113,34 @@ def _write_json_file(path: Path, payload: object, overwrite: bool) -> None:
     )
 
 
+def _l1d_restore_state(candidate: dict) -> str:
+    return "M" if candidate["writeable"] else "S"
+
+
 def _write_l1d_restore_files(
     root: Path, candidates: list[dict], overwrite: bool
 ) -> dict[int, Path]:
     per_core = {}
     for candidate in candidates:
-        per_core.setdefault(candidate["core"], []).append(int(candidate["line_addr"], 16))
+        per_core.setdefault(candidate["core"], []).append(
+            (
+                int(candidate["line_addr"], 16),
+                _l1d_restore_state(candidate),
+            )
+        )
 
     outputs = {}
-    for core, addrs in per_core.items():
+    for core, restore_lines in per_core.items():
         target = root / L1D_RESTORE_FILE_TEMPLATE.format(core=core)
-        _write_addr_file(target, addrs, overwrite)
+        if target.exists() and not overwrite:
+            raise FileExistsError(
+                f"Refusing to overwrite existing gem5 uarch artifact: {target}. "
+                "Pass --overwrite to replace it."
+            )
+        target.write_text(
+            "".join(f"{addr:#x} {state}\n" for addr, state in restore_lines),
+            encoding="utf-8",
+        )
         outputs[core] = target
     return outputs
 
@@ -317,6 +334,7 @@ def _select_l1d_restore_candidates(harvard: dict) -> tuple[list[dict], dict]:
         {
             **candidate,
             "line_addr": f"{candidate['line_addr']:#x}",
+            "restore_state": _l1d_restore_state(candidate),
         }
         for candidate in ordered_candidates
     ]
@@ -439,7 +457,8 @@ def prepare_snapshot_gem5_uarch(
                     "all valid private L1D lines from the QFlex Harvard state, "
                     "ordered per-set by ascending L1D timestamp so future "
                     "restore experiments can preserve source-side recency "
-                    "oldest-to-newest"
+                    "oldest-to-newest; staged restore state is S for "
+                    "writeable=false lines and M for writeable=true lines"
                 ),
                 "stats": l1d_stats,
             },
