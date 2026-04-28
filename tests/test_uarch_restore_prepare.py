@@ -188,7 +188,7 @@ def test_prepare_snapshot_gem5_uarch_writes_outputs_and_manifest(tmp_path: Path)
     assert output_file.read_text(encoding="utf-8") == "0x100\n0x140\n"
     assert (
         l1d_restore_file.read_text(encoding="utf-8")
-        == "0x1c0\n0x200\n0x240\n0x280\n"
+        == "0x1c0 S\n0x200 M\n0x240 S\n0x280 M\n"
     )
     l1d_candidates = json.loads(l1d_file.read_text(encoding="utf-8"))
     assert l1d_candidates == {
@@ -200,6 +200,7 @@ def test_prepare_snapshot_gem5_uarch_writes_outputs_and_manifest(tmp_path: Path)
                 "core": 0,
                 "line_addr": "0x1c0",
                 "modified": True,
+                "restore_state": "S",
                 "set": 0,
                 "ts": 7,
                 "way": 0,
@@ -209,6 +210,7 @@ def test_prepare_snapshot_gem5_uarch_writes_outputs_and_manifest(tmp_path: Path)
                 "core": 0,
                 "line_addr": "0x200",
                 "modified": False,
+                "restore_state": "M",
                 "set": 0,
                 "ts": 9,
                 "way": 1,
@@ -218,6 +220,7 @@ def test_prepare_snapshot_gem5_uarch_writes_outputs_and_manifest(tmp_path: Path)
                 "core": 0,
                 "line_addr": "0x240",
                 "modified": True,
+                "restore_state": "S",
                 "set": 0,
                 "ts": 10,
                 "way": 3,
@@ -227,6 +230,7 @@ def test_prepare_snapshot_gem5_uarch_writes_outputs_and_manifest(tmp_path: Path)
                 "core": 0,
                 "line_addr": "0x280",
                 "modified": True,
+                "restore_state": "M",
                 "set": 0,
                 "ts": 20,
                 "way": 2,
@@ -584,6 +588,7 @@ def test_prepare_snapshot_gem5_uarch_preserves_per_core_l1d_candidates(
             "core": 0,
             "line_addr": "0x300",
             "modified": True,
+            "restore_state": "S",
             "set": 0,
             "ts": 5,
             "way": 0,
@@ -593,6 +598,7 @@ def test_prepare_snapshot_gem5_uarch_preserves_per_core_l1d_candidates(
             "core": 1,
             "line_addr": "0x300",
             "modified": False,
+            "restore_state": "M",
             "set": 0,
             "ts": 7,
             "way": 0,
@@ -606,7 +612,7 @@ def test_prepare_snapshot_gem5_uarch_preserves_per_core_l1d_candidates(
             / "gem5_uarch"
             / "l1d_restore_addrs.core0.txt"
         ).read_text(encoding="utf-8")
-        == "0x300\n"
+        == "0x300 S\n"
     )
     assert (
         (
@@ -615,7 +621,7 @@ def test_prepare_snapshot_gem5_uarch_preserves_per_core_l1d_candidates(
             / "gem5_uarch"
             / "l1d_restore_addrs.core1.txt"
         ).read_text(encoding="utf-8")
-        == "0x300\n"
+        == "0x300 M\n"
     )
 
 
