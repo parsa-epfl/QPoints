@@ -291,7 +291,7 @@
   },
   "result": {
     "outcome": "passed",
-    "summary": "The committed L1D restore path is active and useful under the L1D frontend benchmark. A traced 2-set diagnostic shows that only a small minority of residual L1D misses come from the main 32 KiB array; most come from non-array runtime traffic.",
+    "summary": "The committed L1D restore path is active and useful under the L1D frontend benchmark. L1D restore-state staging now maps writeable=false lines to S and writeable=true lines to M; the 100K reference run remains behaviorally unchanged, and the traced 2-set diagnostic still shows that only a small minority of residual L1D misses come from the main 32 KiB array.",
     "metrics": {
       "simTicks": 80783000,
       "system.mem_ctrls.readReqs": 172,
@@ -304,8 +304,8 @@
       "system.ruby.l2_cntrl0.L2cache.m_demand_hits": 606,
       "system.ruby.l2_cntrl0.L2cache.m_demand_misses": 172,
       "system.ruby.l2_cntrl0.L2cache.m_checkpoint_load_total": 4552,
-      "system.ruby.l2_cntrl0.L2cache.m_checkpoint_load_hits": 611,
-      "system.ruby.l2_cntrl0.L2cache.m_checkpoint_load_still_pending": 3941,
+      "system.ruby.l2_cntrl0.L2cache.m_checkpoint_load_hits": 606,
+      "system.ruby.l2_cntrl0.L2cache.m_checkpoint_load_still_pending": 3946,
       "system.ruby.l1_cntrl0.L1Icache.m_demand_hits": 37354,
       "system.ruby.l1_cntrl0.L1Icache.m_demand_misses": 564
     }
@@ -315,7 +315,7 @@
     "The benchmark's main 32 KiB array is restored into L1D, but some restored array lines are displaced before first use even in the near-fully-associative diagnostic."
   ],
   "provenance": {
-    "created_at_utc": "2026-04-28T18:25:59+00:00",
+    "created_at_utc": "2026-04-28T21:39:04+00:00",
     "output_dir": ".",
     "path_aliases": {
       "QPoints": "<QPoints>",
@@ -338,7 +338,7 @@
       "QPoints": {
         "path": "<QPoints>",
         "branch": "gem5-integration/uarch/ali/uarch-prepare",
-        "head": "f3312b2b3d800e9325ee555d406ec80fdd477167",
+        "head": "d7b390254c0589d989ef17a40b42a43833b9fe41",
         "dirty": false,
         "raw_dirty": true,
         "allowed_dirty_paths": [
@@ -350,7 +350,7 @@
       "gem5": {
         "path": "<gem5>",
         "branch": "gem5-integration/uarch/ali/dev",
-        "head": "398ae7350ebb24ff5d5c2c153b5bb6bfad5727eb",
+        "head": "d6486c3bc7d60fe23f74e5de3bef45956965cb5a",
         "dirty": false,
         "raw_dirty": false,
         "allowed_dirty_paths": [],
