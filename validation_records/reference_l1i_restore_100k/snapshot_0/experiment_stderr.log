@@ -1,0 +1,11 @@
+build/ARM_MESI_Two_Level/base/statistics.hh:277: warn: One of the stats is a legacy stat. Legacy stat is a stat that does not belong to any statistics::Group. Legacy stat is deprecated.
+warn: No dot file generated. Please install pydot to generate the dot file and pdf.
+build/ARM_MESI_Two_Level/sim/kernel_workload.cc:46: info: kernel located at: /home/dev/qflex_git/QPoints/bin/m5/binaries/vmlinux.arm64
+build/ARM_MESI_Two_Level/cpu/o3/fetch.cc:226: warn: ftqSize is 0
+build/ARM_MESI_Two_Level/dev/serial/terminal.cc:170: warn: Sockets disabled, not accepting terminal connections
+build/ARM_MESI_Two_Level/base/statistics.hh:277: warn: One of the stats is a legacy stat. Legacy stat is a stat that does not belong to any statistics::Group. Legacy stat is deprecated.
+build/ARM_MESI_Two_Level/base/vnc/vncserver.cc:163: warn: Sockets disabled, not accepting vnc client connections
+build/ARM_MESI_Two_Level/base/remote_gdb.cc:377: warn: Sockets disabled, not accepting gdb connections
+build/ARM_MESI_Two_Level/sim/simulate.cc:107: info: Entering event queue @ 9943912964000.  Starting simulation...
+build/ARM_MESI_Two_Level/mem/ruby/system/Sequencer.cc:616: warn: Replacement policy updates recently became the responsibility of SLICC state machines. Make sure to setMRU() near callbacks in .sm files!
+build/ARM_MESI_Two_Level/arch/arm/insts/pseudo.cc:173: warn: 	instruction 'bti' unimplemented
