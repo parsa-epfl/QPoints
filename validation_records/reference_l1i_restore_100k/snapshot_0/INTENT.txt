@@ -1,0 +1,21 @@
+Question: Does restoring private L1I state reduce early frontend misses for the
+checkpointed l1d_frontend_mix workload?
+
+Setup:
+- single-core snapshot_0 checkpoint lineage
+- gem5 timing-ruby O3CPU run for 100K instructions
+- restore LLC, L1D, and L1I state
+- L1D restore state uses staged S/M mapping from the Harvard writable bit
+- L1I restore state replays i_cache lines into L1I in S state
+
+Acceptance:
+- L1I demand misses should drop materially relative to the no-L1I reference
+- L1I checkpoint-load hits should be non-zero, confirming the restored frontend
+  lines are both present and accounted as touched
+
+Artifacts:
+- stats.txt
+- config.ini
+- debug.insts
+- manifest.json from the staged gem5_uarch checkpoint metadata
+- restore_l1di_state.args
