@@ -55,6 +55,23 @@ def _make_harvard_line(
     }
 
 
+def _make_fetch_btb_entry(
+    branch_pc: int,
+    target: int,
+    *,
+    ts: int,
+    branch_type: str,
+    bbl_bytes: int = 0,
+) -> dict:
+    return {
+        "tag": branch_pc,
+        "target": target,
+        "ts": ts,
+        "branch_type": branch_type,
+        "bbl_bytes": bbl_bytes,
+    }
+
+
 def test_prepare_snapshot_gem5_uarch_writes_outputs_and_manifest(tmp_path: Path):
     module = _load_prepare_module()
 
@@ -73,6 +90,10 @@ def test_prepare_snapshot_gem5_uarch_writes_outputs_and_manifest(tmp_path: Path)
     private_modified = 0x1c0
     private_writeable = 0x200
     i_side_line = 0x2c0
+    direct_branch_older = 0x400
+    direct_branch_newer = 0x440
+    return_branch = 0x480
+    indirect_call_branch = 0x4c0
 
     _write_zstd_json(
         source_dir / "llc-0.json.zstd",
@@ -171,6 +192,55 @@ def test_prepare_snapshot_gem5_uarch_writes_outputs_and_manifest(tmp_path: Path)
             }
         ],
     )
+    _write_zstd_json(
+        source_dir / "fetch.json.zstd",
+        {
+            "private_units": [
+                {
+                    "btb": {
+                        "array": [
+                            [
+                                _make_fetch_btb_entry(
+                                    direct_branch_newer,
+                                    0x880,
+                                    ts=20,
+                                    branch_type="Conditional",
+                                    bbl_bytes=8,
+                                ),
+                                _make_fetch_btb_entry(
+                                    direct_branch_older,
+                                    0x800,
+                                    ts=10,
+                                    branch_type="DirectCall",
+                                    bbl_bytes=4,
+                                ),
+                                _make_fetch_btb_entry(
+                                    return_branch,
+                                    0x0,
+                                    ts=15,
+                                    branch_type="Return",
+                                    bbl_bytes=0,
+                                ),
+                                _make_fetch_btb_entry(
+                                    indirect_call_branch,
+                                    0x900,
+                                    ts=18,
+                                    branch_type="IndirectCall",
+                                    bbl_bytes=12,
+                                ),
+                                {
+                                    "tag": 0,
+                                    "target": 0,
+                                    "ts": 0,
+                                    "branch_type": "NonBranch",
+                                },
+                            ]
+                        ]
+                    }
+                }
+            ]
+        },
+    )
 
     manifest = module.prepare_snapshot_gem5_uarch(
         qflex_run_dir=qflex_run_dir,
@@ -185,6 +255,8 @@ def test_prepare_snapshot_gem5_uarch_writes_outputs_and_manifest(tmp_path: Path)
     l1d_restore_file = gem5_uarch_dir / "l1d_restore_addrs.core0.txt"
     l1i_file = gem5_uarch_dir / "l1i_restore_candidates.json"
     l1i_restore_file = gem5_uarch_dir / "l1i_restore_addrs.core0.txt"
+    btb_file = gem5_uarch_dir / "btb_restore_candidates.json"
+    btb_restore_file = gem5_uarch_dir / "btb_restore_addrs.core0.txt"
     manifest_file = gem5_uarch_dir / "manifest.json"
 
     assert output_file.read_text(encoding="utf-8") == "0x100\n0x140\n"
@@ -193,8 +265,16 @@ def test_prepare_snapshot_gem5_uarch_writes_outputs_and_manifest(tmp_path: Path)
         == "0x1c0 S\n0x200 M\n0x240 S\n0x280 M\n"
     )
     assert l1i_restore_file.read_text(encoding="utf-8") == "0x2c0 S\n"
+    assert (
+        btb_restore_file.read_text(encoding="utf-8")
+        == "0x3fc 0x400 0x800 0x404 4 DirectCall\n"
+           "0x480 0x480 0x0 0x484 0 Return\n"
+           "0x4b4 0x4c0 0x900 0x4c4 12 IndirectCall\n"
+           "0x438 0x440 0x880 0x444 8 Conditional\n"
+    )
     l1d_candidates = json.loads(l1d_file.read_text(encoding="utf-8"))
     l1i_candidates = json.loads(l1i_file.read_text(encoding="utf-8"))
+    btb_candidates = json.loads(btb_file.read_text(encoding="utf-8"))
     assert l1d_candidates == {
         "schema_version": 1,
         "snapshot": "snapshot_0",
@@ -259,6 +339,60 @@ def test_prepare_snapshot_gem5_uarch_writes_outputs_and_manifest(tmp_path: Path)
             }
         ],
     }
+    assert btb_candidates == {
+        "schema_version": 1,
+        "snapshot": "snapshot_0",
+        "candidates": [
+            {
+                "bbl_addr": "0x3fc",
+                "bbl_bytes": 4,
+                "branch_pc": "0x400",
+                "branch_type": "DirectCall",
+                "core": 0,
+                "fallthrough": "0x404",
+                "set": 0,
+                "target": "0x800",
+                "ts": 10,
+                "way": 1,
+            },
+            {
+                "bbl_addr": "0x480",
+                "bbl_bytes": 0,
+                "branch_pc": "0x480",
+                "branch_type": "Return",
+                "core": 0,
+                "fallthrough": "0x484",
+                "set": 0,
+                "target": "0x0",
+                "ts": 15,
+                "way": 2,
+            },
+            {
+                "bbl_addr": "0x4b4",
+                "bbl_bytes": 12,
+                "branch_pc": "0x4c0",
+                "branch_type": "IndirectCall",
+                "core": 0,
+                "fallthrough": "0x4c4",
+                "set": 0,
+                "target": "0x900",
+                "ts": 18,
+                "way": 3,
+            },
+            {
+                "bbl_addr": "0x438",
+                "bbl_bytes": 8,
+                "branch_pc": "0x440",
+                "branch_type": "Conditional",
+                "core": 0,
+                "fallthrough": "0x444",
+                "set": 0,
+                "target": "0x880",
+                "ts": 20,
+                "way": 0,
+            },
+        ],
+    }
 
     manifest_disk = json.loads(manifest_file.read_text(encoding="utf-8"))
     assert manifest_disk == manifest
@@ -297,6 +431,17 @@ def test_prepare_snapshot_gem5_uarch_writes_outputs_and_manifest(tmp_path: Path)
     assert manifest["components"]["l1i"]["stats"]["candidate_l1i_lines"] == 1
     assert manifest["components"]["l1i"]["stats"]["modified_lines"] == 0
     assert manifest["components"]["l1i"]["stats"]["writeable_lines"] == 0
+    assert manifest["components"]["btb"]["candidate_file"] == str(btb_file)
+    assert manifest["components"]["btb"]["restore_files"] == {
+        "0": str(btb_restore_file)
+    }
+    assert manifest["components"]["btb"]["line_count"] == 4
+    assert manifest["components"]["btb"]["stats"]["total_entries"] == 5
+    assert manifest["components"]["btb"]["stats"]["nonbranch_entries"] == 1
+    assert (
+        manifest["components"]["btb"]["stats"]["restorable_branch_candidates"]
+        == 4
+    )
 
 
 def test_prepare_snapshot_gem5_uarch_can_append_controlled_modified_lines(

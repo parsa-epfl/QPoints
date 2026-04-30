@@ -240,6 +240,26 @@ def test_run_gem5_ruby_data_trace_and_cache_dump(
     assert (outdir / "ruby_l2cache0_dump.txt").is_file()
 
 
+def test_run_gem5_ruby_branch_trace(
+    repo_root: Path,
+    integration_env,
+    artifact_paths,
+    converted_snapshot: str,
+):
+    outdir = _run_gem5(
+        repo_root,
+        integration_env,
+        artifact_paths,
+        converted_snapshot,
+        "pytest_qpoints_ruby_branch_100k",
+        "--timing-ruby",
+        "--branch-trace",
+    )
+
+    assert (outdir / "stats.txt").is_file()
+    assert (outdir / "branch_trace_core_0.log").is_file()
+
+
 def test_run_gem5_ruby_restore_sentinel(
     repo_root: Path,
     integration_env,
