@@ -403,8 +403,25 @@ def _select_btb_restore_candidates(fetch_units: list[dict]) -> tuple[list[dict],
     candidates = []
 
     for core_idx, unit in enumerate(fetch_units):
-        btb = unit.get("btb", {})
-        array = btb.get("array", [])
+        restore_export = unit.get("restore_export", {})
+        btb_view = restore_export.get("bbl_btb")
+        source_view = "restore_export.bbl_btb"
+        if btb_view is None:
+            btb_view = unit.get("bbl_btb")
+            source_view = "bbl_btb"
+        if btb_view is None:
+            btb_view = unit.get("btb", {})
+            source_view = "btb"
+        array = btb_view.get("array", [])
+        using_bbl_btb = "bbl_start" in next(
+            (
+                entry
+                for set_entries in array
+                for entry in set_entries
+                if isinstance(entry, dict)
+            ),
+            {},
+        )
         for set_idx, set_entries in enumerate(array):
             for way_idx, entry in enumerate(set_entries):
                 branch_type = entry.get("branch_type", "NonBranch")
@@ -416,17 +433,21 @@ def _select_btb_restore_candidates(fetch_units: list[dict]) -> tuple[list[dict],
                 if branch_type not in BTB_RESTORABLE_BRANCH_TYPES:
                     continue
 
+                branch_pc = int(entry.get("branch_pc", entry.get("tag", 0)))
+                bbl_bytes = int(entry.get("bbl_bytes", 0))
+                bbl_addr = int(entry.get("bbl_start", branch_pc - bbl_bytes))
                 candidate = {
                     "core": core_idx,
                     "set": set_idx,
                     "way": way_idx,
-                    "branch_pc": int(entry["tag"]),
+                    "branch_pc": branch_pc,
                     "target": int(entry["target"]),
-                    "bbl_bytes": int(entry.get("bbl_bytes", 0)),
+                    "bbl_bytes": bbl_bytes,
                     "ts": int(entry.get("ts", 0)),
                     "branch_type": branch_type,
+                    "source_view": source_view if using_bbl_btb else "btb",
                 }
-                candidate["bbl_addr"] = candidate["branch_pc"] - candidate["bbl_bytes"]
+                candidate["bbl_addr"] = bbl_addr
                 candidate["fallthrough"] = candidate["branch_pc"] + INSTRUCTION_BYTES
                 candidates.append(candidate)
                 stats["restorable_branch_candidates"] += 1
