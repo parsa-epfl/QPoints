@@ -209,7 +209,7 @@ if [[ -n "$TIMING_RUBY" ]]; then
     "--bootloader=${BOOTLOADER}"
     --cpu-type O3CPU
     --bp-type TAGE
-    --btb-entries 4096
+    --btb-entries 16384
     --restore "$CKPT_DIR"
     --num-cores "$CORES"
     --mem-size 16384MiB
