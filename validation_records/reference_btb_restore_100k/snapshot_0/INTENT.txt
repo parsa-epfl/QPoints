@@ -1,0 +1,28 @@
+Question: Does the current FDIP BTB-restore stack produce a trustworthy 100K
+reference run for the single-core snapshot_0 checkpoint?
+
+Setup:
+- single-core snapshot_0 checkpoint lineage
+- gem5 timing-ruby O3CPU run for 100K instructions
+- FDIP enabled with ftqSize=8
+- set-associative BTB enabled with 4 ways
+- restore BBL-BTB state from the staged gem5_uarch checkpoint
+- branch tracing enabled for committed-branch validation and first-appearance
+  analysis
+
+Acceptance:
+- the run completes successfully
+- committed control BTB accounting partitions cleanly into hit/miss only
+- the restored run matches the validated BTB reference counters
+- direct taken first-appearance misses remain at the understood residual level
+  rather than regressing to earlier broken behavior
+
+Artifacts:
+- stats.txt
+- config.ini
+- debug.insts
+- branch_trace_core_0.log
+- manifest.json from the staged gem5_uarch checkpoint metadata
+- restore_btb_state.args
+- a compact BTB validation report explaining why this run is accepted as the
+  closing reference for the BTB-restoration phase
