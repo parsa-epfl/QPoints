@@ -1,0 +1,235 @@
+{
+  "acceptance": [
+    {
+      "expected": 0,
+      "kind": "process_exit_code",
+      "name": "command_exit_zero"
+    },
+    {
+      "expected": 534,
+      "kind": "stats_check",
+      "name": "system.cpu_cluster.cpus.branchPred.bblBTBMisses",
+      "operator": "eq"
+    },
+    {
+      "expected": 18021,
+      "kind": "stats_check",
+      "name": "system.cpu_cluster.cpus.commit.committedControlBTBHit",
+      "operator": "eq"
+    },
+    {
+      "expected": 79,
+      "kind": "stats_check",
+      "name": "system.cpu_cluster.cpus.commit.committedControlBTBMiss",
+      "operator": "eq"
+    },
+    {
+      "expected": 3,
+      "kind": "stats_check",
+      "name": "system.cpu_cluster.cpus.commit.directControlTransferBTBMiss",
+      "operator": "eq"
+    }
+  ],
+  "analyses": [],
+  "artifacts": [
+    {
+      "category": "intent",
+      "description": "Captured experiment intent for this run.",
+      "label": "intent",
+      "path": "reference_btb_restore_100k_INTENT.txt",
+      "protected": true,
+      "required": true,
+      "retention": "keep"
+    },
+    {
+      "category": "log",
+      "description": "Captured stdout from the experiment command.",
+      "label": "stdout",
+      "path": "experiment_stdout.log",
+      "protected": true,
+      "required": true,
+      "retention": "keep"
+    },
+    {
+      "category": "log",
+      "description": "Captured stderr from the experiment command.",
+      "label": "stderr",
+      "path": "experiment_stderr.log",
+      "protected": true,
+      "required": true,
+      "retention": "keep"
+    },
+    {
+      "category": "file",
+      "description": "Protected reference artifact.",
+      "label": "protected:stats.txt",
+      "path": "stats.txt",
+      "protected": true,
+      "required": true,
+      "retention": "keep"
+    },
+    {
+      "category": "file",
+      "description": "Protected reference artifact.",
+      "label": "protected:config.ini",
+      "path": "config.ini",
+      "protected": true,
+      "required": true,
+      "retention": "keep"
+    },
+    {
+      "category": "file",
+      "description": "Protected reference artifact.",
+      "label": "protected:debug.insts",
+      "path": "debug.insts",
+      "protected": true,
+      "required": true,
+      "retention": "keep"
+    },
+    {
+      "category": "file",
+      "description": "Protected reference artifact.",
+      "label": "protected:branch_trace_core_0.log",
+      "path": "branch_trace_core_0.log",
+      "protected": true,
+      "required": true,
+      "retention": "keep"
+    },
+    {
+      "category": "file",
+      "description": "Protected reference artifact.",
+      "label": "protected:manifest.json",
+      "path": "manifest.json",
+      "protected": true,
+      "required": true,
+      "retention": "keep"
+    },
+    {
+      "category": "file",
+      "description": "Protected reference artifact.",
+      "label": "protected:restore_btb_state.args",
+      "path": "restore_btb_state.args",
+      "protected": true,
+      "required": true,
+      "retention": "keep"
+    },
+    {
+      "category": "stats",
+      "description": "Stats file used for acceptance checks.",
+      "label": "stats",
+      "path": "stats.txt",
+      "protected": true,
+      "required": true,
+      "retention": "keep"
+    }
+  ],
+  "commands": [
+    {
+      "argv": [
+        "bash",
+        "-lc",
+        "set -euo pipefail\nOUT=\"/home/dev/qflex_git/QPoints/validation_records/reference_btb_restore_100k/snapshot_0\"\nEXP=\"btb_restore_reference_100k\"\ncd /home/dev/qflex_git/QPoints\n./run_gem5.sh --gem5-ckp-dir /mnt/sdb/aansari/checkpoints/single-core --experiment \"$EXP\" --snapshot snapshot_0 --inst 100000 --cores 1 --timing-ruby --branch-trace --sim-config /tmp/restore_btb_state.args\ncp \"sim_outs/$EXP/snapshot_0/stats.txt\" \"$OUT/\"\ncp \"sim_outs/$EXP/snapshot_0/config.ini\" \"$OUT/\"\ncp \"sim_outs/$EXP/snapshot_0/debug.insts\" \"$OUT/\"\ncp \"sim_outs/$EXP/snapshot_0/branch_trace_core_0.log\" \"$OUT/\""
+      ],
+      "cwd": "<QPoints>",
+      "exit_code": 0,
+      "label": "experiment",
+      "stderr_path": "experiment_stderr.log",
+      "stdout_path": "experiment_stdout.log"
+    }
+  ],
+  "component": "BTB",
+  "details": {},
+  "inputs": {
+    "command": [
+      "bash",
+      "-lc",
+      "set -euo pipefail\nOUT=\"/home/dev/qflex_git/QPoints/validation_records/reference_btb_restore_100k/snapshot_0\"\nEXP=\"btb_restore_reference_100k\"\ncd /home/dev/qflex_git/QPoints\n./run_gem5.sh --gem5-ckp-dir /mnt/sdb/aansari/checkpoints/single-core --experiment \"$EXP\" --snapshot snapshot_0 --inst 100000 --cores 1 --timing-ruby --branch-trace --sim-config /tmp/restore_btb_state.args\ncp \"sim_outs/$EXP/snapshot_0/stats.txt\" \"$OUT/\"\ncp \"sim_outs/$EXP/snapshot_0/config.ini\" \"$OUT/\"\ncp \"sim_outs/$EXP/snapshot_0/debug.insts\" \"$OUT/\"\ncp \"sim_outs/$EXP/snapshot_0/branch_trace_core_0.log\" \"$OUT/\""
+    ]
+  },
+  "intent": {
+    "source_path": "/tmp/reference_btb_restore_100k_INTENT.txt",
+    "staged_path": "reference_btb_restore_100k_INTENT.txt",
+    "text": "Question: Does the current FDIP BTB-restore stack produce a trustworthy 100K\nreference run for the single-core snapshot_0 checkpoint?\n\nSetup:\n- single-core snapshot_0 checkpoint lineage\n- gem5 timing-ruby O3CPU run for 100K instructions\n- FDIP enabled with ftqSize=8\n- set-associative BTB enabled with 4 ways\n- restore BBL-BTB state from the staged gem5_uarch checkpoint\n- branch tracing enabled for committed-branch validation and first-appearance\n  analysis\n\nAcceptance:\n- the run completes successfully\n- committed control BTB accounting partitions cleanly into hit/miss only\n- the restored run matches the validated BTB reference counters\n- direct taken first-appearance misses remain at the understood residual level\n  rather than regressing to earlier broken behavior\n\nArtifacts:\n- stats.txt\n- config.ini\n- debug.insts\n- branch_trace_core_0.log\n- manifest.json from the staged gem5_uarch checkpoint metadata\n- restore_btb_state.args\n- a compact BTB validation report explaining why this run is accepted as the\n  closing reference for the BTB-restoration phase\n"
+  },
+  "kind": "experiment",
+  "lessons": [],
+  "lifecycle": {
+    "retention_policy": "keep",
+    "state": "reference"
+  },
+  "provenance": {
+    "clean_run_policy": {
+      "allowed_dirty_paths": {
+        "QPoints": [
+          "validation_records/reference_btb_restore_100k/snapshot_0"
+        ],
+        "gem5": [],
+        "qflex": [
+          "QPoints"
+        ]
+      },
+      "enforced": true
+    },
+    "created_at_utc": "2026-05-02T11:33:08+00:00",
+    "output_dir": ".",
+    "path_aliases": {
+      "QPoints": "<QPoints>",
+      "gem5": "<gem5>",
+      "qflex": "<qflex>"
+    },
+    "repo_states": {
+      "QPoints": {
+        "allowed_dirty_paths": [
+          "validation_records/reference_btb_restore_100k/snapshot_0"
+        ],
+        "branch": "gem5-integration/uarch/ali/uarch-prepare",
+        "dirty": false,
+        "dirty_entries": [],
+        "head": "509ea82ad3c29974f4484eeeecc6a3529825ceb3",
+        "ignored_dirty_entries": [],
+        "path": "<QPoints>",
+        "raw_dirty": false
+      },
+      "gem5": {
+        "allowed_dirty_paths": [],
+        "branch": "gem5-integration/uarch/ali/dev",
+        "dirty": false,
+        "dirty_entries": [],
+        "head": "7f207ea61fb94a8a2eeee168b1c20802a9e0f0ff",
+        "ignored_dirty_entries": [],
+        "path": "<gem5>",
+        "raw_dirty": false
+      },
+      "qflex": {
+        "allowed_dirty_paths": [
+          "QPoints"
+        ],
+        "branch": "gem5-integration/update/ali/qpoints-uarch",
+        "dirty": false,
+        "dirty_entries": [],
+        "head": "2b7331f784c3eac895a050958cf6cc7aab8d5154",
+        "ignored_dirty_entries": [],
+        "path": "<qflex>",
+        "raw_dirty": false
+      }
+    },
+    "script": "<QPoints>/scripts/validation/run_experiment.py",
+    "updated_at_utc": "2026-05-02T11:33:19+00:00"
+  },
+  "question": "Does the current FDIP BTB-restore stack produce a trustworthy 100K reference run for snapshot_0?",
+  "result": {
+    "metrics": {
+      "exit_code": 0,
+      "system.cpu_cluster.cpus.branchPred.bblBTBMisses": 534,
+      "system.cpu_cluster.cpus.commit.committedControlBTBHit": 18021,
+      "system.cpu_cluster.cpus.commit.committedControlBTBMiss": 79,
+      "system.cpu_cluster.cpus.commit.directControlTransferBTBMiss": 3
+    },
+    "outcome": "passed",
+    "summary": "Experiment command completed successfully."
+  },
+  "schema_version": 2,
+  "supersedes": [],
+  "tags": [],
+  "title": "BTB restore reference 100K"
+}

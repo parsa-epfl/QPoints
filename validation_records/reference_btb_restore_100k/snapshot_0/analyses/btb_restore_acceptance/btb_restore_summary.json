@@ -1,0 +1,214 @@
+{
+  "restored_stats": {
+    "system.cpu_cluster.cpus.branchPred.bblBTBLookups": 153881,
+    "system.cpu_cluster.cpus.branchPred.bblBTBHits": 153347,
+    "system.cpu_cluster.cpus.branchPred.bblBTBMisses": 534,
+    "system.cpu_cluster.cpus.commit.committedControlBranches": 18100,
+    "system.cpu_cluster.cpus.commit.committedControlBTBHit": 18021,
+    "system.cpu_cluster.cpus.commit.committedControlBTBMiss": 79,
+    "system.cpu_cluster.cpus.commit.committedControlDirectionCorrect": 12571,
+    "system.cpu_cluster.cpus.commit.committedControlDirectionIncorrect": 5529,
+    "system.cpu_cluster.cpus.commit.committedControlTargetCorrect": 11441,
+    "system.cpu_cluster.cpus.commit.committedControlTargetIncorrect": 6659,
+    "system.cpu_cluster.cpus.commit.directControlTransferBTBMiss": 3
+  },
+  "baseline_stats": {
+    "system.cpu_cluster.cpus.commit.directControlTransferBTBMiss": 211
+  },
+  "committed_invariants": {
+    "btb_partition_holds": true,
+    "direction_partition_holds": true,
+    "target_partition_holds": true
+  },
+  "first_appearance": {
+    "common_direct_pcs": 851,
+    "baseline": {
+      "taken": {
+        "H": 324,
+        "M": 198
+      },
+      "not_taken": {
+        "H": 225,
+        "M": 104
+      }
+    },
+    "restored": {
+      "taken": {
+        "H": 519,
+        "M": 3
+      },
+      "not_taken": {
+        "H": 275,
+        "M": 54
+      }
+    },
+    "restored_residual_lists": {
+      "taken_miss_pcs": [
+        18446603336356984220,
+        18446603336363976236,
+        18446603336366230812
+      ],
+      "not_taken_miss_pcs": [
+        18446603336355482776,
+        18446603336355519940,
+        18446603336356370068,
+        18446603336356375480,
+        18446603336356375508,
+        18446603336356403672,
+        18446603336356403784,
+        18446603336356405756,
+        18446603336356420160,
+        18446603336356421580,
+        18446603336356433432,
+        18446603336356433496,
+        18446603336356434212,
+        18446603336356451544,
+        18446603336356451804,
+        18446603336356493468,
+        18446603336356529640,
+        18446603336356580040,
+        18446603336356749864,
+        18446603336356749908,
+        18446603336356765104,
+        18446603336356874076,
+        18446603336356985644,
+        18446603336356985688,
+        18446603336356986112,
+        18446603336356988448,
+        18446603336356988656,
+        18446603336356994440,
+        18446603336356997680,
+        18446603336357002368,
+        18446603336357002440,
+        18446603336357005192,
+        18446603336357006040,
+        18446603336357012172,
+        18446603336357066864,
+        18446603336357066884,
+        18446603336357066976,
+        18446603336357083404,
+        18446603336357083540,
+        18446603336357084964,
+        18446603336357085004,
+        18446603336357085060,
+        18446603336357086632,
+        18446603336357095364,
+        18446603336357095636,
+        18446603336357412672,
+        18446603336357696268,
+        18446603336365888852,
+        18446603336365888908,
+        18446603336366018696,
+        18446603336366018788,
+        18446603336366037924,
+        18446603336366167304,
+        18446603336366230780
+      ]
+    }
+  },
+  "residual_miss_coverage": {
+    "taken": {
+      "present_in_restore_checkpoint": 1,
+      "absent_from_restore_checkpoint": 2,
+      "present_pcs": [
+        "0xffff800008a50d1c"
+      ],
+      "absent_pcs": [
+        "0xffff80000817f59c",
+        "0xffff80000882a62c"
+      ],
+      "addr_space": {
+        "kernel": 3,
+        "user": 0
+      }
+    },
+    "not_taken": {
+      "present_in_restore_checkpoint": 0,
+      "absent_from_restore_checkpoint": 54,
+      "present_pcs": [],
+      "absent_pcs": [
+        "0xffff800008010c98",
+        "0xffff800008019dc4",
+        "0xffff8000080e9694",
+        "0xffff8000080eabb8",
+        "0xffff8000080eabd4",
+        "0xffff8000080f19d8",
+        "0xffff8000080f1a48",
+        "0xffff8000080f21fc",
+        "0xffff8000080f5a40",
+        "0xffff8000080f5fcc",
+        "0xffff8000080f8e18",
+        "0xffff8000080f8e58",
+        "0xffff8000080f9124",
+        "0xffff8000080fd4d8",
+        "0xffff8000080fd5dc",
+        "0xffff80000810789c",
+        "0xffff8000081105e8",
+        "0xffff80000811cac8",
+        "0xffff800008146228",
+        "0xffff800008146254",
+        "0xffff800008149db0",
+        "0xffff80000816475c",
+        "0xffff80000817fb2c",
+        "0xffff80000817fb58",
+        "0xffff80000817fd00",
+        "0xffff800008180620",
+        "0xffff8000081806f0",
+        "0xffff800008181d88",
+        "0xffff800008182a30",
+        "0xffff800008183c80",
+        "0xffff800008183cc8",
+        "0xffff800008184788",
+        "0xffff800008184ad8",
+        "0xffff8000081862cc",
+        "0xffff800008193870",
+        "0xffff800008193884",
+        "0xffff8000081938e0",
+        "0xffff80000819790c",
+        "0xffff800008197994",
+        "0xffff800008197f24",
+        "0xffff800008197f4c",
+        "0xffff800008197f84",
+        "0xffff8000081985a8",
+        "0xffff80000819a7c4",
+        "0xffff80000819a8d4",
+        "0xffff8000081e7f40",
+        "0xffff80000822d30c",
+        "0xffff8000089fd554",
+        "0xffff8000089fd58c",
+        "0xffff800008a1d088",
+        "0xffff800008a1d0e4",
+        "0xffff800008a21ba4",
+        "0xffff800008a41508",
+        "0xffff800008a50cfc"
+      ],
+      "addr_space": {
+        "kernel": 54,
+        "user": 0
+      }
+    }
+  },
+  "not_taken_residual_pairs": [
+    {
+      "first": "0xffff800008197f24",
+      "second": "0xffff800008197f4c",
+      "same_cache_line": false,
+      "first_line": "0xffff800008197f00",
+      "second_line": "0xffff800008197f40"
+    },
+    {
+      "first": "0xffff8000080eabb8",
+      "second": "0xffff8000080eabd4",
+      "same_cache_line": false,
+      "first_line": "0xffff8000080eab80",
+      "second_line": "0xffff8000080eabc0"
+    },
+    {
+      "first": "0xffff800008193870",
+      "second": "0xffff800008193884",
+      "same_cache_line": false,
+      "first_line": "0xffff800008193840",
+      "second_line": "0xffff800008193880"
+    }
+  ]
+}
