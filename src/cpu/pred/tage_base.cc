@@ -327,6 +327,23 @@ TAGEBase::restoreStateFromFile()
         return;
     }
 
+    if (nHistoryTables != 7) {
+        fatal(
+              "TAGE restore for %s currently supports only the validated "
+              "7-table geometry; got %u history tables.",
+              name().c_str(), nHistoryTables);
+    }
+    for (int bank = 1; bank <= nHistoryTables; ++bank) {
+        const int mixBank = nHistoryTables - bank;
+        if (mixBank > logTagTableSizes[bank]) {
+            fatal(
+                  "TAGE restore for %s requires logTagTableSizes[%d] >= %d "
+                  "for WormCache-compatible bank remapping; got %u.",
+                  name().c_str(), bank, mixBank,
+                  logTagTableSizes[bank]);
+        }
+    }
+
     std::ifstream input(tageRestoreFile);
     if (!input) {
         fatal("Failed to open TAGE restore file for %s: %s",
