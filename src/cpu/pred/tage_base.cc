@@ -228,6 +228,11 @@ TAGEBase::recordDecisionTrace(bool taken, BranchInfo *bi)
     entry.altCtr = bi->altBank > 0 ?
         gtable[bi->altBank][bi->altBankIndex].ctr : 0;
     entry.bimodalIndex = bi->bimodalIndex;
+    // Deferred follow-up: these fields currently reflect the cached BranchInfo
+    // view of the bimodal state, which is sufficient for the validated TAGE
+    // restore behavior but may not capture the exact table contents for pure
+    // bimodal providers at trace time. Preserve the proven restore path here
+    // and debug trace-fidelity separately.
     entry.bimodalPred = bi->biModePred;
     entry.bimodalHyst = bi->biModeHyst;
     entry.pathHist = bi->pathHist;
