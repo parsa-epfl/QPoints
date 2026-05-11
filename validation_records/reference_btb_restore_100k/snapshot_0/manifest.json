@@ -36,7 +36,7 @@
       "category": "intent",
       "description": "Captured experiment intent for this run.",
       "label": "intent",
-      "path": "reference_btb_restore_100k_INTENT.txt",
+      "path": "INTENT.txt",
       "protected": true,
       "required": true,
       "retention": "keep"
@@ -148,7 +148,7 @@
   },
   "intent": {
     "source_path": "/tmp/reference_btb_restore_100k_INTENT.txt",
-    "staged_path": "reference_btb_restore_100k_INTENT.txt",
+    "staged_path": "INTENT.txt",
     "text": "Question: Does the current FDIP BTB-restore stack produce a trustworthy 100K\nreference run for the single-core snapshot_0 checkpoint?\n\nSetup:\n- single-core snapshot_0 checkpoint lineage\n- gem5 timing-ruby O3CPU run for 100K instructions\n- FDIP enabled with ftqSize=8\n- set-associative BTB enabled with 4 ways\n- restore BBL-BTB state from the staged gem5_uarch checkpoint\n- branch tracing enabled for committed-branch validation and first-appearance\n  analysis\n\nAcceptance:\n- the run completes successfully\n- committed control BTB accounting partitions cleanly into hit/miss only\n- the restored run matches the validated BTB reference counters\n- direct taken first-appearance misses remain at the understood residual level\n  rather than regressing to earlier broken behavior\n\nArtifacts:\n- stats.txt\n- config.ini\n- debug.insts\n- branch_trace_core_0.log\n- manifest.json from the staged gem5_uarch checkpoint metadata\n- restore_btb_state.args\n- a compact BTB validation report explaining why this run is accepted as the\n  closing reference for the BTB-restoration phase\n"
   },
   "kind": "experiment",
