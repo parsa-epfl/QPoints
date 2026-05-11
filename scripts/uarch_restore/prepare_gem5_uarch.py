@@ -126,6 +126,10 @@ def _write_l1d_restore_files(
     for core, addrs in per_core.items():
         target = root / L1D_RESTORE_FILE_TEMPLATE.format(core=core)
         _write_addr_file(target, addrs, overwrite)
+        outputs[core] = target
+    return outputs
+
+
 def _l1i_restore_state(candidate: dict) -> str:
     return "S"
 
