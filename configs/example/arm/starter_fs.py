@@ -39,6 +39,7 @@ at: http://www.arm.com/ResearchEnablement/SystemModeling
 """
 
 import os
+from pathlib import Path
 import m5
 from m5.util import addToPath
 from m5.objects import *
@@ -61,6 +62,8 @@ import devices
 default_kernel = 'vmlinux.arm64'
 default_disk = 'linaro-minimal-aarch64.img'
 default_root_device = '/dev/vda'
+GEM5_UARCH_SUFFIX = 'gem5_uarch'
+TAGE_RESTORE_TEMPLATE = 'tage_restore_state.core{core}.json'
 
 
 # Pre-defined CPU configurations. Each tuple must be ordered as : (cpu_class,
@@ -89,6 +92,96 @@ def create_cow_image(name):
     image.child.image_file = SysPaths.disk(name)
 
     return image;
+
+
+def discover_gem5_uarch_dir(restore_dir: Path):
+    workload_dir = restore_dir.parent
+    snapshot_name = restore_dir.name
+    nested = workload_dir / snapshot_name / GEM5_UARCH_SUFFIX
+    sibling = workload_dir / f"{snapshot_name}.{GEM5_UARCH_SUFFIX}"
+
+    if nested.is_dir():
+        return nested
+    if sibling.is_dir():
+        return sibling
+    return nested
+
+
+def discover_tage_restore_files(args):
+    if not getattr(args, 'restore_tage_state', False):
+        return {}
+
+    if not getattr(args, 'restore', None):
+        m5.util.warn(
+            '--restore-tage-state was set without --restore; '
+            'skipping TAGE warm-state import.'
+        )
+        return {}
+
+    restore_dir = Path(args.restore).resolve()
+    gem5_uarch_dir = discover_gem5_uarch_dir(restore_dir)
+
+    if not gem5_uarch_dir.is_dir():
+        m5.util.warn(
+            f'gem5 uarch restore directory not found: {gem5_uarch_dir}. '
+            'Running with a cold TAGE.'
+        )
+        return {}
+
+    restore_files = {}
+    for core in range(getattr(args, 'num_cores', 0)):
+        target_path = gem5_uarch_dir / TAGE_RESTORE_TEMPLATE.format(core=core)
+        if target_path.is_file():
+            restore_files[core] = str(target_path)
+
+    if not restore_files:
+        m5.util.warn(
+            f'No TAGE restore files were found in {gem5_uarch_dir}. '
+            'Running with a cold TAGE.'
+        )
+
+    return restore_files
+
+
+def configure_tage_restore(system, args):
+    restore_files = discover_tage_restore_files(args)
+    for cluster in getattr(system, 'cpu_cluster', []):
+        for cpu in cluster.cpus:
+            if (
+                not hasattr(cpu, 'branchPred')
+                or not hasattr(cpu.branchPred, 'tage')
+            ):
+                continue
+
+            if cpu.cpu_id in restore_files:
+                cpu.branchPred.tage.restoreTageState = True
+                cpu.branchPred.tage.tageRestoreFile = restore_files[cpu.cpu_id]
+            else:
+                cpu.branchPred.tage.restoreTageState = False
+                cpu.branchPred.tage.tageRestoreFile = ''
+
+
+def configure_tage_decision_trace(system, args):
+    enabled = bool(getattr(args, 'tage_decision_trace', False))
+    limit = int(getattr(args, 'tage_decision_trace_limit', 0))
+    for cluster in getattr(system, 'cpu_cluster', []):
+        for cpu in cluster.cpus:
+            if (
+                not hasattr(cpu, 'branchPred')
+                or not hasattr(cpu.branchPred, 'tage')
+            ):
+                continue
+
+            cpu.branchPred.tage.tageDecisionTraceEnable = enabled
+            cpu.branchPred.tage.tageDecisionTraceLimit = limit
+            cpu.branchPred.tage.tageDecisionTraceFile = (
+                os.path.join(
+                    m5.options.outdir,
+                    f'tage_decision_trace_core_{cpu.cpu_id}.json',
+                )
+                if enabled
+                else ''
+            )
 
 
 def create(args):
@@ -158,6 +251,9 @@ def create(args):
                            preserve_ways=args.preserve_ways,
                            args=args),
     ]
+
+    configure_tage_restore(system, args)
+    configure_tage_decision_trace(system, args)
 
     # Create a cache hierarchy for the cluster. We are assuming that
     # clusters have core-private L1 caches and an L2 that's shared
@@ -297,6 +393,22 @@ def main():
                         help="Enable per-core branch trace logging")
     parser.add_argument("--data-trace", action="store_true",
                         help="Enable per-core data access trace logging")
+    parser.add_argument(
+        "--restore-tage-state",
+        action="store_true",
+        help="Restore staged TAGE predictor state when available")
+    parser.add_argument(
+        "--tage-decision-trace",
+        action="store_true",
+        help="Emit compact per-conditional TAGE decision logs")
+    parser.add_argument(
+        "--tage-decision-trace-limit",
+        type=int,
+        default=0,
+        help=(
+            "Maximum number of conditional TAGE decisions to log "
+            "(0 = unlimited)"
+        ))
 
 
     Options.addCommonOptions(parser)

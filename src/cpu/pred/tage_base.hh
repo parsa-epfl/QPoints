@@ -48,6 +48,7 @@
 #ifndef __CPU_PRED_TAGE_BASE_HH__
 #define __CPU_PRED_TAGE_BASE_HH__
 
+#include <string>
 #include <vector>
 
 #include "base/statistics.hh"
@@ -66,7 +67,9 @@ class TAGEBase : public SimObject
 {
   public:
     TAGEBase(const TAGEBaseParams &p);
+    ~TAGEBase() override;
     void init() override;
+    void startup() override;
 
   protected:
     // Prediction Structures
@@ -188,6 +191,26 @@ class TAGEBase : public SimObject
         {
             delete[] storage;
         }
+    };
+
+    struct DecisionTraceEntry
+    {
+        Addr pc;
+        bool actual;
+        bool predicted;
+        unsigned provider;
+        int hitBank;
+        int hitBankIndex;
+        int hitCtr;
+        int hitU;
+        bool alternatePrediction;
+        int altBank;
+        int altBankIndex;
+        int altCtr;
+        int bimodalIndex;
+        bool bimodalPred;
+        bool bimodalHyst;
+        int pathHist;
     };
 
     virtual BranchInfo *makeBranchInfo();
@@ -430,6 +453,10 @@ class TAGEBase : public SimObject
     bool isSpeculativeUpdateEnabled() const;
     size_t getSizeInBits() const;
 
+    void restoreStateFromFile();
+    void recordDecisionTrace(bool taken, BranchInfo *bi);
+    void dumpDecisionTrace() const;
+
   protected:
     const unsigned logRatioBiModalHystEntries;
     const unsigned nHistoryTables;
@@ -496,10 +523,18 @@ class TAGEBase : public SimObject
     std::vector<bool> noSkip;
 
     const bool speculativeHistUpdate;
+    const bool restoreTageState;
+    const std::string tageRestoreFile;
+    const bool tageDecisionTraceEnable;
+    const std::string tageDecisionTraceFile;
+    const unsigned tageDecisionTraceLimit;
 
     const unsigned instShiftAmt;
 
     bool initialized;
+    std::vector<DecisionTraceEntry> tageDecisionTrace;
+
+    void recomputeFoldedHistoriesFromGlobal(ThreadHistory &history);
 
     struct TAGEBaseStats : public statistics::Group
     {

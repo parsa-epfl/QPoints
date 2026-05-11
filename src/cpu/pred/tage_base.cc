@@ -37,7 +37,12 @@
 
 #include "cpu/pred/tage_base.hh"
 
+#include <algorithm>
+#include <fstream>
+#include <vector>
+
 #include "base/intmath.hh"
+#include "base/json.hh"
 #include "base/logging.hh"
 #include "debug/Fetch.hh"
 #include "debug/Tage.hh"
@@ -47,6 +52,33 @@ namespace gem5
 
 namespace branch_prediction
 {
+
+namespace
+{
+
+bool
+asBool01(const gem5::json &value)
+{
+    if (value.is_boolean()) {
+        return value.get<bool>();
+    }
+    return value.get<int>() != 0;
+}
+
+unsigned
+foldedCompFromJson(const gem5::json &value)
+{
+    if (value.is_number_unsigned() || value.is_number_integer()) {
+        return value.get<unsigned>();
+    }
+    if (value.is_object() && value.contains("comp")) {
+        return value.at("comp").get<unsigned>();
+    }
+    throw std::runtime_error(
+        "folded history entry must be a number or object with comp");
+}
+
+} // anonymous namespace
 
 TAGEBase::TAGEBase(const TAGEBaseParams &p)
    : SimObject(p),
@@ -68,6 +100,11 @@ TAGEBase::TAGEBase(const TAGEBaseParams &p)
      maxNumAlloc(p.maxNumAlloc),
      noSkip(p.noSkip),
      speculativeHistUpdate(p.speculativeHistUpdate),
+     restoreTageState(p.restoreTageState),
+     tageRestoreFile(p.tageRestoreFile),
+     tageDecisionTraceEnable(p.tageDecisionTraceEnable),
+     tageDecisionTraceFile(p.tageDecisionTraceFile),
+     tageDecisionTraceLimit(p.tageDecisionTraceLimit),
      instShiftAmt(p.instShiftAmt),
      initialized(false),
      stats(this, nHistoryTables)
@@ -76,6 +113,11 @@ TAGEBase::TAGEBase(const TAGEBaseParams &p)
         // Set all the table to enabled by default
         noSkip.resize(nHistoryTables + 1, true);
     }
+}
+
+TAGEBase::~TAGEBase()
+{
+    dumpDecisionTrace();
 }
 
 TAGEBase::BranchInfo*
@@ -144,7 +186,97 @@ TAGEBase::init()
 
     tableIndices = new int [nHistoryTables+1];
     tableTags = new int [nHistoryTables+1];
+    if (tageDecisionTraceEnable && tageDecisionTraceLimit != 0) {
+        tageDecisionTrace.reserve(tageDecisionTraceLimit);
+    }
     initialized = true;
+}
+
+void
+TAGEBase::startup()
+{
+    SimObject::startup();
+    if (restoreTageState) {
+        restoreStateFromFile();
+    }
+}
+
+void
+TAGEBase::recordDecisionTrace(bool taken, BranchInfo *bi)
+{
+    if (!tageDecisionTraceEnable || !bi || !bi->condBranch) {
+        return;
+    }
+    if (tageDecisionTraceLimit != 0 &&
+        tageDecisionTrace.size() >= tageDecisionTraceLimit) {
+        return;
+    }
+
+    DecisionTraceEntry entry;
+    entry.pc = bi->branchPC;
+    entry.actual = taken;
+    entry.predicted = bi->tagePred;
+    entry.provider = bi->provider;
+    entry.hitBank = bi->hitBank > 0 ? bi->hitBank : -1;
+    entry.hitBankIndex = bi->hitBank > 0 ? bi->hitBankIndex : -1;
+    entry.hitCtr = bi->hitBank > 0 ?
+        gtable[bi->hitBank][bi->hitBankIndex].ctr : 0;
+    entry.hitU = bi->hitBank > 0 ? gtable[bi->hitBank][bi->hitBankIndex].u : 0;
+    entry.alternatePrediction = bi->altTaken;
+    entry.altBank = bi->altBank > 0 ? bi->altBank : -1;
+    entry.altBankIndex = bi->altBank > 0 ? bi->altBankIndex : -1;
+    entry.altCtr = bi->altBank > 0 ?
+        gtable[bi->altBank][bi->altBankIndex].ctr : 0;
+    entry.bimodalIndex = bi->bimodalIndex;
+    entry.bimodalPred = bi->biModePred;
+    entry.bimodalHyst = bi->biModeHyst;
+    entry.pathHist = bi->pathHist;
+
+    tageDecisionTrace.push_back(entry);
+
+    if (tageDecisionTraceLimit != 0 &&
+        tageDecisionTrace.size() >= tageDecisionTraceLimit) {
+        dumpDecisionTrace();
+    }
+}
+
+void
+TAGEBase::dumpDecisionTrace() const
+{
+    if (!tageDecisionTraceEnable || tageDecisionTraceFile.empty()) {
+        return;
+    }
+
+    std::ofstream output(tageDecisionTraceFile);
+    if (!output) {
+        warn("Failed to open TAGE decision trace file for %s: %s",
+             name().c_str(), tageDecisionTraceFile.c_str());
+        return;
+    }
+
+    gem5::json payload = gem5::json::array();
+    for (const auto &entry : tageDecisionTrace) {
+        payload.push_back({
+            {"pc", entry.pc},
+            {"actual", entry.actual},
+            {"predicted", entry.predicted},
+            {"provider", entry.provider},
+            {"hit_bank", entry.hitBank},
+            {"hit_bank_index", entry.hitBankIndex},
+            {"hit_ctr", entry.hitCtr},
+            {"hit_u", entry.hitU},
+            {"alternate_prediction", entry.alternatePrediction},
+            {"alt_bank", entry.altBank},
+            {"alt_bank_index", entry.altBankIndex},
+            {"alt_ctr", entry.altCtr},
+            {"bimodal_index", entry.bimodalIndex},
+            {"bimodal_pred", entry.bimodalPred},
+            {"bimodal_hyst", entry.bimodalHyst},
+            {"path_hist", entry.pathHist},
+        });
+    }
+
+    output << payload.dump() << std::endl;
 }
 
 void
@@ -160,6 +292,190 @@ TAGEBase::initFoldedHistories(ThreadHistory & history)
         DPRINTF(Tage, "HistLength:%d, TTSize:%d, TTTWidth:%d\n",
                 histLengths[i], logTagTableSizes[i], tagTableTagWidths[i]);
     }
+}
+
+void
+TAGEBase::recomputeFoldedHistoriesFromGlobal(ThreadHistory &history)
+{
+    for (int i = 1; i <= nHistoryTables; i++) {
+        history.computeIndices[i].comp = 0;
+        history.computeTags[0][i].comp = 0;
+        history.computeTags[1][i].comp = 0;
+    }
+
+    std::vector<uint8_t> temp(maxHist + 1, 0);
+    for (int hist_idx = maxHist; hist_idx >= 0; --hist_idx) {
+        for (int j = maxHist; j > 0; --j) {
+            temp[j] = temp[j - 1];
+        }
+        temp[0] = history.gHist[hist_idx];
+
+        for (int i = 1; i <= nHistoryTables; i++) {
+            history.computeIndices[i].update(temp.data());
+            history.computeTags[0][i].update(temp.data());
+            history.computeTags[1][i].update(temp.data());
+        }
+    }
+}
+
+void
+TAGEBase::restoreStateFromFile()
+{
+    if (tageRestoreFile.empty()) {
+        warn("TAGE restore was enabled for %s but no state file was provided.",
+             name().c_str());
+        return;
+    }
+
+    std::ifstream input(tageRestoreFile);
+    if (!input) {
+        fatal("Failed to open TAGE restore file for %s: %s",
+              name().c_str(), tageRestoreFile.c_str());
+    }
+
+    gem5::json payload;
+    try {
+        input >> payload;
+    } catch (const std::exception &e) {
+        fatal("Failed to parse TAGE restore JSON for %s from %s: %s",
+              name().c_str(), tageRestoreFile.c_str(), e.what());
+    }
+
+    const auto &tage_state = payload.at("tage");
+    const auto &btable = tage_state.at("btable");
+    const auto &gtable_json = tage_state.at("gtable");
+    const auto &ghist = tage_state.at("ghist");
+    const auto &ch_i = tage_state.at("ch_i");
+    const auto &ch_t = tage_state.at("ch_t");
+
+    if (!btable.is_array() ||
+        btable.size() != btablePrediction.size()) {
+        fatal(
+              "Unexpected TAGE bimodal size in %s for %s: "
+              "got %zu expected %zu",
+              tageRestoreFile.c_str(), name().c_str(), btable.size(),
+              btablePrediction.size());
+    }
+    if (!gtable_json.is_array() ||
+        gtable_json.size() != nHistoryTables) {
+        fatal(
+              "Unexpected TAGE bank count in %s for %s: got %zu expected %u",
+              tageRestoreFile.c_str(), name().c_str(), gtable_json.size(),
+              nHistoryTables);
+    }
+    if (!ghist.is_array() || ghist.size() != maxHist + 1) {
+        fatal(
+              "Unexpected TAGE global history size in %s for %s: "
+              "got %zu expected %u",
+              tageRestoreFile.c_str(), name().c_str(), ghist.size(),
+              maxHist + 1);
+    }
+    if (!ch_i.is_array() || ch_i.size() != nHistoryTables) {
+        fatal(
+              "Unexpected TAGE folded-index history size in %s for %s: "
+              "got %zu expected %u",
+              tageRestoreFile.c_str(), name().c_str(), ch_i.size(),
+              nHistoryTables);
+    }
+    if (!ch_t.is_array() || ch_t.size() != 2) {
+        fatal(
+              "Unexpected TAGE folded-tag history outer size in %s for %s: "
+              "got %zu expected 2",
+              tageRestoreFile.c_str(), name().c_str(), ch_t.size());
+    }
+    for (size_t outer = 0; outer < 2; ++outer) {
+        if (!ch_t.at(outer).is_array() ||
+            ch_t.at(outer).size() != nHistoryTables) {
+            fatal(
+                  "Unexpected TAGE folded-tag history size in %s for %s "
+                  "at outer index %zu: got %zu expected %u",
+                  tageRestoreFile.c_str(), name().c_str(), outer,
+                  ch_t.at(outer).size(), nHistoryTables);
+        }
+    }
+
+    std::fill(useAltPredForNewlyAllocated.begin(),
+              useAltPredForNewlyAllocated.end(), 0);
+    tCounter = initialTCounterValue;
+
+    for (size_t idx = 0; idx < btablePrediction.size(); ++idx) {
+        const auto &entry = btable.at(idx);
+        btablePrediction[idx] = entry.at("pred").get<int>() != 0;
+    }
+
+    const size_t hyst_group_size = 1ULL << logRatioBiModalHystEntries;
+    for (size_t group = 0; group < btableHysteresis.size(); ++group) {
+        const size_t start = group * hyst_group_size;
+        const size_t end = std::min(start + hyst_group_size, btable.size());
+        size_t ones = 0;
+        for (size_t idx = start; idx < end; ++idx) {
+            if (btable.at(idx).at("hyst").get<int>() != 0) {
+                ++ones;
+            }
+        }
+        bool hyst_value = false;
+        if (ones * 2 == (end - start)) {
+            hyst_value = btable.at(start).at("hyst").get<int>() != 0;
+        } else {
+            hyst_value = ones * 2 > (end - start);
+        }
+        btableHysteresis[group] = hyst_value;
+    }
+
+    for (unsigned wc_bank = 0; wc_bank < nHistoryTables; ++wc_bank) {
+        const auto &wc_entries = gtable_json.at(wc_bank);
+        const unsigned gem5_bank = nHistoryTables - wc_bank;
+        const size_t expected_entries = 1ULL << logTagTableSizes[gem5_bank];
+        if (!wc_entries.is_array() || wc_entries.size() != expected_entries) {
+            fatal(
+                  "Unexpected TAGE bank size in %s for %s at source "
+                  "bank %u: got %zu expected %zu",
+                  tageRestoreFile.c_str(), name().c_str(), wc_bank,
+                  wc_entries.size(), expected_entries);
+        }
+
+        for (size_t idx = 0; idx < expected_entries; ++idx) {
+            const auto &entry = wc_entries.at(idx);
+            gtable[gem5_bank][idx].ctr = entry.at("ctr").get<int>();
+            gtable[gem5_bank][idx].tag =
+                entry.at("tag").get<unsigned>() &
+                ((1U << tagTableTagWidths[gem5_bank]) - 1U);
+            gtable[gem5_bank][idx].u =
+                entry.at("ubit").get<unsigned>() &
+                ((1U << tagTableUBits) - 1U);
+        }
+    }
+
+    if (threadHistory.empty()) {
+        warn("No thread history slots available while restoring TAGE for %s.",
+             name().c_str());
+        return;
+    }
+
+    ThreadHistory &history = threadHistory[0];
+    std::fill(
+        history.globalHistory,
+        history.globalHistory + histBufferSize,
+        0);
+    history.pathHist =
+        tage_state.at("phist").get<int>() & ((1ULL << pathHistBits) - 1);
+    history.ptGhist = histBufferSize - maxHist - 1;
+    history.gHist = &history.globalHistory[history.ptGhist];
+    for (unsigned i = 0; i <= maxHist; ++i) {
+        history.gHist[i] = asBool01(ghist.at(i)) ? 1 : 0;
+    }
+    for (unsigned wc_bank = 0; wc_bank < nHistoryTables; ++wc_bank) {
+        const unsigned gem5_bank = nHistoryTables - wc_bank;
+        history.computeIndices[gem5_bank].comp =
+            foldedCompFromJson(ch_i.at(wc_bank));
+        history.computeTags[0][gem5_bank].comp =
+            foldedCompFromJson(ch_t.at(0).at(wc_bank));
+        history.computeTags[1][gem5_bank].comp =
+            foldedCompFromJson(ch_t.at(1).at(wc_bank));
+    }
+
+    inform("%s restored staged TAGE state from %s",
+           name().c_str(), tageRestoreFile.c_str());
 }
 
 void
@@ -213,15 +529,26 @@ int
 TAGEBase::F(int A, int size, int bank) const
 {
     int A1, A2;
+    int mixBank = bank;
+
+    // WormCache stores/restores banks in longest-history-first order and uses
+    // that ordinal in the path-history mixer. gem5's native bank numbering is
+    // shortest-history-first, so the PC shift term already lines up after the
+    // bank remap, but the path-history mixer does not. When consuming restored
+    // WormCache TAGE state, use the WormCache-compatible bank ordinal here so
+    // the restored tagged entries are indexed with the same path-history hash.
+    if (restoreTageState) {
+        mixBank = nHistoryTables - bank;
+    }
 
     A = A & ((1ULL << size) - 1);
     A1 = (A & ((1ULL << logTagTableSizes[bank]) - 1));
     A2 = (A >> logTagTableSizes[bank]);
-    A2 = ((A2 << bank) & ((1ULL << logTagTableSizes[bank]) - 1))
-       + (A2 >> (logTagTableSizes[bank] - bank));
+    A2 = ((A2 << mixBank) & ((1ULL << logTagTableSizes[bank]) - 1))
+       + (A2 >> (logTagTableSizes[bank] - mixBank));
     A = A1 ^ A2;
-    A = ((A << bank) & ((1ULL << logTagTableSizes[bank]) - 1))
-      + (A >> (logTagTableSizes[bank] - bank));
+    A = ((A << mixBank) & ((1ULL << logTagTableSizes[bank]) - 1))
+      + (A >> (logTagTableSizes[bank] - mixBank));
     return (A);
 }
 
@@ -439,9 +766,6 @@ TAGEBase::tagePredict(ThreadID tid, Addr branch_pc,
     }
     bi->branchPC = branch_pc;
     bi->condBranch = cond_branch;
-    DPRINTF(Tage, "Bgodala TAGE CHECK branch:%lx predict:%d\n",branch_pc, pred_taken);
-    DPRINTF(Tage, "TAGE BI CHECK hitBank: %d longestMatchPred: %d hitBankIndex: %d pseudoNewAlloc: %d provider: %d bimodalIndex: %d\n",
-bi->hitBank, bi->longestMatchPred, bi->hitBankIndex, bi->pseudoNewAlloc, bi->provider, bi->bimodalIndex);
     return pred_taken;
 }
 
