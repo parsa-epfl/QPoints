@@ -1,0 +1,47 @@
+tage_history_probe is a validation microbenchmark and offline predictor probe
+for the TAGE-restoration phase.
+
+Intent:
+- Create one dominant hot conditional branch whose outcome depends on a short
+  deterministic recurrence over recent outcomes.
+- Keep the dynamic branch stream simple enough that we can reason about what is
+  fed into TAGE before involving the full QFlex -> gem5 conversion pipeline.
+- Compare a bimodal-only baseline against a WormCache-style TAGE model on the
+  expected branch sequence.
+
+Why this benchmark exists:
+- Existing validated microbenchmarks are not a good first TAGE-restore vehicle.
+- `llc_resident_rw` is branch-simple and should already be easy for bimodal.
+- `l1d_frontend_mix` has rich control flow, but it is too branch-noisy for a
+  first restoration proof.
+- We want a benchmark whose hot branch is bimodal-hard but TAGE-easy after
+  warmup.
+
+Behavior model:
+- The hot conditional branch is driven by a 3-bit recurrence:
+  - `next = ((state >> 2) ^ state) & 1`
+  - `state = ((state << 1) | next) & 0x7`
+- Starting from seed `0b101`, this recurrence cycles through a nontrivial
+  period-7 pattern without reaching zero.
+- The semantic branch stream modeled for the offline simulator is validated
+  against the current AArch64 lowering produced by the local cross-compiler:
+  - hot conditional branch at PC `0x65c`
+  - unconditional loop-back branch at PC `0x688`
+  - one hot conditional branch per iteration
+  - one unconditional loop-back branch per iteration
+
+Files:
+- `tage_history_probe.c`
+  - the C microbenchmark that we can later stage into the VM and run through
+    the real QFlex/gem5 pipeline
+- `generate_expected_sequence.cpp`
+  - emits the expected semantic branch stream for the benchmark
+- `simulate_wormcache_tage.cpp`
+  - standalone predictor simulator based on WormCache TAGE semantics, plus a
+    bimodal baseline using the same base-counter scheme
+
+Success criteria for the offline probe:
+- the hot conditional branch is clearly worse under bimodal than under TAGE
+- after warmup, TAGE accuracy on the hot conditional becomes near-perfect
+- the hot conditional is mainly served by tagged TAGE tables rather than the
+  bimodal fallback

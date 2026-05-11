@@ -1,0 +1,39 @@
+tage_family_8x8 is a TAGE-restoration validation microbenchmark.
+
+Intent:
+- Scale the proven 8x4 branch family structure up to 8 families while keeping
+  each family at 8 hot conditional branch PCs.
+- Increase the number of hot static conditional PCs from 32 to 64 so cold TAGE
+  training takes longer in the short 10K-100K executed-instruction window that
+  we care about for gem5 restoration validation.
+- Keep the benchmark itself tight and self-contained so it is ready to stage
+  into the VM layer without dragging along the offline modeling machinery.
+
+Behavior:
+- There are 8 independent branch families.
+- Each family has 8 static conditional branch PCs, for 64 hot conditionals in
+  total.
+- Each family keeps its own 3-bit recurrence state.
+- Inside one family iteration, the benchmark consumes 8 consecutive recurrence
+  steps, one per branch PC:
+  - `bit = ((state >> 2) ^ state) & 1`
+  - `state = ((state << 1) | bit) & 0x7`
+- After the 8 hot conditionals, the family loop executes a loop-control
+  conditional branch.
+- The outer infinite loop then advances through the next family and finally
+  performs a short shared tail before repeating.
+
+Why this benchmark exists:
+- The 8x4 version is already bimodal-hard and TAGE-easy, but offline analysis
+  suggests cold TAGE still converges fairly quickly.
+- For the real restoration phase, we want a stronger early-window signal
+  without changing the basic benchmark shape that we already understand.
+- 8x8 is the next rung: same structure, same recurrence, more hot PCs.
+
+Files:
+- `tage_family_8x8.c`
+  - the actual microbenchmark to build locally and later migrate into the VM
+    layer
+- `Makefile`
+  - builds both the host binary and an AArch64 binary using the local cross
+    toolchain so we can inspect the lowering before staging into the guest

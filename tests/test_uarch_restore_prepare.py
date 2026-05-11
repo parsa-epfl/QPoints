@@ -55,6 +55,33 @@ def _make_harvard_line(
     }
 
 
+def _make_tage_payload() -> dict:
+    return {
+        "tick": 123,
+        "seed": 77,
+        "phist": 42,
+        "ghist": [True, False, True, True],
+        "ch_i": [1, 2],
+        "ch_t": [[3, 4], [5, 6]],
+        "btable": [
+            {"pred": 0, "hyst": 1},
+            {"pred": 1, "hyst": 0},
+            {"pred": 0, "hyst": 1},
+            {"pred": 0, "hyst": 1},
+        ],
+        "gtable": [
+            [
+                {"ctr": 0, "tag": 0, "ubit": 0},
+                {"ctr": 1, "tag": 17, "ubit": 2},
+            ],
+            [
+                {"ctr": -1, "tag": 9, "ubit": 1},
+                {"ctr": 0, "tag": 0, "ubit": 0},
+            ],
+        ],
+    }
+
+
 def test_prepare_snapshot_gem5_uarch_writes_outputs_and_manifest(tmp_path: Path):
     module = _load_prepare_module()
 
@@ -171,6 +198,16 @@ def test_prepare_snapshot_gem5_uarch_writes_outputs_and_manifest(tmp_path: Path)
             }
         ],
     )
+    _write_zstd_json(
+        source_dir / "fetch.json.zstd",
+        {
+            "private_units": [
+                {
+                    "tage": _make_tage_payload(),
+                }
+            ]
+        },
+    )
 
     manifest = module.prepare_snapshot_gem5_uarch(
         qflex_run_dir=qflex_run_dir,
@@ -183,6 +220,8 @@ def test_prepare_snapshot_gem5_uarch_writes_outputs_and_manifest(tmp_path: Path)
     output_file = gem5_uarch_dir / "llc_restore_addrs.txt"
     l1d_file = gem5_uarch_dir / "l1d_restore_candidates.json"
     l1d_restore_file = gem5_uarch_dir / "l1d_restore_addrs.core0.txt"
+    tage_file = gem5_uarch_dir / "tage_restore_candidates.json"
+    tage_restore_file = gem5_uarch_dir / "tage_restore_state.core0.json"
     manifest_file = gem5_uarch_dir / "manifest.json"
 
     assert output_file.read_text(encoding="utf-8") == "0x100\n0x140\n"
@@ -191,6 +230,8 @@ def test_prepare_snapshot_gem5_uarch_writes_outputs_and_manifest(tmp_path: Path)
         == "0x1c0\n0x200\n0x240\n0x280\n"
     )
     l1d_candidates = json.loads(l1d_file.read_text(encoding="utf-8"))
+    tage_candidates = json.loads(tage_file.read_text(encoding="utf-8"))
+    tage_restore = json.loads(tage_restore_file.read_text(encoding="utf-8"))
     assert l1d_candidates == {
         "schema_version": 1,
         "snapshot": "snapshot_0",
@@ -234,6 +275,35 @@ def test_prepare_snapshot_gem5_uarch_writes_outputs_and_manifest(tmp_path: Path)
             },
         ],
     }
+    assert tage_candidates == {
+        "schema_version": 1,
+        "snapshot": "snapshot_0",
+        "candidates": [
+            {
+                "core": 0,
+                "history_lengths": [130, 76, 44, 25, 15, 9, 5],
+                "history_order": "longest_to_shortest",
+                "path_history_bits": 16,
+                "bimodal_log_entries": 13,
+                "tagged_log_entries": 9,
+                "schema_version": 1,
+                "snapshot_core": 0,
+                "stats": {
+                    "btable_entries": 4,
+                    "ch_i_entries": 2,
+                    "ch_t_outer_entries": 2,
+                    "ghist_bits": 4,
+                    "ghist_true_bits": 3,
+                    "gtable_banks": 2,
+                    "gtable_entries_per_bank": [2, 2],
+                    "nondefault_btable_entries": 1,
+                    "nondefault_gtable_entries_per_bank": [1, 1],
+                },
+                "tage": _make_tage_payload(),
+            }
+        ],
+    }
+    assert tage_restore == tage_candidates["candidates"][0]
 
     manifest_disk = json.loads(manifest_file.read_text(encoding="utf-8"))
     assert manifest_disk == manifest
@@ -252,6 +322,14 @@ def test_prepare_snapshot_gem5_uarch_writes_outputs_and_manifest(tmp_path: Path)
     assert manifest["components"]["l1d"]["restore_files"] == {
         "0": str(l1d_restore_file)
     }
+    assert manifest["components"]["tage"]["candidate_file"] == str(tage_file)
+    assert manifest["components"]["tage"]["restore_files"] == {
+        "0": str(tage_restore_file)
+    }
+    assert manifest["components"]["tage"]["line_count"] == 1
+    assert manifest["components"]["tage"]["stats"]["total_fetch_units"] == 1
+    assert manifest["components"]["tage"]["stats"]["units_with_tage"] == 1
+    assert manifest["components"]["tage"]["stats"]["cores_emitted"] == 1
     assert manifest["components"]["l1d"]["line_count"] == 4
     assert (
         manifest["components"]["l1d"]["stats"]["total_private_lines"] == 5

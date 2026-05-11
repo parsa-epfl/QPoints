@@ -7,7 +7,7 @@ fi
 
 usage() {
   cat <<'EOF'
-Usage: run_gem5.sh --gem5-ckp-dir DIR --experiment NAME --snapshot NAME --inst N --cores N [--branch-trace] [--data-trace] [--dump-cache-state] [--timing-ruby] [--sim-config FILE]
+Usage: run_gem5.sh --gem5-ckp-dir DIR --experiment NAME --snapshot NAME --inst N --cores N [--branch-trace] [--tage-decision-trace] [--data-trace] [--dump-cache-state] [--timing-ruby] [--sim-config FILE]
 
 Arguments (all required):
   --gem5-ckp-dir  Checkpoint root directory
@@ -18,6 +18,8 @@ Arguments (all required):
 
 Options:
   --branch-trace  Enable per-core branch trace logging
+  --tage-decision-trace
+                  Enable per-core compact TAGE decision logging
   --data-trace    Enable per-core data access trace logging
   --dump-cache-state
                   Enable Ruby cache-state dumping (currently requires
@@ -112,6 +114,7 @@ INST=""
 CORES=""
 SIM_CONFIG=""
 BRANCH_TRACE_ARGS=()
+TAGE_DECISION_TRACE_ARGS=()
 DATA_TRACE_ARGS=()
 DUMP_CACHE_STATE_ARGS=()
 TIMING_RUBY=""
@@ -145,6 +148,10 @@ while [[ $# -gt 0 ]]; do
       ;;
     --branch-trace)
       BRANCH_TRACE_ARGS=(--branch-trace)
+      shift 1
+      ;;
+    --tage-decision-trace)
+      TAGE_DECISION_TRACE_ARGS=(--tage-decision-trace)
       shift 1
       ;;
     --data-trace)
@@ -215,6 +222,7 @@ if [[ -n "$TIMING_RUBY" ]]; then
     --mem-size 16384MiB
     "${TIMING_RUBY_CONFIG_ARGS[@]}"
     "${BRANCH_TRACE_ARGS[@]}"
+    "${TAGE_DECISION_TRACE_ARGS[@]}"
     "${DATA_TRACE_ARGS[@]}"
     "${DUMP_CACHE_STATE_ARGS[@]}"
   )
@@ -245,6 +253,7 @@ else
     --mem-size 16384MiB
     "${CLASSIC_CONFIG_ARGS[@]}"
     "${BRANCH_TRACE_ARGS[@]}"
+    "${TAGE_DECISION_TRACE_ARGS[@]}"
     "${DATA_TRACE_ARGS[@]}"
   )
 fi
