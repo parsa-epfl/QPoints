@@ -20,6 +20,8 @@ L1I_CANDIDATE_FILE = "l1i_restore_candidates.json"
 L1I_RESTORE_FILE_TEMPLATE = "l1i_restore_addrs.core{core}.txt"
 BTB_CANDIDATE_FILE = "btb_restore_candidates.json"
 BTB_RESTORE_FILE_TEMPLATE = "btb_restore_addrs.core{core}.txt"
+TAGE_CANDIDATE_FILE = "tage_restore_candidates.json"
+TAGE_RESTORE_FILE_TEMPLATE = "tage_restore_state.core{core}.json"
 LLC_SOURCE_FILE = "llc-0.json.zstd"
 DIRECTORY_SOURCE_FILE = "directory-0.json.zstd"
 HARVARD_SOURCE_FILE = "harvard-0.json.zstd"
@@ -125,6 +127,21 @@ def _write_json_file(path: Path, payload: object, overwrite: bool) -> None:
         json.dumps(payload, indent=2, sort_keys=True) + "\n",
         encoding="utf-8",
     )
+
+
+def _write_per_core_json_files(
+    root: Path,
+    candidates: list[dict],
+    overwrite: bool,
+    file_template: str,
+) -> dict[int, Path]:
+    outputs = {}
+    for candidate in candidates:
+        core = int(candidate["core"])
+        target = root / file_template.format(core=core)
+        _write_json_file(target, candidate, overwrite)
+        outputs[core] = target
+    return outputs
 
 
 def _l1d_restore_state(candidate: dict) -> str:
@@ -561,6 +578,89 @@ def _select_btb_restore_candidates(fetch_units: list[dict]) -> tuple[list[dict],
     return serialized_candidates, stats
 
 
+def _count_nondefault_btable_entries(entries: list[dict]) -> int:
+    return sum(
+        1
+        for entry in entries
+        if int(entry.get("pred", 0)) != 0 or int(entry.get("hyst", 1)) != 1
+    )
+
+
+def _count_nondefault_gtable_entries(entries_by_bank: list[list[dict]]) -> list[int]:
+    counts = []
+    for bank_entries in entries_by_bank:
+        counts.append(
+            sum(
+                1
+                for entry in bank_entries
+                if int(entry.get("ctr", 0)) != 0
+                or int(entry.get("tag", 0)) != 0
+                or int(entry.get("ubit", 0)) != 0
+            )
+        )
+    return counts
+
+
+def _select_tage_restore_candidates(fetch_units: list[dict]) -> tuple[list[dict], dict]:
+    stats = {
+        "total_fetch_units": len(fetch_units),
+        "units_with_tage": 0,
+        "cores_emitted": 0,
+    }
+
+    candidates = []
+    for core_idx, unit in enumerate(fetch_units):
+        tage = unit.get("tage")
+        if not isinstance(tage, dict):
+            continue
+
+        stats["units_with_tage"] += 1
+
+        ghist = tage.get("ghist", [])
+        ch_i = tage.get("ch_i", [])
+        ch_t = tage.get("ch_t", [])
+        btable = tage.get("btable", [])
+        gtable = tage.get("gtable", [])
+
+        candidate = {
+            "schema_version": 1,
+            "snapshot_core": core_idx,
+            "core": core_idx,
+            "history_lengths": [130, 76, 44, 25, 15, 9, 5],
+            "history_order": "longest_to_shortest",
+            "path_history_bits": 16,
+            "bimodal_log_entries": 13,
+            "tagged_log_entries": 9,
+            "tage": {
+                "tick": int(tage.get("tick", 0)),
+                "seed": int(tage.get("seed", 0)),
+                "phist": int(tage.get("phist", 0)),
+                "ghist": [bool(bit) for bit in ghist],
+                "ch_i": ch_i,
+                "ch_t": ch_t,
+                "btable": btable,
+                "gtable": gtable,
+            },
+            "stats": {
+                "ghist_bits": len(ghist),
+                "ghist_true_bits": sum(1 for bit in ghist if bit),
+                "ch_i_entries": len(ch_i),
+                "ch_t_outer_entries": len(ch_t),
+                "btable_entries": len(btable),
+                "gtable_banks": len(gtable),
+                "gtable_entries_per_bank": [len(bank) for bank in gtable],
+                "nondefault_btable_entries": _count_nondefault_btable_entries(btable),
+                "nondefault_gtable_entries_per_bank": _count_nondefault_gtable_entries(
+                    gtable
+                ),
+            },
+        }
+        candidates.append(candidate)
+
+    stats["cores_emitted"] = len(candidates)
+    return candidates, stats
+
+
 def prepare_snapshot_gem5_uarch(
     qflex_run_dir: Path,
     gem5_workload_root: Path,
@@ -584,6 +684,7 @@ def prepare_snapshot_gem5_uarch(
     l1d_candidate_file = gem5_uarch_dir / L1D_CANDIDATE_FILE
     l1i_candidate_file = gem5_uarch_dir / L1I_CANDIDATE_FILE
     btb_candidate_file = gem5_uarch_dir / BTB_CANDIDATE_FILE
+    tage_candidate_file = gem5_uarch_dir / TAGE_CANDIDATE_FILE
     manifest_file = gem5_uarch_dir / MANIFEST_FILE
 
     if not qflex_uarch_dir.is_dir():
@@ -625,6 +726,7 @@ def prepare_snapshot_gem5_uarch(
     l1d_candidates, l1d_stats = _select_l1d_restore_candidates(harvard)
     l1i_candidates, l1i_stats = _select_l1i_restore_candidates(harvard)
     btb_candidates, btb_stats = _select_btb_restore_candidates(fetch_units)
+    tage_candidates, tage_stats = _select_tage_restore_candidates(fetch_units)
     selected_modified = max(0, llc_debug_modified_count)
     selected_modified_lines = modified_lines[:selected_modified]
     effective_selected_modified = len(selected_modified_lines)
@@ -666,6 +768,15 @@ def prepare_snapshot_gem5_uarch(
         },
         overwrite,
     )
+    _write_json_file(
+        tage_candidate_file,
+        {
+            "schema_version": 1,
+            "snapshot": snapshot,
+            "candidates": tage_candidates,
+        },
+        overwrite,
+    )
     l1d_restore_files = _write_restore_files(
         gem5_uarch_dir,
         l1d_candidates,
@@ -685,6 +796,12 @@ def prepare_snapshot_gem5_uarch(
         btb_candidates,
         overwrite,
         BTB_RESTORE_FILE_TEMPLATE,
+    )
+    tage_restore_files = _write_per_core_json_files(
+        gem5_uarch_dir,
+        tage_candidates,
+        overwrite,
+        TAGE_RESTORE_FILE_TEMPLATE,
     )
 
     manifest = {
@@ -764,6 +881,23 @@ def prepare_snapshot_gem5_uarch(
                     "original branch identity"
                 ),
                 "stats": btb_stats,
+            },
+            "tage": {
+                "source_file": str(fetch_source_file),
+                "candidate_file": str(tage_candidate_file),
+                "restore_files": {
+                    str(core): str(path)
+                    for core, path in sorted(tage_restore_files.items())
+                },
+                "line_count": len(tage_candidates),
+                "selection_policy": (
+                    "serialize the per-core WormCache TAGE checkpoint payload "
+                    "into human-readable JSON without cross-implementation "
+                    "translation; gem5-side restore code is responsible for "
+                    "bank remapping, bimodal hysteresis grouping, folded-"
+                    "history recomputation, and policy-state defaults"
+                ),
+                "stats": tage_stats,
             },
         },
     }

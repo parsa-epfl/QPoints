@@ -1,0 +1,55 @@
+tage_family_8x4 is a validation microbenchmark and offline predictor probe
+for the TAGE-restoration phase.
+
+Intent:
+- Create a branch-dense benchmark with several hot conditional branch PCs so
+  cold TAGE training takes materially longer than in the single-branch probe.
+- Keep the structure simple enough that we can model the expected branch stream
+  outside the main QFlex -> gem5 conversion pipeline before involving the full
+  simulation flow.
+- Compare a bimodal-only baseline against a WormCache-style TAGE model on the
+  expected branch sequence.
+
+Why this benchmark exists:
+- The single-branch tage_history_probe already shows "bimodal hard, TAGE easy"
+  behavior, but it converges too quickly to create a long cold window.
+- For the real restoration experiment, we only care about roughly 10K to 100K
+  instructions after checkpoint start.
+- We therefore want more hot conditional PCs so the non-restored case spends a
+  larger fraction of that short window training the tagged tables.
+
+Behavior model:
+- There are 4 independent branch families.
+- Each family has 8 static conditional branch PCs, for 32 hot conditionals in
+  total.
+- Each family keeps its own 3-bit recurrence state.
+- Inside one family iteration, the benchmark consumes 8 consecutive recurrence
+  steps, one per branch PC:
+  - `bit = ((state >> 2) ^ state) & 1`
+  - `state = ((state << 1) | bit) & 0x7`
+- After the 8 hot conditionals, the family loop executes a loop-control
+  conditional branch.
+- The outer infinite loop then moves to the next family and finally executes an
+  unconditional loop-back branch.
+
+Offline semantic stream:
+- 8 target conditional branches per family iteration
+- 1 loop-control conditional branch per family iteration
+- 1 unconditional outer-loop backedge per outer iteration
+
+Files:
+- `tage_family_8x4.c`
+  - the C microbenchmark that we can later stage into the VM and run through
+    the real QFlex/gem5 pipeline
+- `generate_expected_sequence.cpp`
+  - emits the expected semantic branch stream for the benchmark
+- `simulate_wormcache_tage.cpp`
+  - standalone predictor simulator based on WormCache TAGE semantics, plus a
+    bimodal baseline using the same base-counter scheme
+
+Success criteria for the offline probe:
+- the target conditional branches are clearly worse under bimodal than under
+  TAGE
+- after warmup, TAGE accuracy on the target conditional set becomes very high
+- the target conditionals are mainly served by tagged TAGE tables rather than
+  the bimodal fallback

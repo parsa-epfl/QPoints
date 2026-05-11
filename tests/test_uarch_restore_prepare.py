@@ -72,6 +72,33 @@ def _make_fetch_btb_entry(
     }
 
 
+def _make_tage_payload() -> dict:
+    return {
+        "tick": 123,
+        "seed": 77,
+        "phist": 42,
+        "ghist": [True, False, True, True],
+        "ch_i": [1, 2],
+        "ch_t": [[3, 4], [5, 6]],
+        "btable": [
+            {"pred": 0, "hyst": 1},
+            {"pred": 1, "hyst": 0},
+            {"pred": 0, "hyst": 1},
+            {"pred": 0, "hyst": 1},
+        ],
+        "gtable": [
+            [
+                {"ctr": 0, "tag": 0, "ubit": 0},
+                {"ctr": 1, "tag": 17, "ubit": 2},
+            ],
+            [
+                {"ctr": -1, "tag": 9, "ubit": 1},
+                {"ctr": 0, "tag": 0, "ubit": 0},
+            ],
+        ],
+    }
+
+
 def test_prepare_snapshot_gem5_uarch_writes_outputs_and_manifest(tmp_path: Path):
     module = _load_prepare_module()
 
@@ -236,7 +263,8 @@ def test_prepare_snapshot_gem5_uarch_writes_outputs_and_manifest(tmp_path: Path)
                                 },
                             ]
                         ]
-                    }
+                    },
+                    "tage": _make_tage_payload(),
                 }
             ]
         },
@@ -257,6 +285,8 @@ def test_prepare_snapshot_gem5_uarch_writes_outputs_and_manifest(tmp_path: Path)
     l1i_restore_file = gem5_uarch_dir / "l1i_restore_addrs.core0.txt"
     btb_file = gem5_uarch_dir / "btb_restore_candidates.json"
     btb_restore_file = gem5_uarch_dir / "btb_restore_addrs.core0.txt"
+    tage_file = gem5_uarch_dir / "tage_restore_candidates.json"
+    tage_restore_file = gem5_uarch_dir / "tage_restore_state.core0.json"
     manifest_file = gem5_uarch_dir / "manifest.json"
 
     assert output_file.read_text(encoding="utf-8") == "0x100\n0x140\n"
@@ -275,6 +305,8 @@ def test_prepare_snapshot_gem5_uarch_writes_outputs_and_manifest(tmp_path: Path)
     l1d_candidates = json.loads(l1d_file.read_text(encoding="utf-8"))
     l1i_candidates = json.loads(l1i_file.read_text(encoding="utf-8"))
     btb_candidates = json.loads(btb_file.read_text(encoding="utf-8"))
+    tage_candidates = json.loads(tage_file.read_text(encoding="utf-8"))
+    tage_restore = json.loads(tage_restore_file.read_text(encoding="utf-8"))
     assert l1d_candidates == {
         "schema_version": 1,
         "snapshot": "snapshot_0",
@@ -350,6 +382,7 @@ def test_prepare_snapshot_gem5_uarch_writes_outputs_and_manifest(tmp_path: Path)
                 "branch_type": "DirectCall",
                 "core": 0,
                 "fallthrough": "0x404",
+                "source_view": "btb",
                 "set": 0,
                 "target": "0x800",
                 "ts": 10,
@@ -362,6 +395,7 @@ def test_prepare_snapshot_gem5_uarch_writes_outputs_and_manifest(tmp_path: Path)
                 "branch_type": "Return",
                 "core": 0,
                 "fallthrough": "0x484",
+                "source_view": "btb",
                 "set": 0,
                 "target": "0x0",
                 "ts": 15,
@@ -374,6 +408,7 @@ def test_prepare_snapshot_gem5_uarch_writes_outputs_and_manifest(tmp_path: Path)
                 "branch_type": "IndirectCall",
                 "core": 0,
                 "fallthrough": "0x4c4",
+                "source_view": "btb",
                 "set": 0,
                 "target": "0x900",
                 "ts": 18,
@@ -386,6 +421,7 @@ def test_prepare_snapshot_gem5_uarch_writes_outputs_and_manifest(tmp_path: Path)
                 "branch_type": "Conditional",
                 "core": 0,
                 "fallthrough": "0x444",
+                "source_view": "btb",
                 "set": 0,
                 "target": "0x880",
                 "ts": 20,
@@ -393,6 +429,35 @@ def test_prepare_snapshot_gem5_uarch_writes_outputs_and_manifest(tmp_path: Path)
             },
         ],
     }
+    assert tage_candidates == {
+        "schema_version": 1,
+        "snapshot": "snapshot_0",
+        "candidates": [
+            {
+                "core": 0,
+                "history_lengths": [130, 76, 44, 25, 15, 9, 5],
+                "history_order": "longest_to_shortest",
+                "path_history_bits": 16,
+                "bimodal_log_entries": 13,
+                "schema_version": 1,
+                "snapshot_core": 0,
+                "stats": {
+                    "btable_entries": 4,
+                    "ch_i_entries": 2,
+                    "ch_t_outer_entries": 2,
+                    "ghist_bits": 4,
+                    "ghist_true_bits": 3,
+                    "gtable_banks": 2,
+                    "gtable_entries_per_bank": [2, 2],
+                    "nondefault_btable_entries": 1,
+                    "nondefault_gtable_entries_per_bank": [1, 1],
+                },
+                "tage": _make_tage_payload(),
+                "tagged_log_entries": 9,
+            }
+        ],
+    }
+    assert tage_restore == tage_candidates["candidates"][0]
 
     manifest_disk = json.loads(manifest_file.read_text(encoding="utf-8"))
     assert manifest_disk == manifest
@@ -442,6 +507,14 @@ def test_prepare_snapshot_gem5_uarch_writes_outputs_and_manifest(tmp_path: Path)
         manifest["components"]["btb"]["stats"]["restorable_branch_candidates"]
         == 4
     )
+    assert manifest["components"]["tage"]["candidate_file"] == str(tage_file)
+    assert manifest["components"]["tage"]["restore_files"] == {
+        "0": str(tage_restore_file)
+    }
+    assert manifest["components"]["tage"]["line_count"] == 1
+    assert manifest["components"]["tage"]["stats"]["total_fetch_units"] == 1
+    assert manifest["components"]["tage"]["stats"]["units_with_tage"] == 1
+    assert manifest["components"]["tage"]["stats"]["cores_emitted"] == 1
 
 
 def test_prepare_snapshot_gem5_uarch_can_append_controlled_modified_lines(

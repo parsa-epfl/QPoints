@@ -1,0 +1,5 @@
+tage_family_8x4
+tage_family_8x4.aarch64
+generate_expected_sequence
+simulate_wormcache_tage
+*.csv
