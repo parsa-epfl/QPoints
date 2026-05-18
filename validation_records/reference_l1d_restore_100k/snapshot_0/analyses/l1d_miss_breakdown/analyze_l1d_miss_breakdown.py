@@ -90,7 +90,7 @@ def preload_restore(path: Path):
         raw = raw.strip()
         if not raw:
             continue
-        line = int(raw, 0)
+        line = int(raw.split()[0], 0)
         restored.append(line)
         block = line // LINE_SIZE
         set_idx = block % NUM_SETS
