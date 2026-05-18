@@ -75,6 +75,12 @@ def define_options(parser):
             "metadata if available"
         ))
     parser.add_argument(
+        "--restore-l1i-state", action="store_true", default=False,
+        help=(
+            "Restore private L1I warm-state lines discovered from checkpoint "
+            "metadata if available"
+        ))
+    parser.add_argument(
         "--restore-tage-state", action="store_true", default=False,
         help=(
             "Restore TAGE direction state discovered from checkpoint "

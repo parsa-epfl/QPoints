@@ -49,6 +49,9 @@ machine(MachineType:L1Cache, "MESI Directory L1 Cache CMP")
    Cycles to_l2_latency := 1;
    bool send_evictions;
    bool enable_prefetch := "False";
+   bool restore_l1i_state := "False";
+   std::string l1i_restore_file := "";
+   bool warm_restore_l1i_mode := "False";
 
    // Message Queues
    // From this node's L1 cache TO the network
@@ -175,6 +178,7 @@ machine(MachineType:L1Cache, "MESI Directory L1 Cache CMP")
   void unset_cache_entry();
   void set_tbe(TBE a);
   void unset_tbe();
+  void startupWarmStateFromFile(std::string path);
   void wakeUpBuffers(Addr a);
   void profileMsgDelay(int virtualNetworkType, Cycles c);
 
@@ -268,6 +272,47 @@ machine(MachineType:L1Cache, "MESI Directory L1 Cache CMP")
     if (is_valid(cache_entry)) {
       cache_entry.changePermission(L1Cache_State_to_permission(state));
     }
+  }
+
+  void preloadWarmL1ILine(Addr addr) {
+    Entry cache_entry := getL1ICacheEntry(addr);
+    if (is_invalid(cache_entry)) {
+      cache_entry := static_cast(Entry, "pointer",
+          L1Icache.allocate(addr, new Entry));
+    }
+
+    assert(is_valid(cache_entry));
+    readDataFromMemory(addr, cache_entry.DataBlk);
+    cache_entry.Dirty := false;
+    cache_entry.isPrefetch := false;
+    cache_entry.CacheState := State:S;
+    setAccessPermission(cache_entry, addr, State:S);
+    L1Icache.setMRU(addr);
+    L1Icache.markCheckpointLoad(addr);
+  }
+
+  void applyWarmLineAddr(Addr addr) {
+    if (warm_restore_l1i_mode) {
+      preloadWarmL1ILine(makeLineAddress(addr));
+    }
+  }
+
+  void applyWarmLineState(Addr addr, std::string warm_state) {
+    if (warm_restore_l1i_mode) {
+      preloadWarmL1ILine(makeLineAddress(addr));
+    }
+  }
+
+  void startupWarmL1IState() {
+    if (restore_l1i_state) {
+      warm_restore_l1i_mode := true;
+      startupWarmStateFromFile(l1i_restore_file);
+      warm_restore_l1i_mode := false;
+    }
+  }
+
+  void startupWarmState() {
+    startupWarmL1IState();
   }
 
   Event mandatory_request_type_to_event(RubyRequestType type) {
@@ -842,6 +887,7 @@ machine(MachineType:L1Cache, "MESI Directory L1 Cache CMP")
     assert(is_valid(cache_entry));
     DPRINTF(RubySlicc, "%s\n", cache_entry.DataBlk);
     L1Icache.setMRU(cache_entry);
+    L1Icache.noteCheckpointLoadHit(address);
     sequencer.readCallback(address, cache_entry.DataBlk);
   }
 
