@@ -42,6 +42,7 @@
 
 #include <algorithm>
 #include <cctype>
+#include <sstream>
 
 #include "base/logging.hh"
 #include "debug/RubyQueue.hh"
@@ -127,7 +128,7 @@ AbstractController::startupWarmStateFromFile(const std::string &path)
 {
     if (path.empty()) {
         warn(
-            "%s: LLC warm-state restore enabled but no restore file was "
+            "%s: warm-state restore enabled but no restore file was "
             "provided.",
             name()
         );
@@ -136,7 +137,7 @@ AbstractController::startupWarmStateFromFile(const std::string &path)
 
     std::ifstream infile(path);
     if (!infile.is_open()) {
-        warn("%s: could not open LLC warm-state restore file %s.",
+        warn("%s: could not open warm-state restore file %s.",
              name(), path);
         return;
     }
@@ -161,11 +162,24 @@ AbstractController::startupWarmStateFromFile(const std::string &path)
         }
 
         try {
-            Addr addr = static_cast<Addr>(std::stoull(line, nullptr, 0));
-            applyWarmLineAddr(addr);
+            std::istringstream parser(line);
+            std::string addr_token;
+            std::string state_token;
+            parser >> addr_token;
+            parser >> state_token;
+
+            Addr addr = static_cast<Addr>(std::stoull(addr_token, nullptr, 0));
+            if (state_token.empty()) {
+                applyWarmLineAddr(addr);
+            } else {
+                applyWarmLineState(addr, state_token);
+            }
         } catch (const std::exception &exc) {
-            warn("%s: failed to parse LLC restore line '%s' from %s: %s",
-                 name(), line, path, exc.what());
+            warn(
+                "%s: failed to parse warm-state restore line '%s' "
+                "from %s: %s",
+                name(), line, path, exc.what()
+            );
         }
     }
 }

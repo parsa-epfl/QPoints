@@ -110,6 +110,10 @@ class AbstractController : public ClockedObject, public Consumer
     virtual void regStats();
     virtual void startupWarmState() { }
     virtual void applyWarmLineAddr(const Addr &addr) { }
+    virtual void applyWarmLineState(const Addr &addr, const std::string &state)
+    {
+        applyWarmLineAddr(addr);
+    }
     void startupWarmStateFromFile(const std::string &path);
 
     virtual void recordCacheTrace(int cntrl, CacheRecorder* tr) = 0;

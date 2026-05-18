@@ -52,6 +52,9 @@ machine(MachineType:L1Cache, "MESI Directory L1 Cache CMP")
    bool restore_l1i_state := "False";
    std::string l1i_restore_file := "";
    bool warm_restore_l1i_mode := "False";
+   bool restore_l1d_state := "False";
+   std::string l1d_restore_file := "";
+   bool warm_restore_l1d_mode := "False";
 
    // Message Queues
    // From this node's L1 cache TO the network
@@ -290,16 +293,44 @@ machine(MachineType:L1Cache, "MESI Directory L1 Cache CMP")
     L1Icache.setMRU(addr);
     L1Icache.markCheckpointLoad(addr);
   }
+  void preloadWarmL1DLine(Addr addr, State state) {
+    Entry cache_entry := getL1DCacheEntry(addr);
+    if (is_invalid(cache_entry)) {
+      cache_entry := static_cast(Entry, "pointer",
+          L1Dcache.allocate(addr, new Entry));
+    }
+
+    assert(is_valid(cache_entry));
+    readDataFromMemory(addr, cache_entry.DataBlk);
+    cache_entry.Dirty := false;
+    cache_entry.isPrefetch := false;
+    cache_entry.CacheState := state;
+    setAccessPermission(cache_entry, addr, state);
+    L1Dcache.setMRU(addr);
+    L1Dcache.markCheckpointLoad(addr);
+  }
 
   void applyWarmLineAddr(Addr addr) {
     if (warm_restore_l1i_mode) {
       preloadWarmL1ILine(makeLineAddress(addr));
+    } else if (warm_restore_l1d_mode) {
+      // Deferred follow-up: address-only warm inputs still default to M here to
+      // preserve the validated single-core replay path. A general multicore-safe
+      // restore flow must seed matching L2/directory ownership metadata before
+      // this should be treated as a coherent-visible M-state installation.
+      preloadWarmL1DLine(makeLineAddress(addr), State:M);
     }
   }
 
   void applyWarmLineState(Addr addr, std::string warm_state) {
     if (warm_restore_l1i_mode) {
       preloadWarmL1ILine(makeLineAddress(addr));
+    } else if (warm_restore_l1d_mode) {
+      if (warm_state == "S") {
+        preloadWarmL1DLine(makeLineAddress(addr), State:S);
+      } else {
+        preloadWarmL1DLine(makeLineAddress(addr), State:M);
+      }
     }
   }
 
@@ -311,8 +342,17 @@ machine(MachineType:L1Cache, "MESI Directory L1 Cache CMP")
     }
   }
 
+  void startupWarmL1DState() {
+    if (restore_l1d_state) {
+      warm_restore_l1d_mode := true;
+      startupWarmStateFromFile(l1d_restore_file);
+      warm_restore_l1d_mode := false;
+    }
+  }
+
   void startupWarmState() {
     startupWarmL1IState();
+    startupWarmL1DState();
   }
 
   Event mandatory_request_type_to_event(RubyRequestType type) {
@@ -542,6 +582,7 @@ machine(MachineType:L1Cache, "MESI Directory L1 Cache CMP")
           // *** DATA ACCESS ***
           Entry L1Dcache_entry := getL1DCacheEntry(in_msg.LineAddress);
           if (is_valid(L1Dcache_entry)) {
+            L1Dcache.noteCheckpointLoadHit(in_msg.LineAddress);
             // The tag matches for the L1, so the L1 ask the L2 for it
             trigger(mandatory_request_type_to_event(in_msg.Type), in_msg.LineAddress,
                     L1Dcache_entry, TBEs[in_msg.LineAddress]);

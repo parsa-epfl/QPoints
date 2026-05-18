@@ -40,8 +40,9 @@ from .Ruby import send_evicts
 class L1Cache(RubyCache): pass
 class L2Cache(RubyCache): pass
 
-GEM5_UARCH_SUFFIX = ".gem5_uarch"
+GEM5_UARCH_SUFFIX = "gem5_uarch"
 LLC_RESTORE_STAGED = "llc_restore_addrs.txt"
+L1D_RESTORE_TEMPLATE = "l1d_restore_addrs.core{core}.txt"
 L1I_RESTORE_TEMPLATE = "l1i_restore_addrs.core{core}.txt"
 
 
@@ -50,6 +51,19 @@ def discover_gem5_uarch_dir(restore_dir: Path):
     snapshot_name = restore_dir.name
     nested = workload_dir / snapshot_name / GEM5_UARCH_SUFFIX.lstrip(".")
     sibling = workload_dir / f"{snapshot_name}{GEM5_UARCH_SUFFIX}"
+
+    if nested.is_dir():
+        return nested
+    if sibling.is_dir():
+        return sibling
+    return nested
+
+
+def discover_gem5_uarch_dir(restore_dir: Path):
+    workload_dir = restore_dir.parent
+    snapshot_name = restore_dir.name
+    nested = workload_dir / snapshot_name / GEM5_UARCH_SUFFIX
+    sibling = workload_dir / f"{snapshot_name}.{GEM5_UARCH_SUFFIX}"
 
     if nested.is_dir():
         return nested
@@ -136,6 +150,49 @@ def discover_l1i_restore_files(options):
 
     return restore_files
 
+
+def discover_l1d_restore_files(options):
+    if not getattr(options, "restore_l1d_state", False):
+        return {}
+
+    if getattr(options, "num_cpus", 0) != 1:
+        fatal(
+            "L1D warm restore is currently validated only for single-core "
+            "runs; multicore restore requires coherent L2/directory state. "
+            "Got %d CPUs." % getattr(options, "num_cpus", 0)
+        )
+
+    if not getattr(options, "restore", None):
+        m5.util.warn(
+            "--restore-l1d-state was set without --restore; "
+            "skipping L1D warm-state import."
+        )
+        return {}
+
+    restore_dir = Path(options.restore).resolve()
+    gem5_uarch_dir = discover_gem5_uarch_dir(restore_dir)
+
+    if not gem5_uarch_dir.is_dir():
+        m5.util.warn(
+            f"gem5 uarch restore directory not found: {gem5_uarch_dir}. "
+            "Running with cold private L1D state."
+        )
+        return {}
+
+    restore_files = {}
+    for core in range(getattr(options, "num_cpus", 0)):
+        target_path = gem5_uarch_dir / L1D_RESTORE_TEMPLATE.format(core=core)
+        if target_path.is_file():
+            restore_files[core] = str(target_path)
+
+    if not restore_files:
+        m5.util.warn(
+            f"No L1D restore files matching {L1D_RESTORE_TEMPLATE} were found "
+            f"in {gem5_uarch_dir}. Running with cold private L1D state."
+        )
+
+    return restore_files
+
 def define_options(parser):
     return
 
@@ -164,6 +221,8 @@ def create_system(options, full_system, system, dma_ports, bootmem,
     block_size_bits = int(math.log(options.cacheline_size, 2))
     l1i_restore_files = discover_l1i_restore_files(options)
 
+    l1d_restore_files = discover_l1d_restore_files(options)
+
     for i in range(options.num_cpus):
         #
         # First create the Ruby objects associated with this cpu
@@ -174,6 +233,7 @@ def create_system(options, full_system, system, dma_ports, bootmem,
                             is_icache = True)
         l1d_cache = L1Cache(size = options.l1d_size,
                             assoc = options.l1d_assoc,
+                            replacement_policy = LRURP(),
                             start_index_bit = block_size_bits,
                             is_icache = False)
 
@@ -191,6 +251,12 @@ def create_system(options, full_system, system, dma_ports, bootmem,
                                       ),
                                       l1i_restore_file=(
                                           l1i_restore_files.get(i, "")
+                                      ),
+                                      restore_l1d_state=(
+                                          i in l1d_restore_files
+                                      ),
+                                      l1d_restore_file=(
+                                          l1d_restore_files.get(i, "")
                                       ),
                                       ruby_system = ruby_system,
                                       clk_domain = clk_domain,
