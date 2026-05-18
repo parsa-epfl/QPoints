@@ -74,6 +74,21 @@ def define_options(parser):
             "Restore LLC warm-state lines discovered from checkpoint "
             "metadata if available"
         ))
+    parser.add_argument(
+        "--restore-tage-state", action="store_true", default=False,
+        help=(
+            "Restore TAGE direction state discovered from checkpoint "
+            "metadata if available"
+        ))
+    parser.add_argument(
+        "--tage-decision-trace", action="store_true", default=False,
+        help="Emit compact per-conditional TAGE decision logs")
+    parser.add_argument(
+        "--tage-decision-trace-limit", action="store", type=int, default=0,
+        help=(
+            "Maximum number of conditional TAGE decisions to log "
+            "(0 = unlimited)"
+        ))
 
     # Options related to cache structure
     parser.add_argument(

@@ -59,7 +59,6 @@ void
 TAGE::update(ThreadID tid, Addr branch_pc, bool taken, void* bp_history,
               bool squashed, const StaticInstPtr & inst, Addr corrTarget)
 {
-    DPRINTF(Tage, "Bgodala TAGE update is called\n");
     assert(bp_history);
 
     TageBranchInfo *bi = static_cast<TageBranchInfo*>(bp_history);
@@ -73,12 +72,11 @@ TAGE::update(ThreadID tid, Addr branch_pc, bool taken, void* bp_history,
     }
 
     int nrand = random_mt.random<int>() & 3;
-    // Bgodala removing randomness for sanity check
-    //int nrand = 1;
     if (bi->tageBranchInfo->condBranch) {
         tage_bi->isUpdated = true;
         DPRINTF(Tage, "Updating tables for branch:%lx; taken?:%d\n",
                 branch_pc, taken);
+        tage->recordDecisionTrace(taken, tage_bi);
         tage->updateStats(taken, bi->tageBranchInfo);
         tage->condBranchUpdate(tid, branch_pc, taken, tage_bi, nrand,
                                corrTarget, bi->tageBranchInfo->tagePred);
@@ -109,7 +107,6 @@ TAGE::predict(ThreadID tid, Addr branch_pc, bool cond_branch, void* &b)
     TageBranchInfo *bi = new TageBranchInfo(*tage);//nHistoryTables+1);
     b = (void*)(bi);
     bool pred_taken =  tage->tagePredict(tid, branch_pc, cond_branch, bi->tageBranchInfo);
-    DPRINTF(Tage, "Bgodala PREDICT FUNCTION TAGE CHECK Lookup branch: %lx; predict:%d\n", branch_pc, pred_taken);
     DPRINTF(Tage, "predict: tid:%d bp_history:%lx\n",tid, b);
     return pred_taken;
 }

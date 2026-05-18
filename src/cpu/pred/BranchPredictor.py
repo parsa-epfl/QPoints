@@ -145,6 +145,26 @@ class TAGEBase(SimObject):
             "A large number to track all branch histories(2MEntries default)")
 
     pathHistBits = Param.Unsigned(16, "Path history size")
+    restoreTageState = Param.Bool(
+        False,
+        "Restore staged TAGE direction state from a checkpoint-local file",
+    )
+    tageRestoreFile = Param.String(
+        "",
+        "Path to the staged checkpoint-local TAGE state file",
+    )
+    tageDecisionTraceEnable = Param.Bool(
+        False,
+        "Log compact per-conditional TAGE decisions for debugging",
+    )
+    tageDecisionTraceFile = Param.String(
+        "",
+        "Path to the compact per-conditional TAGE decision log",
+    )
+    tageDecisionTraceLimit = Param.Unsigned(
+        0,
+        "Maximum number of conditional TAGE decisions to log (0 = unlimited)",
+    )
     logUResetPeriod = Param.Unsigned(18,
         "Log period in number of branches to reset TAGE useful counters")
     numUseAltOnNa = Param.Unsigned(1, "Number of USE_ALT_ON_NA counters")
@@ -778,5 +798,4 @@ class MultiperspectivePerceptronTAGE8KB(MultiperspectivePerceptronTAGE):
     tage = MPP_TAGE_8KB()
     loop_predictor = MPP_LoopPredictor_8KB()
     statistical_corrector = MPP_StatisticalCorrector_8KB()
-
 
