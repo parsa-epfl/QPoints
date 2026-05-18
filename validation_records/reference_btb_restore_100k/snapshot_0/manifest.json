@@ -36,7 +36,7 @@
       "category": "intent",
       "description": "Captured experiment intent for this run.",
       "label": "intent",
-      "path": "reference_btb_restore_100k_INTENT.txt",
+      "path": "INTENT.txt",
       "protected": true,
       "required": true,
       "retention": "keep"

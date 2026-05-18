@@ -754,6 +754,164 @@ def test_prepare_snapshot_gem5_uarch_migrates_from_sibling_layout(
     ).is_file()
 
 
+def test_prepare_snapshot_gem5_uarch_unlinks_sibling_symlink_on_overwrite(
+    tmp_path: Path,
+):
+    module = _load_prepare_module()
+
+    qflex_run_dir = tmp_path / "qflex-run"
+    gem5_workload_root = tmp_path / "gem5-workload"
+    source_dir = qflex_run_dir / "snapshot_0.uarch"
+    source_dir.mkdir(parents=True)
+    gem5_workload_root.mkdir()
+    (gem5_workload_root / "snapshot_0").mkdir()
+
+    external_dir = tmp_path / "external-uarch"
+    external_dir.mkdir()
+    (external_dir / "keep.txt").write_text("keep\n", encoding="utf-8")
+
+    sibling_dir = gem5_workload_root / "snapshot_0.gem5_uarch"
+    sibling_dir.symlink_to(external_dir, target_is_directory=True)
+
+    _write_zstd_json(
+        source_dir / "llc-0.json.zstd",
+        {
+            "blocks": [
+                {
+                    "blocks": [
+                        {
+                            "block_id_with_v": _encode_block_id_with_v(0x100),
+                            "ts": 10,
+                            "modified": False,
+                        }
+                    ]
+                }
+            ]
+        },
+    )
+    _write_zstd_json(source_dir / "directory-0.json.zstd", {"entries": [{}]})
+    _write_zstd_json(
+        source_dir / "harvard-0.json.zstd",
+        [{"i_cache": [{"lines": []}], "d_cache": [{"lines": []}]}],
+    )
+    _write_zstd_json(source_dir / "fetch.json.zstd", {"private_units": []})
+
+    module.prepare_snapshot_gem5_uarch(
+        qflex_run_dir=qflex_run_dir,
+        gem5_workload_root=gem5_workload_root,
+        snapshot="snapshot_0",
+        overwrite=True,
+    )
+
+    assert not sibling_dir.exists()
+    assert (external_dir / "keep.txt").read_text(encoding="utf-8") == "keep\n"
+
+
+def test_prepare_snapshot_gem5_uarch_clears_stale_per_core_restore_files(
+    tmp_path: Path,
+):
+    module = _load_prepare_module()
+
+    qflex_run_dir = tmp_path / "qflex-run"
+    gem5_workload_root = tmp_path / "gem5-workload"
+    source_dir = qflex_run_dir / "snapshot_0.uarch"
+    source_dir.mkdir(parents=True)
+    gem5_workload_root.mkdir()
+    (gem5_workload_root / "snapshot_0").mkdir()
+
+    _write_zstd_json(
+        source_dir / "llc-0.json.zstd",
+        {
+            "blocks": [
+                {
+                    "blocks": [
+                        {
+                            "block_id_with_v": _encode_block_id_with_v(0x100),
+                            "ts": 10,
+                            "modified": False,
+                        }
+                    ]
+                }
+            ]
+        },
+    )
+    _write_zstd_json(source_dir / "directory-0.json.zstd", {"entries": [{}]})
+    _write_zstd_json(
+        source_dir / "harvard-0.json.zstd",
+        [
+            {
+                "i_cache": [{"lines": []}],
+                "d_cache": [
+                    {
+                        "lines": [
+                            _make_harvard_line(
+                                0x300,
+                                writeable=False,
+                                modified=True,
+                                ts=5,
+                            )
+                        ]
+                    }
+                ],
+            }
+        ],
+    )
+    _write_zstd_json(
+        source_dir / "fetch.json.zstd",
+        {
+            "private_units": [
+                {
+                    "btb": {
+                        "array": [
+                            [
+                                _make_fetch_btb_entry(
+                                    0x400,
+                                    0x800,
+                                    ts=10,
+                                    branch_type="DirectCall",
+                                    bbl_bytes=4,
+                                )
+                            ]
+                        ]
+                    },
+                    "tage": _make_tage_payload(),
+                }
+            ]
+        },
+    )
+
+    module.prepare_snapshot_gem5_uarch(
+        qflex_run_dir=qflex_run_dir,
+        gem5_workload_root=gem5_workload_root,
+        snapshot="snapshot_0",
+        overwrite=True,
+    )
+
+    gem5_uarch_dir = gem5_workload_root / "snapshot_0" / "gem5_uarch"
+    assert (gem5_uarch_dir / "l1d_restore_addrs.core0.txt").exists()
+    assert (gem5_uarch_dir / "btb_restore_addrs.core0.txt").exists()
+    assert (gem5_uarch_dir / "tage_restore_state.core0.json").exists()
+
+    (source_dir / "harvard-0.json.zstd").unlink()
+    (source_dir / "fetch.json.zstd").unlink()
+    _write_zstd_json(
+        source_dir / "harvard-0.json.zstd",
+        [{"i_cache": [{"lines": []}], "d_cache": [{"lines": []}]}],
+    )
+    _write_zstd_json(source_dir / "fetch.json.zstd", {"private_units": []})
+
+    module.prepare_snapshot_gem5_uarch(
+        qflex_run_dir=qflex_run_dir,
+        gem5_workload_root=gem5_workload_root,
+        snapshot="snapshot_0",
+        overwrite=True,
+    )
+
+    assert not (gem5_uarch_dir / "l1d_restore_addrs.core0.txt").exists()
+    assert not (gem5_uarch_dir / "btb_restore_addrs.core0.txt").exists()
+    assert not (gem5_uarch_dir / "tage_restore_state.core0.json").exists()
+
+
 def test_prepare_snapshot_gem5_uarch_preserves_per_core_l1d_candidates(
     tmp_path: Path,
 ):

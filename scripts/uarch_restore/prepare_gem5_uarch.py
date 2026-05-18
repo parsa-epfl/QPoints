@@ -16,12 +16,16 @@ QFLEX_UARCH_SUFFIX = ".uarch"
 LLC_RESTORE_FILE = "llc_restore_addrs.txt"
 L1D_CANDIDATE_FILE = "l1d_restore_candidates.json"
 L1D_RESTORE_FILE_TEMPLATE = "l1d_restore_addrs.core{core}.txt"
+L1D_RESTORE_FILE_GLOB = "l1d_restore_addrs.core*.txt"
 L1I_CANDIDATE_FILE = "l1i_restore_candidates.json"
 L1I_RESTORE_FILE_TEMPLATE = "l1i_restore_addrs.core{core}.txt"
+L1I_RESTORE_FILE_GLOB = "l1i_restore_addrs.core*.txt"
 BTB_CANDIDATE_FILE = "btb_restore_candidates.json"
 BTB_RESTORE_FILE_TEMPLATE = "btb_restore_addrs.core{core}.txt"
+BTB_RESTORE_FILE_GLOB = "btb_restore_addrs.core*.txt"
 TAGE_CANDIDATE_FILE = "tage_restore_candidates.json"
 TAGE_RESTORE_FILE_TEMPLATE = "tage_restore_state.core{core}.json"
+TAGE_RESTORE_FILE_GLOB = "tage_restore_state.core*.json"
 LLC_SOURCE_FILE = "llc-0.json.zstd"
 DIRECTORY_SOURCE_FILE = "directory-0.json.zstd"
 HARVARD_SOURCE_FILE = "harvard-0.json.zstd"
@@ -129,12 +133,26 @@ def _write_json_file(path: Path, payload: object, overwrite: bool) -> None:
     )
 
 
+def _clear_matching_outputs(root: Path, file_glob: str, overwrite: bool) -> None:
+    if not overwrite:
+        return
+    for target in root.glob(file_glob):
+        if target.is_symlink() or target.is_file():
+            target.unlink()
+        elif target.is_dir():
+            shutil.rmtree(target)
+        else:
+            target.unlink(missing_ok=True)
+
+
 def _write_per_core_json_files(
     root: Path,
     candidates: list[dict],
     overwrite: bool,
     file_template: str,
+    file_glob: str,
 ) -> dict[int, Path]:
+    _clear_matching_outputs(root, file_glob, overwrite)
     outputs = {}
     for candidate in candidates:
         core = int(candidate["core"])
@@ -157,8 +175,10 @@ def _write_restore_files(
     candidates: list[dict],
     overwrite: bool,
     file_template: str,
+    file_glob: str,
     state_fn,
 ) -> dict[int, Path]:
+    _clear_matching_outputs(root, file_glob, overwrite)
     per_core = {}
     for candidate in candidates:
         per_core.setdefault(candidate["core"], []).append(
@@ -189,7 +209,9 @@ def _write_btb_restore_files(
     candidates: list[dict],
     overwrite: bool,
     file_template: str,
+    file_glob: str,
 ) -> dict[int, Path]:
+    _clear_matching_outputs(root, file_glob, overwrite)
     per_core = {}
     for candidate in candidates:
         per_core.setdefault(candidate["core"], []).append(
@@ -709,7 +731,9 @@ def prepare_snapshot_gem5_uarch(
                 f"{sibling_gem5_uarch_dir}. Pass --overwrite to remove it and "
                 "migrate to the nested snapshot/gem5_uarch layout."
             )
-        if sibling_gem5_uarch_dir.is_dir():
+        if sibling_gem5_uarch_dir.is_symlink():
+            sibling_gem5_uarch_dir.unlink()
+        elif sibling_gem5_uarch_dir.is_dir():
             shutil.rmtree(sibling_gem5_uarch_dir)
         else:
             sibling_gem5_uarch_dir.unlink()
@@ -782,6 +806,7 @@ def prepare_snapshot_gem5_uarch(
         l1d_candidates,
         overwrite,
         L1D_RESTORE_FILE_TEMPLATE,
+        L1D_RESTORE_FILE_GLOB,
         _l1d_restore_state,
     )
     l1i_restore_files = _write_restore_files(
@@ -789,6 +814,7 @@ def prepare_snapshot_gem5_uarch(
         l1i_candidates,
         overwrite,
         L1I_RESTORE_FILE_TEMPLATE,
+        L1I_RESTORE_FILE_GLOB,
         _l1i_restore_state,
     )
     btb_restore_files = _write_btb_restore_files(
@@ -796,12 +822,14 @@ def prepare_snapshot_gem5_uarch(
         btb_candidates,
         overwrite,
         BTB_RESTORE_FILE_TEMPLATE,
+        BTB_RESTORE_FILE_GLOB,
     )
     tage_restore_files = _write_per_core_json_files(
         gem5_uarch_dir,
         tage_candidates,
         overwrite,
         TAGE_RESTORE_FILE_TEMPLATE,
+        TAGE_RESTORE_FILE_GLOB,
     )
 
     manifest = {
