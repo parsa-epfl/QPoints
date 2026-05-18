@@ -41,6 +41,7 @@
 #ifndef __CPU_O3_COMMIT_HH__
 #define __CPU_O3_COMMIT_HH__
 
+#include <iosfwd>
 #include <queue>
 
 #include "base/statistics.hh"
@@ -355,6 +356,10 @@ class Commit
     /** Pointer to O3CPU. */
     CPU *cpu;
 
+    /** Optional per-core branch trace stream for committed control flow. */
+    bool branchTraceEnable;
+    std::ostream *branchTraceStream;
+
     /** Vector of all of the threads. */
     std::vector<ThreadState *> thread;
 
@@ -543,6 +548,56 @@ class Commit
         statistics::Vector functionCalls;
         /** Committed instructions by instruction type (OpClass) */
         statistics::Vector2d committedInstType;
+
+        /** Total number of committed control instructions. */
+        statistics::Scalar committedControlBranches;
+        /** Committed control instructions delivered by the FDIP BBL path. */
+        statistics::Scalar committedControlBTBHit;
+        /** Committed control instructions that fell back from the FDIP BBL
+         * path.
+         */
+        statistics::Scalar committedControlBTBMiss;
+        /** Committed control instructions with correct direction
+         * prediction.
+         */
+        statistics::Scalar committedControlDirectionCorrect;
+        /** Committed control instructions with incorrect direction
+         * prediction.
+         */
+        statistics::Scalar committedControlDirectionIncorrect;
+        /** Committed control instructions with correct next-PC target
+         * prediction.
+         */
+        statistics::Scalar committedControlTargetCorrect;
+        /** Committed control instructions with incorrect next-PC target
+         * prediction.
+         */
+        statistics::Scalar committedControlTargetIncorrect;
+
+        /** Direct branches whose resolved PC state transfers control and
+         * arrived via fallback after the BBL chain missed.
+         */
+        statistics::Scalar directControlTransferBTBMiss;
+        /** Direct branches whose resolved PC state transfers control and
+         * arrived via a BBL-chain hit sourced from FetchDirect fill.
+         */
+        statistics::Scalar directControlTransferBTBHitFetchDirect;
+        /** Direct branches whose resolved PC state transfers control and
+         * arrived via a BBL-chain hit sourced from FetchNondirect fill.
+         */
+        statistics::Scalar directControlTransferBTBHitFetchNondirect;
+        /** Direct branches whose resolved PC state transfers control and
+         * arrived via a BBL-chain hit sourced from PredecodeDirect fill.
+         */
+        statistics::Scalar directControlTransferBTBHitPredecodeDirect;
+        /** Direct branches whose resolved PC state transfers control and
+         * arrived via a BBL-chain hit sourced from ResolveControl fill.
+         */
+        statistics::Scalar directControlTransferBTBHitResolveControl;
+        /** Direct branches whose resolved PC state transfers control and
+         * arrived via a BBL-chain hit sourced from Restore fill.
+         */
+        statistics::Scalar directControlTransferBTBHitRestore;
 
         /** Number of cycles where the commit bandwidth limit is reached. */
         statistics::Scalar commitEligibleSamples;

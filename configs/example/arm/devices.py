@@ -228,6 +228,7 @@ class CpuCluster(SubSystem):
                 cpu.branchPred = bpClass()
                 if args.btb_entries:
                     cpu.branchPred.BTBEntries = args.btb_entries
+                    cpu.branchPred.BTBWays = args.btb_ways
                     #cpu.branchPred.BTBEntries = 64*1024*1024
                     cpu.branchPred.BTBTagSize = 64 - (math.log(cpu.branchPred.BTBEntries,2) + 2)
                 #indirectBPClass = ObjectList.indirect_bp_list.get('SimpleIndirectPredictor')

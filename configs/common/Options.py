@@ -154,6 +154,7 @@ def addNoISAOptions(parser):
     parser.add_argument("--l3_assoc", type=int, default=16)
     parser.add_argument("--cacheline_size", type=int, default=64)
     parser.add_argument("--btb-entries", type=str, default="4096")
+    parser.add_argument("--btb-ways", type=int, default=4)
     parser.add_argument("--starveRandomness", type=float, default=3.125)
     parser.add_argument("--starveAtleast", type=int, default=0)
     parser.add_argument("--randomStarve", action="store_true", default=False)

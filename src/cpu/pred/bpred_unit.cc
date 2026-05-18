@@ -43,9 +43,14 @@
 #include "cpu/pred/bpred_unit.hh"
 
 #include <algorithm>
+#include <fstream>
+#include <memory>
+#include <sstream>
+#include <string>
 
 #include "arch/pcstate.hh"
 #include "base/compiler.hh"
+#include "base/logging.hh"
 #include "base/trace.hh"
 #include "config/the_isa.hh"
 #include "debug/Branch.hh"
@@ -56,6 +61,130 @@ namespace gem5
 namespace branch_prediction
 {
 
+namespace
+{
+
+void
+normalizeRestoredArmPcState(TheISA::PCState &pc)
+{
+    pc.aarch64(true);
+    pc.nextAArch64(true);
+    pc.thumb(false);
+    pc.nextThumb(false);
+    pc.jazelle(false);
+    pc.nextJazelle(false);
+    pc.itstate(0);
+    pc.nextItstate(0);
+    pc.upc(0);
+    pc.nupc(1);
+    pc.npc(pc.pc() + 4);
+}
+
+class RestoredBranchInst final : public StaticInst
+{
+  public:
+    RestoredBranchInst(
+        const char *mnemonic,
+        const TheISA::PCState &target,
+        bool is_direct,
+        bool is_unconditional,
+        bool is_call,
+        bool is_return
+    ) : StaticInst(mnemonic, No_OpClass), targetPc(target)
+    {
+        flags[IsControl] = true;
+        if (is_direct) {
+            flags[IsDirectControl] = true;
+        } else {
+            flags[IsIndirectControl] = true;
+        }
+        if (is_unconditional) {
+            flags[IsUncondControl] = true;
+        } else {
+            flags[IsCondControl] = true;
+        }
+        if (is_call) {
+            flags[IsCall] = true;
+        }
+        if (is_return) {
+            flags[IsReturn] = true;
+        }
+    }
+
+    Fault
+    execute(ExecContext *xc, Trace::InstRecord *traceData) const override
+    {
+        panic("restored BTB synthetic branch should never execute");
+    }
+
+    void
+    advancePC(TheISA::PCState &pc_state) const override
+    {
+        pc_state.advance();
+    }
+
+    TheISA::PCState
+    branchTarget(const TheISA::PCState &pc) const override
+    {
+        return targetPc;
+    }
+
+    TheISA::PCState
+    buildRetPC(
+        const TheISA::PCState &cur_pc,
+        const TheISA::PCState &call_pc) const override
+    {
+        return call_pc;
+    }
+
+  protected:
+    std::string
+    generateDisassembly(Addr pc, const loader::SymbolTable *symtab) const override
+    {
+        return std::string(mnemonic);
+    }
+
+  private:
+    TheISA::PCState targetPc;
+};
+
+StaticInstPtr
+    makeRestoredBranchInst(
+    const std::string &branchType,
+    const TheISA::PCState &targetPc)
+{
+    if (branchType == "Conditional") {
+        return StaticInstPtr(
+            new RestoredBranchInst(
+                "restored_b.cond", targetPc, true, false, false, false));
+    }
+    if (branchType == "DirectCall") {
+        return StaticInstPtr(
+            new RestoredBranchInst(
+                "restored_bl", targetPc, true, true, true, false));
+    }
+    if (branchType == "IndirectCall") {
+        return StaticInstPtr(
+            new RestoredBranchInst(
+                "restored_blr", targetPc, false, true, true, false));
+    }
+    if (branchType == "IndirectBranch") {
+        return StaticInstPtr(
+            new RestoredBranchInst(
+                "restored_br", targetPc, false, true, false, false));
+    }
+    if (branchType == "Return") {
+        return StaticInstPtr(
+            new RestoredBranchInst(
+                "restored_ret", targetPc, false, true, false, true));
+    }
+    return StaticInstPtr(
+        new RestoredBranchInst(
+            "restored_b", targetPc, true, true, false, false));
+}
+
+} // anonymous namespace
+
 BPredUnit::BPredUnit(const Params &params)
     : SimObject(params),
       numThreads(params.numThreads),
@@ -63,15 +192,128 @@ BPredUnit::BPredUnit(const Params &params)
       BTB(params.BTBEntries,
           params.BTBTagSize,
           params.instShiftAmt,
+          params.BTBWays,
           params.numThreads),
       RAS(numThreads),
       iPred(params.indirectBranchPred),
       prev_hist(nullptr),
       stats(this),
-      instShiftAmt(params.instShiftAmt)
+      instShiftAmt(params.instShiftAmt),
+      restoreBTBState(params.restoreBTBState),
+      btbRestoreFile(params.btbRestoreFile)
 {
     for (auto& r : RAS)
         r.init(params.RASSize);
+}
+
+void
+BPredUnit::startup()
+{
+    SimObject::startup();
+    if (restoreBTBState) {
+        restoreBTBFromFile();
+    }
+}
+
+void
+BPredUnit::noteBTBFill(BTBFillSource source)
+{
+    switch (source) {
+      case BTBFillSource::FetchDirect:
+        ++stats.btbFillFetchDirect;
+        break;
+      case BTBFillSource::FetchNondirect:
+        ++stats.btbFillFetchNondirect;
+        break;
+      case BTBFillSource::PredecodeDirect:
+        ++stats.btbFillPredecodeDirect;
+        break;
+      case BTBFillSource::ResolveControl:
+        ++stats.btbFillResolveControl;
+        break;
+      case BTBFillSource::Restore:
+        ++stats.btbFillRestore;
+        break;
+      case BTBFillSource::None:
+        break;
+    }
+}
+
+void
+BPredUnit::flushPendingBTBRestoreCount()
+{
+    if (pendingBTBRestoreCount) {
+        stats.btbFillRestore += pendingBTBRestoreEntries;
+        pendingBTBRestoreCount = false;
+        pendingBTBRestoreEntries = 0;
+    }
+}
+
+void
+BPredUnit::restoreBTBFromFile()
+{
+    if (btbRestoreFile.empty()) {
+        warn("BTB restore was enabled for %s but no replay file was provided.",
+             name().c_str());
+        return;
+    }
+
+    std::ifstream input(btbRestoreFile);
+    if (!input) {
+        fatal("Failed to open BTB restore file for %s: %s",
+              name().c_str(), btbRestoreFile.c_str());
+    }
+
+    std::string line;
+    unsigned restored = 0;
+    unsigned lineno = 0;
+    while (std::getline(input, line)) {
+        ++lineno;
+        if (line.empty()) {
+            continue;
+        }
+
+        std::istringstream iss(line);
+        Addr bblAddr = 0;
+        Addr branchPC = 0;
+        Addr targetAddr = 0;
+        Addr fallthroughAddr = 0;
+        uint64_t bblBytes = 0;
+        std::string branchType;
+        if (!(iss >> std::hex >> bblAddr >> branchPC >> targetAddr
+                  >> fallthroughAddr >> std::dec >> bblBytes >> branchType)) {
+            fatal("Malformed BTB restore line in %s at line %u: %s",
+                  btbRestoreFile.c_str(), lineno, line.c_str());
+        }
+
+        TheISA::PCState branchPCState(branchPC);
+        TheISA::PCState targetPC(targetAddr);
+        TheISA::PCState fallthroughPC(fallthroughAddr);
+        normalizeRestoredArmPcState(branchPCState);
+        normalizeRestoredArmPcState(targetPC);
+        normalizeRestoredArmPcState(fallthroughPC);
+        const bool isUnconditional =
+            branchType != "Conditional";
+        StaticInstPtr restoredInst =
+            makeRestoredBranchInst(branchType, targetPC);
+        BTB.update(
+            bblAddr,
+            restoredInst,
+            branchPCState,
+            bblBytes,
+            targetPC,
+            fallthroughPC,
+            isUnconditional,
+            0,
+            BTBFillSource::Restore);
+        ++restored;
+    }
+
+    pendingBTBRestoreEntries = restored;
+    pendingBTBRestoreCount = restored != 0;
+
+    inform("%s restored %u staged BTB entries from %s",
+           name().c_str(), restored, btbRestoreFile.c_str());
 }
 
 BPredUnit::BPredUnitStats::BPredUnitStats(statistics::Group *parent)
@@ -86,6 +328,12 @@ BPredUnit::BPredUnitStats::BPredUnitStats(statistics::Group *parent)
       ADD_STAT(BTBHits, statistics::units::Count::get(), "Number of BTB hits"),
       ADD_STAT(BTBHitRatio, statistics::units::Ratio::get(), "BTB Hit Ratio",
                BTBHits / BTBLookups),
+      ADD_STAT(bblBTBLookups, statistics::units::Count::get(),
+               "Number of basic-block BTB lookups."),
+      ADD_STAT(bblBTBHits, statistics::units::Count::get(),
+               "Number of basic-block BTB hits."),
+      ADD_STAT(bblBTBMisses, statistics::units::Count::get(),
+               "Number of basic-block BTB misses."),
       ADD_STAT(RASUsed, statistics::units::Count::get(),
                "Number of times the RAS was used to get a target."),
       ADD_STAT(RASIncorrect, statistics::units::Count::get(),
@@ -97,7 +345,17 @@ BPredUnit::BPredUnitStats::BPredUnitStats(statistics::Group *parent)
       ADD_STAT(indirectMisses, statistics::units::Count::get(),
                "Number of indirect misses."),
       ADD_STAT(indirectMispredicted, statistics::units::Count::get(),
-               "Number of mispredicted indirect branches.")
+               "Number of mispredicted indirect branches."),
+      ADD_STAT(btbFillFetchDirect, statistics::units::Count::get(),
+               "Number of BTB entry populations tagged as FetchDirect."),
+      ADD_STAT(btbFillFetchNondirect, statistics::units::Count::get(),
+               "Number of BTB entry populations tagged as FetchNondirect."),
+      ADD_STAT(btbFillPredecodeDirect, statistics::units::Count::get(),
+               "Number of BTB entry populations tagged as PredecodeDirect."),
+      ADD_STAT(btbFillResolveControl, statistics::units::Count::get(),
+               "Number of BTB entry populations tagged as ResolveControl."),
+      ADD_STAT(btbFillRestore, statistics::units::Count::get(),
+               "Number of BTB entry populations tagged as Restore.")
 {
     BTBHitRatio.precision(6);
 }
@@ -165,11 +423,15 @@ BPredUnit::getBblSize(Addr bbladdr, ThreadID tid)
 bool
 BPredUnit::getBblValid(Addr bbladdr, ThreadID tid)
 {
+    flushPendingBTBRestoreCount();
     ++stats.BTBLookups;
+    ++stats.bblBTBLookups;
     if (BTB.valid(bbladdr, tid)){
         ++stats.BTBHits;
+        ++stats.bblBTBHits;
         return true;
     }else{
+        ++stats.bblBTBMisses;
         return false;
     }
 }
@@ -186,10 +448,17 @@ BPredUnit::getFT(Addr bbladdr, ThreadID tid)
     return BTB.lookupFT(bbladdr, tid);
 }
 
+BTBFillSource
+BPredUnit::getBblSource(Addr bbladdr, ThreadID tid)
+{
+    return BTB.lookupSource(bbladdr, tid);
+}
+
 bool
 BPredUnit::predict(const StaticInstPtr &inst, const InstSeqNum &seqNum,
                    TheISA::PCState &pc, ThreadID tid)
 {
+    flushPendingBTBRestoreCount();
     // See if branch predictor predicts taken.
     // If so, get its target addr either from the BTB or the RAS.
     // Save off record of branch stuff so the RAS can be fixed
@@ -241,6 +510,8 @@ BPredUnit::predict(const StaticInstPtr &inst, const InstSeqNum &seqNum,
             // in the RAS.
             TheISA::PCState rasTop = RAS[tid].top();
             target = inst->buildRetPC(pc, rasTop);
+            target.upc(0);
+            target.nupc(1);
 
             // Record the top entry of the RAS, and its index.
             predict_record.usedRAS = true;
@@ -273,6 +544,8 @@ BPredUnit::predict(const StaticInstPtr &inst, const InstSeqNum &seqNum,
                 // Check BTB on direct branches
                 if (BTB.valid(pc.instAddr(), tid)) {
                     ++stats.BTBHits;
+                    predict_record.btbSource =
+                        BTB.lookupSource(pc.instAddr(), tid);
                     // If it's not a return, use the BTB to get target addr.
                     target = BTB.lookup(pc.instAddr(), tid);
                     DPRINTF(Branch,
@@ -284,7 +557,6 @@ BPredUnit::predict(const StaticInstPtr &inst, const InstSeqNum &seqNum,
                             "valid entry\n",tid,seqNum);
                     pred_taken = false;
                     predict_record.predTaken = pred_taken;
-                    predict_record.wasBTBMiss = true;
                     // The Direction of the branch predictor is altered
                     // because the BTB did not have an entry
                     // The predictor needs to be updated accordingly
@@ -366,6 +638,7 @@ bool
 BPredUnit::predict(const StaticInstPtr &inst, const InstSeqNum &seqNum,
                    Addr bbladdr, TheISA::PCState &pc, ThreadID tid)
 {
+    flushPendingBTBRestoreCount();
     // See if branch predictor predicts taken.
     // If so, get its target addr either from the BTB or the RAS.
     // Save off record of branch stuff so the RAS can be fixed
@@ -447,39 +720,42 @@ BPredUnit::predict(const StaticInstPtr &inst, const InstSeqNum &seqNum,
             }
 
             if (inst->isDirectCtrl() || !iPred) {
-                ++stats.BTBLookups;
-                // Check BTB on direct branches
-                //if (BTB.valid(pc.instAddr(), tid)) {
-                if (BTB.valid(bbladdr, tid)) {
-                    ++stats.BTBHits;
-                    // If it's not a return, use the BTB to get target addr.
-                    //target = BTB.lookup(pc.instAddr(), tid);
-                    target = BTB.lookup(bbladdr, tid);
-                    DPRINTF(Branch,
-                            "[tid:%i] [sn:%llu] Instruction %s predicted "
-                            "target is %s\n",
-                            tid, seqNum, pc, target);
-                } else {
-                    DPRINTF(Branch, "[tid:%i] [sn:%llu] BTB doesn't have a "
-                            "valid entry\n",tid,seqNum);
-                    pred_taken = false;
-                    predict_record.predTaken = pred_taken;
-                    predict_record.wasBTBMiss = true;
-                    // The Direction of the branch predictor is altered
-                    // because the BTB did not have an entry
-                    // The predictor needs to be updated accordingly
-                    if (!inst->isCall() && !inst->isReturn()) {
-                        btbUpdate(tid, pc.instAddr(), bp_history);
-                        DPRINTF(Branch,
-                                "[tid:%i] [sn:%llu] btbUpdate "
-                                "called for %s\n",
-                                tid, seqNum, pc);
-                    } else if (inst->isCall() && !inst->isUncondCtrl()) {
-                        RAS[tid].pop();
-                        predict_record.pushedRAS = false;
-                    }
-                    inst->advancePC(target);
-                }
+                // For direct branches, the local frontend already knows the
+                // architected target once decode or BBL discovery has
+                // identified the branch. A second BTB lookup here is
+                // redundant and muddies hit/miss accounting, so keep the old
+                // BTB lookup code commented for reference and use the decoded
+                // direct target instead.
+                //
+                // Deferred follow-up: !iPred also routes indirect controls
+                // through this path. Keep the validated FDIP/BTB behavior
+                // stable on this branch and handle the no-indirect-predictor
+                // fallback semantics in a dedicated debug/fix pass.
+                //
+                // ++stats.BTBLookups;
+                // if (BTB.valid(bbladdr, tid)) {
+                //     ++stats.BTBHits;
+                //     predict_record.btbSource =
+                //         BTB.lookupSource(bbladdr, tid);
+                //     target = BTB.lookup(bbladdr, tid);
+                // } else {
+                //     pred_taken = false;
+                //     predict_record.predTaken = pred_taken;
+                //     if (!inst->isCall() && !inst->isReturn()) {
+                //         btbUpdate(tid, pc.instAddr(), bp_history);
+                //     } else if (inst->isCall() && !inst->isUncondCtrl()) {
+                //         RAS[tid].pop();
+                //         predict_record.pushedRAS = false;
+                //     }
+                //     inst->advancePC(target);
+                // }
+                target = inst->branchTarget(pc);
+                target.upc(0);
+                target.nupc(1);
+                DPRINTF(Branch,
+                        "[tid:%i] [sn:%llu] Instruction %s predicted "
+                        "direct target from decoded branch metadata as %s\n",
+                        tid, seqNum, pc, target);
             } else {
                 predict_record.wasIndirect = true;
                 ++stats.indirectLookups;
@@ -490,6 +766,8 @@ BPredUnit::predict(const StaticInstPtr &inst, const InstSeqNum &seqNum,
                     TheISA::PCState indirectBrTarget = pc;
                     indirectBrTarget.pc(target.pc());
                     indirectBrTarget.npc(target.npc());
+                    indirectBrTarget.upc(0);
+                    indirectBrTarget.nupc(1);
                     target = indirectBrTarget;
                     DPRINTF(Branch,
                             "[tid:%i] [sn:%llu] "
@@ -755,7 +1033,9 @@ BPredUnit::squash(const InstSeqNum &squashed_sn,
                         "PC %#x\n", tid, squashed_sn,
                         hist_it->seqNum, hist_it->pc);
 
-                BTB.update((*hist_it).pc, corrTarget, tid);
+                noteBTBFill(BTBFillSource::ResolveControl);
+                BTB.update((*hist_it).pc, corrTarget, tid,
+                           BTBFillSource::ResolveControl);
             }
         } else {
            //Actually not Taken
@@ -891,7 +1171,10 @@ BPredUnit::squash(const InstSeqNum &squashed_sn,
                         "PC %#x\n", tid, squashed_sn,
                         hist_it->seqNum, hist_it->pc);
 
-                //BTB.update((*hist_it).pc, corrTarget, tid);
+                noteBTBFill(BTBFillSource::ResolveControl);
+                BTB.update(bblAddr, branchInst, branchPC, bblSize, corrTarget,
+                           corrFT, branchInst->isUncondCtrl(), tid,
+                           BTBFillSource::ResolveControl);
             }
         } else {
            //Actually not Taken
@@ -948,18 +1231,6 @@ BPredUnit::dump()
             cprintf("\n");
         }
     }
-}
-
-bool 
-BPredUnit::isBTBMiss(const InstSeqNum seq_num, ThreadID tid){
-        History &pred_hist = predHist[tid];
-        History::iterator it = pred_hist.begin();
-        for(;it != pred_hist.end(); it++){
-          if(it->seqNum == seq_num){
-            return it->wasBTBMiss;
-          }
-        }
-        return false;
 }
 
 } // namespace branch_prediction

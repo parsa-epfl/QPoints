@@ -43,6 +43,7 @@
 #define __CPU_PRED_BPRED_UNIT_HH__
 
 #include <deque>
+#include <string>
 
 #include "base/statistics.hh"
 #include "base/types.hh"
@@ -74,6 +75,7 @@ class BPredUnit : public SimObject
      * @param params The params object, that has the size of the BP and BTB.
      */
     BPredUnit(const Params &p);
+    void startup() override;
 
     void regProbePoints() override;
 
@@ -89,6 +91,7 @@ class BPredUnit : public SimObject
     bool getBblValid(Addr bbladdr, ThreadID tid);
     TheISA::PCState getTaken(Addr bbladdr, ThreadID tid);
     TheISA::PCState getFT(Addr bbladdr, ThreadID tid);
+    BTBFillSource getBblSource(Addr bbladdr, ThreadID tid);
 
     /**
      * Predicts whether or not the instruction is a taken branch, and the
@@ -214,15 +217,23 @@ class BPredUnit : public SimObject
     void BTBUpdate(Addr instPC, const StaticInstPtr &staticBranchInst, 
                 const TheISA::PCState &branch,
                 const uint64_t bblSize, const TheISA::PCState &target, 
-                const TheISA::PCState &ft, bool uncond, ThreadID tid)
-    { BTB.update(instPC, staticBranchInst, branch, bblSize, target, ft, uncond, tid); }
+                const TheISA::PCState &ft, bool uncond, ThreadID tid,
+                BTBFillSource source)
+    {
+        noteBTBFill(source);
+        BTB.update(instPC, staticBranchInst, branch, bblSize, target, ft,
+                   uncond, tid, source);
+    }
 
 
     void dump();
     
-    bool isBTBMiss(const InstSeqNum seq_num, ThreadID tid);
+    void restoreBTBFromFile();
 
   private:
+    void noteBTBFill(BTBFillSource source);
+    void flushPendingBTBRestoreCount();
+
     struct PredictorHistory
     {
         /**
@@ -236,7 +247,8 @@ class BPredUnit : public SimObject
             : seqNum(seq_num), pc(instPC), bpHistory(bp_history),
               indirectHistory(indirect_history), RASTarget(0), RASIndex(0),
               tid(_tid), predTaken(pred_taken), usedRAS(0), pushedRAS(0),
-              wasCall(0), wasReturn(0), wasIndirect(0), target(MaxAddr),
+              wasCall(0), wasReturn(0), wasIndirect(0),
+              btbSource(BTBFillSource::None), target(MaxAddr),
               inst(inst)
         {}
 
@@ -249,7 +261,8 @@ class BPredUnit : public SimObject
             : seqNum(seq_num), pc(instPC), bpHistory(bp_history),
               indirectHistory(indirect_history), RASTarget(0), RASIndex(0),
               tid(_tid), predTaken(pred_taken), usedRAS(0), pushedRAS(0),
-              wasCall(0), wasReturn(0), wasIndirect(0), wasBTBMiss(0), 
+              wasCall(0), wasReturn(0), wasIndirect(0),
+              btbSource(BTBFillSource::None),
               target(MaxAddr), inst(inst), bbladdr(bbladdr)
         {}
 
@@ -298,7 +311,7 @@ class BPredUnit : public SimObject
         /** Wether this instruction was an indirect branch */
         bool wasIndirect;
 
-        bool wasBTBMiss;
+        BTBFillSource btbSource;
 
         /** Target of the branch. First it is predicted, and fixed later
          *  if necessary
@@ -353,6 +366,10 @@ class BPredUnit : public SimObject
         statistics::Scalar BTBHits;
         /** Stat for the ratio between BTB hits and BTB lookups. */
         statistics::Formula BTBHitRatio;
+        /** Basic-block-level BTB lookup activity. */
+        statistics::Scalar bblBTBLookups;
+        statistics::Scalar bblBTBHits;
+        statistics::Scalar bblBTBMisses;
         /** Stat for number of times the RAS is used to get a target. */
         statistics::Scalar RASUsed;
         /** Stat for number of times the RAS is incorrect. */
@@ -366,11 +383,28 @@ class BPredUnit : public SimObject
         statistics::Scalar indirectMisses;
         /** Stat for the number of indirect target mispredictions.*/
         statistics::Scalar indirectMispredicted;
+
+        /** BTB population counts by source. */
+        statistics::Scalar btbFillFetchDirect;
+        statistics::Scalar btbFillFetchNondirect;
+        statistics::Scalar btbFillPredecodeDirect;
+        statistics::Scalar btbFillResolveControl;
+        statistics::Scalar btbFillRestore;
     } stats;
 
   protected:
     /** Number of bits to shift instructions by for predictor addresses. */
     const unsigned instShiftAmt;
+
+    /** Whether to preload BTB entries from a staged checkpoint file. */
+    const bool restoreBTBState;
+
+    /** Path to the staged BTB replay file. */
+    const std::string btbRestoreFile;
+
+    /** Restore fills happen before stats are fully live; flush later. */
+    bool pendingBTBRestoreCount = false;
+    unsigned pendingBTBRestoreEntries = 0;
 
     /**
      * @{

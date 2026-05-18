@@ -59,6 +59,7 @@
 #include "cpu/o3/cpu.hh"
 #include "cpu/o3/dyn_inst_ptr.hh"
 #include "cpu/o3/lsq_unit.hh"
+#include "cpu/pred/btb.hh"
 #include "cpu/op_class.hh"
 #include "cpu/reg_class.hh"
 #include "cpu/static_inst.hh"
@@ -1134,6 +1135,12 @@ class DynInst : public ExecContext, public RefCounted
     bool isStalled = false;
     char mispred = 0;
     bool isBTBMiss = false;
+    branch_prediction::BTBFillSource btbFillSource =
+        branch_prediction::BTBFillSource::None;
+    /** 'B' = basic-block/FTQ path, 'F' = fallback decode path, '-' unknown. */
+    char frontendPath = '-';
+    /** 'H' = branch arrived from a successful BBL chain, 'M' = fallback. */
+    char bblProbe = '-';
     bool isPredictable = false;
 
     Tick fetchTick = -1;      // instruction fetch is completed.

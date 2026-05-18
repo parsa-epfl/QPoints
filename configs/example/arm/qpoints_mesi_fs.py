@@ -26,6 +26,7 @@ default_disk = "linaro-minimal-aarch64.img"
 default_root_device = "/dev/vda"
 GEM5_UARCH_SUFFIX = "gem5_uarch"
 TAGE_RESTORE_TEMPLATE = "tage_restore_state.core{core}.json"
+BTB_RESTORE_TEMPLATE = "btb_restore_addrs.core{core}.txt"
 
 
 # Ruby creates the private L1I/L1D caches and the shared L2 LLC, so the
@@ -55,6 +56,13 @@ def normalize_args(args):
     args.cpu = "ooo"
     args.cpu_type = "O3CPU"
     args.ruby = True
+
+    if not args.fdip:
+        m5.util.warn(
+            "FDIP is disabled: the frontend runs in decode-discovery mode "
+            "and does not use the BTB for branch discovery or basic-block "
+            "chaining."
+        )
 
     # QPoints uses --num-cores; Ruby expects --num-cpus.
     args.num_cpus = args.num_cores
@@ -160,6 +168,56 @@ def configure_tage_decision_trace(system, args):
         )
 
 
+def discover_btb_restore_files(args):
+    if not getattr(args, "restore_btb_state", False):
+        return {}
+
+    if not getattr(args, "restore", None):
+        m5.util.warn(
+            "--restore-btb-state was set without --restore; "
+            "skipping BTB warm-state import."
+        )
+        return {}
+
+    restore_dir = Path(args.restore).resolve()
+    gem5_uarch_dir = discover_gem5_uarch_dir(restore_dir)
+
+    if not gem5_uarch_dir.is_dir():
+        m5.util.warn(
+            f"gem5 uarch restore directory not found: {gem5_uarch_dir}. "
+            "Running with a cold BTB."
+        )
+        return {}
+
+    restore_files = {}
+    for core in range(getattr(args, "num_cores", 0)):
+        target_path = gem5_uarch_dir / BTB_RESTORE_TEMPLATE.format(core=core)
+        if target_path.is_file():
+            restore_files[core] = str(target_path)
+
+    if not restore_files:
+        m5.util.warn(
+            f"No BTB restore files matching {BTB_RESTORE_TEMPLATE} were found "
+            f"in {gem5_uarch_dir}. Running with a cold BTB."
+        )
+
+    return restore_files
+
+
+def configure_btb_restore(system, args):
+    restore_files = discover_btb_restore_files(args)
+    cpus = get_cpus(system)
+    for idx, cpu in enumerate(cpus):
+        if not hasattr(cpu, "branchPred"):
+            continue
+        if idx in restore_files:
+            cpu.branchPred.restoreBTBState = True
+            cpu.branchPred.btbRestoreFile = restore_files[idx]
+        else:
+            cpu.branchPred.restoreBTBState = False
+            cpu.branchPred.btbRestoreFile = ""
+
+
 def config_ruby(system, args):
     cpus = get_cpus(system)
 
@@ -236,6 +294,7 @@ def create(args):
         ),
     ]
 
+    configure_btb_restore(system, args)
     configure_tage_restore(system, args)
     configure_tage_decision_trace(system, args)
 
