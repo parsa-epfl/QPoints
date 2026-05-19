@@ -11,14 +11,36 @@ import shutil
 import subprocess
 
 
-GEM5_UARCH_SUFFIX = ".gem5_uarch"
+GEM5_UARCH_SUFFIX = "gem5_uarch"
 QFLEX_UARCH_SUFFIX = ".uarch"
 LLC_RESTORE_FILE = "llc_restore_addrs.txt"
+L1D_CANDIDATE_FILE = "l1d_restore_candidates.json"
+L1D_RESTORE_FILE_TEMPLATE = "l1d_restore_addrs.core{core}.txt"
+L1D_RESTORE_FILE_GLOB = "l1d_restore_addrs.core*.txt"
+L1I_CANDIDATE_FILE = "l1i_restore_candidates.json"
+L1I_RESTORE_FILE_TEMPLATE = "l1i_restore_addrs.core{core}.txt"
+L1I_RESTORE_FILE_GLOB = "l1i_restore_addrs.core*.txt"
+BTB_CANDIDATE_FILE = "btb_restore_candidates.json"
+BTB_RESTORE_FILE_TEMPLATE = "btb_restore_addrs.core{core}.txt"
+BTB_RESTORE_FILE_GLOB = "btb_restore_addrs.core*.txt"
+TAGE_CANDIDATE_FILE = "tage_restore_candidates.json"
+TAGE_RESTORE_FILE_TEMPLATE = "tage_restore_state.core{core}.json"
+TAGE_RESTORE_FILE_GLOB = "tage_restore_state.core*.json"
 LLC_SOURCE_FILE = "llc-0.json.zstd"
 DIRECTORY_SOURCE_FILE = "directory-0.json.zstd"
 HARVARD_SOURCE_FILE = "harvard-0.json.zstd"
+FETCH_SOURCE_FILE = "fetch.json.zstd"
 MANIFEST_FILE = "manifest.json"
 CACHE_LINE_SIZE = 64
+INSTRUCTION_BYTES = 4
+BTB_RESTORABLE_BRANCH_TYPES = {
+    "Conditional",
+    "Unconditional",
+    "DirectCall",
+    "Return",
+    "IndirectCall",
+    "IndirectBranch",
+}
 
 
 def parse_args() -> argparse.Namespace:
@@ -38,7 +60,7 @@ def parse_args() -> argparse.Namespace:
         "--gem5-workload-root",
         required=True,
         type=Path,
-        help="gem5 workload root containing snapshot_X/ and snapshot_X.gem5_uarch/.",
+        help="gem5 workload root containing snapshot_X/ directories.",
     )
     parser.add_argument(
         "--snapshot",
@@ -99,6 +121,145 @@ def _write_manifest(path: Path, payload: dict, overwrite: bool) -> None:
     )
 
 
+def _write_json_file(path: Path, payload: object, overwrite: bool) -> None:
+    if path.exists() and not overwrite:
+        raise FileExistsError(
+            f"Refusing to overwrite existing gem5 uarch artifact: {path}. "
+            "Pass --overwrite to replace it."
+        )
+    path.write_text(
+        json.dumps(payload, indent=2, sort_keys=True) + "\n",
+        encoding="utf-8",
+    )
+
+
+def _clear_matching_outputs(root: Path, file_glob: str, overwrite: bool) -> None:
+    if not overwrite:
+        return
+    for target in root.glob(file_glob):
+        if target.is_symlink() or target.is_file():
+            target.unlink()
+        elif target.is_dir():
+            shutil.rmtree(target)
+        else:
+            target.unlink(missing_ok=True)
+
+
+def _write_per_core_json_files(
+    root: Path,
+    candidates: list[dict],
+    overwrite: bool,
+    file_template: str,
+    file_glob: str,
+) -> dict[int, Path]:
+    _clear_matching_outputs(root, file_glob, overwrite)
+    outputs = {}
+    for candidate in candidates:
+        core = int(candidate["core"])
+        target = root / file_template.format(core=core)
+        _write_json_file(target, candidate, overwrite)
+        outputs[core] = target
+    return outputs
+
+
+def _l1d_restore_state(candidate: dict) -> str:
+    return "M" if candidate["writeable"] else "S"
+
+
+def _l1i_restore_state(candidate: dict) -> str:
+    return "S"
+
+
+def _write_restore_files(
+    root: Path,
+    candidates: list[dict],
+    overwrite: bool,
+    file_template: str,
+    file_glob: str,
+    state_fn,
+) -> dict[int, Path]:
+    _clear_matching_outputs(root, file_glob, overwrite)
+    per_core = {}
+    for candidate in candidates:
+        per_core.setdefault(candidate["core"], []).append(
+            (
+                int(candidate["line_addr"], 16),
+                state_fn(candidate),
+            )
+        )
+
+    outputs = {}
+    for core, restore_lines in per_core.items():
+        target = root / file_template.format(core=core)
+        if target.exists() and not overwrite:
+            raise FileExistsError(
+                f"Refusing to overwrite existing gem5 uarch artifact: {target}. "
+                "Pass --overwrite to replace it."
+            )
+        target.write_text(
+            "".join(f"{addr:#x} {state}\n" for addr, state in restore_lines),
+            encoding="utf-8",
+        )
+        outputs[core] = target
+    return outputs
+
+
+def _write_btb_restore_files(
+    root: Path,
+    candidates: list[dict],
+    overwrite: bool,
+    file_template: str,
+    file_glob: str,
+) -> dict[int, Path]:
+    _clear_matching_outputs(root, file_glob, overwrite)
+    per_core = {}
+    for candidate in candidates:
+        per_core.setdefault(candidate["core"], []).append(
+            (
+                int(candidate["bbl_addr"], 16),
+                int(candidate["branch_pc"], 16),
+                int(candidate["target"], 16),
+                int(candidate["fallthrough"], 16),
+                int(candidate["bbl_bytes"]),
+                candidate["branch_type"],
+            )
+        )
+
+    outputs = {}
+    for core, restore_lines in per_core.items():
+        target = root / file_template.format(core=core)
+        if target.exists() and not overwrite:
+            raise FileExistsError(
+                f"Refusing to overwrite existing gem5 uarch artifact: {target}. "
+                "Pass --overwrite to replace it."
+            )
+        target.write_text(
+            "".join(
+                f"{bbl_addr:#x} {pc:#x} {target_addr:#x} {fallthrough:#x} "
+                f"{bbl_bytes} {branch_type}\n"
+                for (
+                    bbl_addr,
+                    pc,
+                    target_addr,
+                    fallthrough,
+                    bbl_bytes,
+                    branch_type,
+                ) in restore_lines
+            ),
+            encoding="utf-8",
+        )
+        outputs[core] = target
+    return outputs
+
+
+def _nested_gem5_uarch_dir(gem5_workload_root: Path, snapshot: str) -> Path:
+    return gem5_workload_root / snapshot / GEM5_UARCH_SUFFIX
+
+
+def _sibling_gem5_uarch_dir(gem5_workload_root: Path, snapshot: str) -> Path:
+    return gem5_workload_root / f"{snapshot}.{GEM5_UARCH_SUFFIX}"
+
+
 def _order_restore_lines(lines: list[dict]) -> list[dict]:
     # gem5 warm restore inserts lines sequentially and marks each insertion as
     # most recently used. Emitting oldest-to-newest lines within each set lets
@@ -154,22 +315,38 @@ def _parse_directory(path: Path) -> dict:
 def _parse_harvard(path: Path) -> dict:
     payload = _load_qflex_json(path)
     result = {}
-    for core in payload:
+    for core_idx, core in enumerate(payload):
         for cache_name in ("i_cache", "d_cache"):
-            for set_rec in core[cache_name]:
-                for line in set_rec["lines"]:
+            for set_idx, set_rec in enumerate(core[cache_name]):
+                for way_idx, line in enumerate(set_rec["lines"]):
                     enc = int(line.get("block_id_with_v", 0))
                     if enc == 0 or (enc & 1) == 0:
                         continue
                     block_id = enc >> 1
                     result.setdefault(block_id, []).append(
                         {
+                            "core": core_idx,
                             "cache": cache_name,
+                            "set": set_idx,
+                            "way": way_idx,
+                            "line_addr": block_id * CACHE_LINE_SIZE,
+                            "ts": int(line.get("ts", 0)),
+                            "is_instruction": bool(line.get("is_instruction", False)),
                             "writeable": bool(line.get("writeable", False)),
                             "modified": bool(line.get("modified", False)),
                         }
                     )
     return result
+
+
+def _parse_fetch(path: Path) -> list[dict]:
+    payload = _load_qflex_json(path)
+    units = payload.get("private_units", [])
+    if not isinstance(units, list):
+        raise RuntimeError(
+            f"Unexpected fetch uarch structure in {path}: missing private_units list"
+        )
+    return units
 
 
 def _select_llc_restore_lines(
@@ -227,6 +404,285 @@ def _select_llc_restore_lines(
     )
 
 
+def _select_l1d_restore_candidates(harvard: dict) -> tuple[list[dict], dict]:
+    stats = {
+        "total_private_lines": 0,
+        "non_l1d_lines_skipped": 0,
+        "candidate_l1d_lines": 0,
+        "modified_lines": 0,
+        "writeable_lines": 0,
+    }
+
+    candidates = []
+    for entries in harvard.values():
+        for entry in entries:
+            stats["total_private_lines"] += 1
+            if entry["cache"] != "d_cache" or entry["is_instruction"]:
+                stats["non_l1d_lines_skipped"] += 1
+                continue
+
+            candidate = {
+                "core": entry["core"],
+                "set": entry["set"],
+                "way": entry["way"],
+                "line_addr": entry["line_addr"],
+                "ts": entry["ts"],
+                "writeable": entry["writeable"],
+                "modified": entry["modified"],
+            }
+            candidates.append(candidate)
+            stats["candidate_l1d_lines"] += 1
+            if entry["modified"]:
+                stats["modified_lines"] += 1
+            if entry["writeable"]:
+                stats["writeable_lines"] += 1
+
+    ordered_candidates = sorted(
+        candidates,
+        key=lambda candidate: (
+            candidate["core"],
+            candidate["set"],
+            candidate["ts"],
+            candidate["way"],
+            candidate["line_addr"],
+        ),
+    )
+    serialized_candidates = [
+        {
+            **candidate,
+            "line_addr": f"{candidate['line_addr']:#x}",
+            "restore_state": _l1d_restore_state(candidate),
+        }
+        for candidate in ordered_candidates
+    ]
+    return serialized_candidates, stats
+
+
+def _select_l1i_restore_candidates(harvard: dict) -> tuple[list[dict], dict]:
+    stats = {
+        "total_private_lines": 0,
+        "data_lines_skipped": 0,
+        "candidate_l1i_lines": 0,
+        "modified_lines": 0,
+        "writeable_lines": 0,
+    }
+
+    candidates = []
+    for entries in harvard.values():
+        for entry in entries:
+            stats["total_private_lines"] += 1
+            if entry["cache"] != "i_cache" or not entry["is_instruction"]:
+                stats["data_lines_skipped"] += 1
+                continue
+
+            candidate = {
+                "core": entry["core"],
+                "set": entry["set"],
+                "way": entry["way"],
+                "line_addr": entry["line_addr"],
+                "ts": entry["ts"],
+                "writeable": entry["writeable"],
+                "modified": entry["modified"],
+            }
+            candidates.append(candidate)
+            stats["candidate_l1i_lines"] += 1
+            if entry["modified"]:
+                stats["modified_lines"] += 1
+            if entry["writeable"]:
+                stats["writeable_lines"] += 1
+
+    ordered_candidates = sorted(
+        candidates,
+        key=lambda candidate: (
+            candidate["core"],
+            candidate["set"],
+            candidate["ts"],
+            candidate["way"],
+            candidate["line_addr"],
+        ),
+    )
+    serialized_candidates = [
+        {
+            **candidate,
+            "line_addr": f"{candidate['line_addr']:#x}",
+            "restore_state": _l1i_restore_state(candidate),
+        }
+        for candidate in ordered_candidates
+    ]
+    return serialized_candidates, stats
+
+
+def _select_btb_restore_candidates(fetch_units: list[dict]) -> tuple[list[dict], dict]:
+    stats = {
+        "total_entries": 0,
+        "nonbranch_entries": 0,
+        "restorable_branch_candidates": 0,
+        "branch_type_counts": {},
+    }
+
+    branch_type_counts = {}
+    candidates = []
+
+    for core_idx, unit in enumerate(fetch_units):
+        restore_export = unit.get("restore_export", {})
+        btb_view = restore_export.get("bbl_btb")
+        source_view = "restore_export.bbl_btb"
+        if btb_view is None:
+            btb_view = unit.get("bbl_btb")
+            source_view = "bbl_btb"
+        if btb_view is None:
+            btb_view = unit.get("btb", {})
+            source_view = "btb"
+        array = btb_view.get("array", [])
+        using_bbl_btb = "bbl_start" in next(
+            (
+                entry
+                for set_entries in array
+                for entry in set_entries
+                if isinstance(entry, dict)
+            ),
+            {},
+        )
+        for set_idx, set_entries in enumerate(array):
+            for way_idx, entry in enumerate(set_entries):
+                branch_type = entry.get("branch_type", "NonBranch")
+                branch_type_counts[branch_type] = branch_type_counts.get(branch_type, 0) + 1
+                stats["total_entries"] += 1
+                if branch_type == "NonBranch":
+                    stats["nonbranch_entries"] += 1
+                    continue
+                if branch_type not in BTB_RESTORABLE_BRANCH_TYPES:
+                    continue
+
+                branch_pc = int(entry.get("branch_pc", entry.get("tag", 0)))
+                bbl_bytes = int(entry.get("bbl_bytes", 0))
+                bbl_addr = int(entry.get("bbl_start", branch_pc - bbl_bytes))
+                candidate = {
+                    "core": core_idx,
+                    "set": set_idx,
+                    "way": way_idx,
+                    "branch_pc": branch_pc,
+                    "target": int(entry["target"]),
+                    "bbl_bytes": bbl_bytes,
+                    "ts": int(entry.get("ts", 0)),
+                    "branch_type": branch_type,
+                    "source_view": source_view if using_bbl_btb else "btb",
+                }
+                candidate["bbl_addr"] = bbl_addr
+                candidate["fallthrough"] = candidate["branch_pc"] + INSTRUCTION_BYTES
+                candidates.append(candidate)
+                stats["restorable_branch_candidates"] += 1
+
+    stats["branch_type_counts"] = branch_type_counts
+
+    ordered_candidates = sorted(
+        candidates,
+        key=lambda candidate: (
+            candidate["core"],
+            candidate["set"],
+            candidate["ts"],
+            candidate["way"],
+            candidate["bbl_addr"],
+            candidate["branch_pc"],
+            candidate["target"],
+        ),
+    )
+    serialized_candidates = [
+        {
+            **candidate,
+            "bbl_addr": f"{candidate['bbl_addr']:#x}",
+            "branch_pc": f"{candidate['branch_pc']:#x}",
+            "target": f"{candidate['target']:#x}",
+            "fallthrough": f"{candidate['fallthrough']:#x}",
+        }
+        for candidate in ordered_candidates
+    ]
+    return serialized_candidates, stats
+
+
+def _count_nondefault_btable_entries(entries: list[dict]) -> int:
+    return sum(
+        1
+        for entry in entries
+        if int(entry.get("pred", 0)) != 0 or int(entry.get("hyst", 1)) != 1
+    )
+
+
+def _count_nondefault_gtable_entries(entries_by_bank: list[list[dict]]) -> list[int]:
+    counts = []
+    for bank_entries in entries_by_bank:
+        counts.append(
+            sum(
+                1
+                for entry in bank_entries
+                if int(entry.get("ctr", 0)) != 0
+                or int(entry.get("tag", 0)) != 0
+                or int(entry.get("ubit", 0)) != 0
+            )
+        )
+    return counts
+
+
+def _select_tage_restore_candidates(fetch_units: list[dict]) -> tuple[list[dict], dict]:
+    stats = {
+        "total_fetch_units": len(fetch_units),
+        "units_with_tage": 0,
+        "cores_emitted": 0,
+    }
+
+    candidates = []
+    for core_idx, unit in enumerate(fetch_units):
+        tage = unit.get("tage")
+        if not isinstance(tage, dict):
+            continue
+
+        stats["units_with_tage"] += 1
+
+        ghist = tage.get("ghist", [])
+        ch_i = tage.get("ch_i", [])
+        ch_t = tage.get("ch_t", [])
+        btable = tage.get("btable", [])
+        gtable = tage.get("gtable", [])
+
+        candidate = {
+            "schema_version": 1,
+            "snapshot_core": core_idx,
+            "core": core_idx,
+            "history_lengths": [130, 76, 44, 25, 15, 9, 5],
+            "history_order": "longest_to_shortest",
+            "path_history_bits": 16,
+            "bimodal_log_entries": 13,
+            "tagged_log_entries": 9,
+            "tage": {
+                "tick": int(tage.get("tick", 0)),
+                "seed": int(tage.get("seed", 0)),
+                "phist": int(tage.get("phist", 0)),
+                "ghist": [bool(bit) for bit in ghist],
+                "ch_i": ch_i,
+                "ch_t": ch_t,
+                "btable": btable,
+                "gtable": gtable,
+            },
+            "stats": {
+                "ghist_bits": len(ghist),
+                "ghist_true_bits": sum(1 for bit in ghist if bit),
+                "ch_i_entries": len(ch_i),
+                "ch_t_outer_entries": len(ch_t),
+                "btable_entries": len(btable),
+                "gtable_banks": len(gtable),
+                "gtable_entries_per_bank": [len(bank) for bank in gtable],
+                "nondefault_btable_entries": _count_nondefault_btable_entries(btable),
+                "nondefault_gtable_entries_per_bank": _count_nondefault_gtable_entries(
+                    gtable
+                ),
+            },
+        }
+        candidates.append(candidate)
+
+    stats["cores_emitted"] = len(candidates)
+    return candidates, stats
+
+
 def prepare_snapshot_gem5_uarch(
     qflex_run_dir: Path,
     gem5_workload_root: Path,
@@ -239,17 +695,27 @@ def prepare_snapshot_gem5_uarch(
 
     gem5_snapshot_dir = gem5_workload_root / snapshot
     qflex_uarch_dir = qflex_run_dir / f"{snapshot}{QFLEX_UARCH_SUFFIX}"
-    gem5_uarch_dir = gem5_workload_root / f"{snapshot}{GEM5_UARCH_SUFFIX}"
+    gem5_uarch_dir = _nested_gem5_uarch_dir(gem5_workload_root, snapshot)
+    sibling_gem5_uarch_dir = _sibling_gem5_uarch_dir(gem5_workload_root, snapshot)
 
     llc_source_file = qflex_uarch_dir / LLC_SOURCE_FILE
     directory_source_file = qflex_uarch_dir / DIRECTORY_SOURCE_FILE
     harvard_source_file = qflex_uarch_dir / HARVARD_SOURCE_FILE
+    fetch_source_file = qflex_uarch_dir / FETCH_SOURCE_FILE
     target_file = gem5_uarch_dir / LLC_RESTORE_FILE
+    l1d_candidate_file = gem5_uarch_dir / L1D_CANDIDATE_FILE
+    l1i_candidate_file = gem5_uarch_dir / L1I_CANDIDATE_FILE
+    btb_candidate_file = gem5_uarch_dir / BTB_CANDIDATE_FILE
+    tage_candidate_file = gem5_uarch_dir / TAGE_CANDIDATE_FILE
     manifest_file = gem5_uarch_dir / MANIFEST_FILE
 
     if not qflex_uarch_dir.is_dir():
         raise FileNotFoundError(f"QFlex uarch directory not found: {qflex_uarch_dir}")
-    for required in (llc_source_file, directory_source_file, harvard_source_file):
+    for required in (
+        llc_source_file,
+        directory_source_file,
+        harvard_source_file,
+    ):
         if not required.is_file():
             raise FileNotFoundError(f"Missing QFlex uarch source file: {required}")
     if not gem5_snapshot_dir.is_dir():
@@ -258,14 +724,33 @@ def prepare_snapshot_gem5_uarch(
             f"{gem5_snapshot_dir}"
         )
 
+    if sibling_gem5_uarch_dir.exists():
+        if not overwrite:
+            raise FileExistsError(
+                "Refusing to coexist with sibling gem5 uarch directory: "
+                f"{sibling_gem5_uarch_dir}. Pass --overwrite to remove it and "
+                "migrate to the nested snapshot/gem5_uarch layout."
+            )
+        if sibling_gem5_uarch_dir.is_symlink():
+            sibling_gem5_uarch_dir.unlink()
+        elif sibling_gem5_uarch_dir.is_dir():
+            shutil.rmtree(sibling_gem5_uarch_dir)
+        else:
+            sibling_gem5_uarch_dir.unlink()
+
     gem5_uarch_dir.mkdir(parents=True, exist_ok=True)
 
     llc_lines = _parse_llc_lines(llc_source_file)
     directory = _parse_directory(directory_source_file)
     harvard = _parse_harvard(harvard_source_file)
+    fetch_units = _parse_fetch(fetch_source_file) if fetch_source_file.is_file() else []
     clean_lines, modified_lines, stats = _select_llc_restore_lines(
         llc_lines, directory, harvard
     )
+    l1d_candidates, l1d_stats = _select_l1d_restore_candidates(harvard)
+    l1i_candidates, l1i_stats = _select_l1i_restore_candidates(harvard)
+    btb_candidates, btb_stats = _select_btb_restore_candidates(fetch_units)
+    tage_candidates, tage_stats = _select_tage_restore_candidates(fetch_units)
     selected_modified = max(0, llc_debug_modified_count)
     selected_modified_lines = modified_lines[:selected_modified]
     effective_selected_modified = len(selected_modified_lines)
@@ -278,6 +763,74 @@ def prepare_snapshot_gem5_uarch(
         )
 
     _write_addr_file(target_file, addrs, overwrite)
+    _write_json_file(
+        l1d_candidate_file,
+        {
+            "schema_version": 1,
+            "snapshot": snapshot,
+            "cache_line_size": CACHE_LINE_SIZE,
+            "candidates": l1d_candidates,
+        },
+        overwrite,
+    )
+    _write_json_file(
+        l1i_candidate_file,
+        {
+            "schema_version": 1,
+            "snapshot": snapshot,
+            "cache_line_size": CACHE_LINE_SIZE,
+            "candidates": l1i_candidates,
+        },
+        overwrite,
+    )
+    _write_json_file(
+        btb_candidate_file,
+        {
+            "schema_version": 1,
+            "snapshot": snapshot,
+            "candidates": btb_candidates,
+        },
+        overwrite,
+    )
+    _write_json_file(
+        tage_candidate_file,
+        {
+            "schema_version": 1,
+            "snapshot": snapshot,
+            "candidates": tage_candidates,
+        },
+        overwrite,
+    )
+    l1d_restore_files = _write_restore_files(
+        gem5_uarch_dir,
+        l1d_candidates,
+        overwrite,
+        L1D_RESTORE_FILE_TEMPLATE,
+        L1D_RESTORE_FILE_GLOB,
+        _l1d_restore_state,
+    )
+    l1i_restore_files = _write_restore_files(
+        gem5_uarch_dir,
+        l1i_candidates,
+        overwrite,
+        L1I_RESTORE_FILE_TEMPLATE,
+        L1I_RESTORE_FILE_GLOB,
+        _l1i_restore_state,
+    )
+    btb_restore_files = _write_btb_restore_files(
+        gem5_uarch_dir,
+        btb_candidates,
+        overwrite,
+        BTB_RESTORE_FILE_TEMPLATE,
+        BTB_RESTORE_FILE_GLOB,
+    )
+    tage_restore_files = _write_per_core_json_files(
+        gem5_uarch_dir,
+        tage_candidates,
+        overwrite,
+        TAGE_RESTORE_FILE_TEMPLATE,
+        TAGE_RESTORE_FILE_GLOB,
+    )
 
     manifest = {
         "schema_version": 1,
@@ -302,7 +855,78 @@ def prepare_snapshot_gem5_uarch(
                 ),
                 "selected_modified_lines": effective_selected_modified,
                 "stats": stats,
-            }
+            },
+            "l1d": {
+                "source_file": str(harvard_source_file),
+                "candidate_file": str(l1d_candidate_file),
+                "restore_files": {
+                    str(core): str(path)
+                    for core, path in sorted(l1d_restore_files.items())
+                },
+                "line_count": len(l1d_candidates),
+                "selection_policy": (
+                    "all valid private L1D lines from the QFlex Harvard state, "
+                    "ordered per-set by ascending L1D timestamp so future "
+                    "restore experiments can preserve source-side recency "
+                    "oldest-to-newest; staged restore state is S for "
+                    "writeable=false lines and M for writeable=true lines"
+                ),
+                "stats": l1d_stats,
+            },
+            "l1i": {
+                "source_file": str(harvard_source_file),
+                "candidate_file": str(l1i_candidate_file),
+                "restore_files": {
+                    str(core): str(path)
+                    for core, path in sorted(l1i_restore_files.items())
+                },
+                "line_count": len(l1i_candidates),
+                "selection_policy": (
+                    "all valid private L1I lines from the QFlex Harvard state, "
+                    "ordered per-set by ascending L1I timestamp so restore "
+                    "replays source-side recency oldest-to-newest; staged "
+                    "restore state is always S"
+                ),
+                "stats": l1i_stats,
+            },
+            "btb": {
+                "source_file": str(fetch_source_file),
+                "candidate_file": str(btb_candidate_file),
+                "restore_files": {
+                    str(core): str(path)
+                    for core, path in sorted(btb_restore_files.items())
+                },
+                "line_count": len(btb_candidates),
+                "selection_policy": (
+                    "all restorable BTB entries from the QFlex fetch-side "
+                    "state for branch types Conditional, Unconditional, "
+                    "DirectCall, Return, IndirectCall, and IndirectBranch, "
+                    "ordered oldest-to-newest per source set by timestamp; "
+                    "each staged entry carries both the source branch PC and "
+                    "the derived basic-block start address "
+                    "(branch_pc - bbl_bytes) so local gem5 can reconstruct "
+                    "its BBL-indexed BTB entries while preserving the "
+                    "original branch identity"
+                ),
+                "stats": btb_stats,
+            },
+            "tage": {
+                "source_file": str(fetch_source_file),
+                "candidate_file": str(tage_candidate_file),
+                "restore_files": {
+                    str(core): str(path)
+                    for core, path in sorted(tage_restore_files.items())
+                },
+                "line_count": len(tage_candidates),
+                "selection_policy": (
+                    "serialize the per-core WormCache TAGE checkpoint payload "
+                    "into human-readable JSON without cross-implementation "
+                    "translation; gem5-side restore code is responsible for "
+                    "bank remapping, bimodal hysteresis grouping, folded-"
+                    "history recomputation, and policy-state defaults"
+                ),
+                "stats": tage_stats,
+            },
         },
     }
     _write_manifest(manifest_file, manifest, overwrite)

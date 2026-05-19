@@ -1,0 +1,6 @@
+--fdip
+--restore-btb-state
+--ftqSize=8
+--btb-entries
+16384
+--btb-ways=4

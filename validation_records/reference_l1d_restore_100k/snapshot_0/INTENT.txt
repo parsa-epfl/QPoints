@@ -1,0 +1,25 @@
+Run the committed timing-Ruby L1D restore path for `100000` instructions on the
+`l1d_frontend_mix` lineage and preserve both the reference outcome and a traced
+explanation for the remaining L1D misses.
+
+Purpose:
+- confirm that L1D warm restore is active in gem5 with `LRURP`
+- capture a stable reference run for the restored `snapshot_0`
+- explain why `L1Dcache.m_demand_misses` remains non-zero after restoration
+
+Reference status:
+- lifecycle state: `reference`
+- retention policy: `keep`
+- protected artifacts include the reference run stats/config/logs and the traced
+  miss-breakdown analysis bundle
+
+Acceptance criteria:
+1. the 8-way L1D restore run completes successfully
+2. `system.ruby.l1_cntrl0.L1Dcache.m_checkpoint_load_total > 0`
+3. `system.ruby.l1_cntrl0.L1Dcache.m_demand_hits > 0`
+4. the traced 2-set diagnostic run completes successfully and produces a data trace
+
+What this package validates:
+- the committed L1D restore path is active and materially useful
+- the benchmark's main 32 KiB data array is restored into the checkpointed L1D state
+- most remaining L1D misses are not from that main array, but from non-array runtime traffic

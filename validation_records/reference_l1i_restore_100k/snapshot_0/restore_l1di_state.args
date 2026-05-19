@@ -1,0 +1,3 @@
+--restore-llc-state
+--restore-l1d-state
+--restore-l1i-state

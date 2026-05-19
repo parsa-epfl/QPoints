@@ -240,6 +240,26 @@ def test_run_gem5_ruby_data_trace_and_cache_dump(
     assert (outdir / "ruby_l2cache0_dump.txt").is_file()
 
 
+def test_run_gem5_ruby_branch_trace(
+    repo_root: Path,
+    integration_env,
+    artifact_paths,
+    converted_snapshot: str,
+):
+    outdir = _run_gem5(
+        repo_root,
+        integration_env,
+        artifact_paths,
+        converted_snapshot,
+        "pytest_qpoints_ruby_branch_100k",
+        "--timing-ruby",
+        "--branch-trace",
+    )
+
+    assert (outdir / "stats.txt").is_file()
+    assert (outdir / "branch_trace_core_0.log").is_file()
+
+
 def test_run_gem5_ruby_restore_sentinel(
     repo_root: Path,
     integration_env,
@@ -255,7 +275,7 @@ def test_run_gem5_ruby_restore_sentinel(
     qflex_run_dir = Path(integration_env.get("qflex_run_dir", qflex_ckp_dir / "run"))
     gem5_ckp_dir = Path(integration_env.get("gem5_ckp_dir"))
     qflex_uarch_dir = qflex_run_dir / f"{converted_snapshot}.uarch"
-    gem5_uarch_dir = gem5_ckp_dir / f"{converted_snapshot}.gem5_uarch"
+    gem5_uarch_dir = gem5_ckp_dir / converted_snapshot / "gem5_uarch"
     gem5_uarch_preexisting = gem5_uarch_dir.exists()
 
     if not gem5_uarch_preexisting:

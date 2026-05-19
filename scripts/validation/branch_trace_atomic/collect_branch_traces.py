@@ -154,7 +154,8 @@ class IncrementalLineCounter:
             state["partial"] = ""
             for line in lines:
                 if line.endswith("\n") or line.endswith("\r"):
-                    if line.strip():
+                    stripped = line.strip()
+                    if stripped and not stripped.startswith("branch_pc,"):
                         state["count"] += 1
                 else:
                     state["partial"] = line

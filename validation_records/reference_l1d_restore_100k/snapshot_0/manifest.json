@@ -1,0 +1,376 @@
+{
+  "kind": "experiment",
+  "schema_version": 1,
+  "component": "restore.l1d",
+  "title": "L1D restore reference and miss breakdown",
+  "lifecycle": {
+    "state": "reference",
+    "retention_policy": "keep"
+  },
+  "intent": {
+    "source_path": "<QPoints>/validation_records/reference_l1d_restore_100k/snapshot_0/INTENT.txt",
+    "staged_path": "INTENT.txt",
+    "text": "Run the committed timing-Ruby L1D restore path for `100000` instructions on the\n`l1d_frontend_mix` lineage and preserve both the reference outcome and a traced\nexplanation for the remaining L1D misses.\n\nPurpose:\n- confirm that L1D warm restore is active in gem5 with `LRURP`\n- capture a stable reference run for the restored `snapshot_0`\n- explain why `L1Dcache.m_demand_misses` remains non-zero after restoration\n\nReference status:\n- lifecycle state: `reference`\n- retention policy: `keep`\n- protected artifacts include the reference run stats/config/logs and the traced\n  miss-breakdown analysis bundle\n\nAcceptance criteria:\n1. the 8-way L1D restore run completes successfully\n2. `system.ruby.l1_cntrl0.L1Dcache.m_checkpoint_load_total > 0`\n3. `system.ruby.l1_cntrl0.L1Dcache.m_demand_hits > 0`\n4. the traced 2-set diagnostic run completes successfully and produces a data trace\n\nWhat this package validates:\n- the committed L1D restore path is active and materially useful\n- the benchmark's main 32 KiB data array is restored into the checkpointed L1D state\n- most remaining L1D misses are not from that main array, but from non-array runtime traffic\n"
+  },
+  "acceptance": [
+    {
+      "name": "command_exit_zero",
+      "kind": "process_exit_code",
+      "expected": 0
+    },
+    {
+      "name": "system.ruby.l1_cntrl0.L1Dcache.m_checkpoint_load_total",
+      "kind": "stats_check",
+      "operator": "gt",
+      "expected": 0
+    },
+    {
+      "name": "system.ruby.l1_cntrl0.L1Dcache.m_demand_hits",
+      "kind": "stats_check",
+      "operator": "gt",
+      "expected": 0
+    },
+    {
+      "name": "trace_log_present",
+      "kind": "file_exists",
+      "expected": "analyses/l1d_miss_breakdown/data_trace_core_0.log"
+    }
+  ],
+  "commands": [
+    {
+      "label": "reference-run",
+      "cwd": "<QPoints>",
+      "argv": [
+        "bash",
+        "run_gem5.sh",
+        "--gem5-ckp-dir",
+        "/mnt/sdb/aansari/checkpoints/single-core",
+        "--experiment",
+        "l1d_restore_reference_100k",
+        "--snapshot",
+        "snapshot_0",
+        "--inst",
+        "100000",
+        "--cores",
+        "1",
+        "--timing-ruby",
+        "--sim-config",
+        "restore_l1d_state.args"
+      ],
+      "exit_code": 0,
+      "stdout_path": "experiment_stdout.log",
+      "stderr_path": "experiment_stderr.log"
+    },
+    {
+      "label": "miss-trace-run",
+      "cwd": "<QPoints>",
+      "argv": [
+        "bash",
+        "run_gem5.sh",
+        "--gem5-ckp-dir",
+        "/mnt/sdb/aansari/checkpoints/single-core",
+        "--experiment",
+        "l1d_restore_miss_trace_100k_2set",
+        "--snapshot",
+        "snapshot_0",
+        "--inst",
+        "100000",
+        "--cores",
+        "1",
+        "--timing-ruby",
+        "--data-trace",
+        "--sim-config",
+        "analyses/l1d_miss_breakdown/restore_l1d_2set_trace.args"
+      ],
+      "exit_code": 0,
+      "stdout_path": "analyses/l1d_miss_breakdown/trace_stdout.log",
+      "stderr_path": "analyses/l1d_miss_breakdown/trace_stderr.log"
+    }
+  ],
+  "inputs": {
+    "command": [
+      "bash",
+      "run_gem5.sh",
+      "--gem5-ckp-dir",
+      "/mnt/sdb/aansari/checkpoints/single-core",
+      "--experiment",
+      "l1d_restore_reference_100k",
+      "--snapshot",
+      "snapshot_0",
+      "--inst",
+      "100000",
+      "--cores",
+      "1",
+      "--timing-ruby",
+      "--sim-config",
+      "restore_l1d_state.args"
+    ]
+  },
+  "artifacts": [
+    {
+      "label": "intent",
+      "category": "intent",
+      "path": "INTENT.txt",
+      "protected": true,
+      "required": true,
+      "retention": "keep",
+      "description": "Captured experiment intent for this run."
+    },
+    {
+      "label": "stdout",
+      "category": "log",
+      "path": "experiment_stdout.log",
+      "protected": true,
+      "required": true,
+      "retention": "keep",
+      "description": "Captured stdout from the reference run."
+    },
+    {
+      "label": "stderr",
+      "category": "log",
+      "path": "experiment_stderr.log",
+      "protected": true,
+      "required": true,
+      "retention": "keep",
+      "description": "Captured stderr from the reference run."
+    },
+    {
+      "label": "protected:stats.txt",
+      "category": "file",
+      "path": "stats.txt",
+      "protected": true,
+      "required": true,
+      "retention": "keep",
+      "description": "Protected reference stats artifact."
+    },
+    {
+      "label": "protected:config.ini",
+      "category": "file",
+      "path": "config.ini",
+      "protected": true,
+      "required": true,
+      "retention": "keep",
+      "description": "Protected reference config artifact."
+    },
+    {
+      "label": "protected:debug.insts",
+      "category": "file",
+      "path": "debug.insts",
+      "protected": true,
+      "required": true,
+      "retention": "keep",
+      "description": "Protected reference debug trace artifact."
+    },
+    {
+      "label": "protected:restore_l1d_state.args",
+      "category": "file",
+      "path": "restore_l1d_state.args",
+      "protected": true,
+      "required": true,
+      "retention": "keep",
+      "description": "Reference run gem5 argument overrides."
+    },
+    {
+      "label": "analysis:data_trace_core_0.log",
+      "category": "analysis",
+      "path": "analyses/l1d_miss_breakdown/data_trace_core_0.log",
+      "protected": true,
+      "required": true,
+      "retention": "keep",
+      "description": "Timing-Ruby data trace used to explain residual L1D misses."
+    },
+    {
+      "label": "analysis:l1d_restore_addrs.core0.txt",
+      "category": "analysis",
+      "path": "analyses/l1d_miss_breakdown/l1d_restore_addrs.core0.txt",
+      "protected": true,
+      "required": true,
+      "retention": "keep",
+      "description": "Restored L1D line inventory used for trace replay."
+    },
+    {
+      "label": "analysis:analyze_l1d_miss_breakdown.py",
+      "category": "analysis",
+      "path": "analyses/l1d_miss_breakdown/analyze_l1d_miss_breakdown.py",
+      "protected": true,
+      "required": true,
+      "retention": "keep",
+      "description": "Script that replays the trace against the restored L1D contents."
+    },
+    {
+      "label": "analysis:l1d_miss_breakdown.json",
+      "category": "analysis",
+      "path": "analyses/l1d_miss_breakdown/l1d_miss_breakdown.json",
+      "protected": true,
+      "required": true,
+      "retention": "keep",
+      "description": "Structured summary of residual L1D misses."
+    },
+    {
+      "label": "analysis:L1D_MISS_REPORT.md",
+      "category": "analysis",
+      "path": "analyses/l1d_miss_breakdown/L1D_MISS_REPORT.md",
+      "protected": true,
+      "required": true,
+      "retention": "keep",
+      "description": "Human-readable explanation of residual L1D misses."
+    },
+    {
+      "label": "analysis:trace_config.ini",
+      "category": "analysis",
+      "path": "analyses/l1d_miss_breakdown/trace_config.ini",
+      "protected": true,
+      "required": true,
+      "retention": "keep",
+      "description": "gem5 config from the 2-set traced diagnostic run."
+    },
+    {
+      "label": "analysis:trace_stats.txt",
+      "category": "analysis",
+      "path": "analyses/l1d_miss_breakdown/trace_stats.txt",
+      "protected": true,
+      "required": true,
+      "retention": "keep",
+      "description": "Stats from the 2-set traced diagnostic run."
+    },
+    {
+      "label": "analysis:trace_stdout.log",
+      "category": "analysis",
+      "path": "analyses/l1d_miss_breakdown/trace_stdout.log",
+      "protected": true,
+      "required": true,
+      "retention": "keep",
+      "description": "Captured stdout from the traced diagnostic run."
+    },
+    {
+      "label": "analysis:trace_stderr.log",
+      "category": "analysis",
+      "path": "analyses/l1d_miss_breakdown/trace_stderr.log",
+      "protected": true,
+      "required": true,
+      "retention": "keep",
+      "description": "Captured stderr from the traced diagnostic run."
+    },
+    {
+      "label": "analysis:restore_l1d_2set_trace.args",
+      "category": "analysis",
+      "path": "analyses/l1d_miss_breakdown/restore_l1d_2set_trace.args",
+      "protected": true,
+      "required": true,
+      "retention": "keep",
+      "description": "gem5 argument overrides used for the traced 2-set diagnostic run."
+    }
+  ],
+  "analyses": [
+    {
+      "label": "l1d-miss-breakdown",
+      "question": "Why do L1D misses remain after restoration, and do they primarily come from the benchmark's main 32 KiB data array?",
+      "script": "analyses/l1d_miss_breakdown/analyze_l1d_miss_breakdown.py",
+      "inputs": [
+        "analyses/l1d_miss_breakdown/data_trace_core_0.log",
+        "analyses/l1d_miss_breakdown/l1d_restore_addrs.core0.txt",
+        "analyses/l1d_miss_breakdown/trace_config.ini",
+        "analyses/l1d_miss_breakdown/trace_stats.txt"
+      ],
+      "outputs": [
+        "analyses/l1d_miss_breakdown/l1d_miss_breakdown.json",
+        "analyses/l1d_miss_breakdown/L1D_MISS_REPORT.md"
+      ],
+      "status": "validated",
+      "conclusion": "The main 32 KiB array is present in the restored L1D state, and the residual misses are dominated by non-array runtime traffic rather than failure to restore the benchmark's primary data footprint."
+    }
+  ],
+  "details": {
+    "reference_run_experiment": "l1d_restore_reference_100k",
+    "diagnostic_trace_experiment": "l1d_restore_miss_trace_100k_2set",
+    "array_inference": {
+      "line_count": 513,
+      "start": "0xaaaadec10080",
+      "end": "0xaaaadec18080"
+    }
+  },
+  "result": {
+    "outcome": "passed",
+    "summary": "The committed L1D restore path is active and useful under the L1D frontend benchmark. L1D restore-state staging now maps writeable=false lines to S and writeable=true lines to M; the 100K reference run remains behaviorally unchanged, and the traced 2-set diagnostic still shows that only a small minority of residual L1D misses come from the main 32 KiB array.",
+    "metrics": {
+      "simTicks": 80783000,
+      "system.mem_ctrls.readReqs": 172,
+      "system.ruby.l1_cntrl0.L1Dcache.m_demand_hits": 5186,
+      "system.ruby.l1_cntrl0.L1Dcache.m_demand_misses": 214,
+      "system.ruby.l1_cntrl0.L1Dcache.m_checkpoint_load_total": 1024,
+      "system.ruby.l1_cntrl0.L1Dcache.m_checkpoint_load_hits": 551,
+      "system.ruby.l1_cntrl0.L1Dcache.m_checkpoint_load_dead_blocks": 158,
+      "system.ruby.l1_cntrl0.L1Dcache.m_checkpoint_load_still_pending": 315,
+      "system.ruby.l2_cntrl0.L2cache.m_demand_hits": 606,
+      "system.ruby.l2_cntrl0.L2cache.m_demand_misses": 172,
+      "system.ruby.l2_cntrl0.L2cache.m_checkpoint_load_total": 4552,
+      "system.ruby.l2_cntrl0.L2cache.m_checkpoint_load_hits": 606,
+      "system.ruby.l2_cntrl0.L2cache.m_checkpoint_load_still_pending": 3946,
+      "system.ruby.l1_cntrl0.L1Icache.m_demand_hits": 37354,
+      "system.ruby.l1_cntrl0.L1Icache.m_demand_misses": 564
+    }
+  },
+  "lessons": [
+    "Raw L1D miss counts overstate benchmark-local restore loss because early runtime traffic contributes many non-array misses.",
+    "The benchmark's main 32 KiB array is restored into L1D, but some restored array lines are displaced before first use even in the near-fully-associative diagnostic."
+  ],
+  "provenance": {
+    "created_at_utc": "2026-04-28T21:39:04+00:00",
+    "output_dir": ".",
+    "path_aliases": {
+      "QPoints": "<QPoints>",
+      "gem5": "<gem5>",
+      "qflex": "<qflex>"
+    },
+    "clean_run_policy": {
+      "enforced": true,
+      "allowed_dirty_paths": {
+        "QPoints": [
+          "validation_records/reference_l1d_restore_100k/snapshot_0"
+        ],
+        "gem5": [],
+        "qflex": [
+          "QPoints"
+        ]
+      }
+    },
+    "repo_states": {
+      "QPoints": {
+        "path": "<QPoints>",
+        "branch": "gem5-integration/uarch/ali/uarch-prepare",
+        "head": "d7b390254c0589d989ef17a40b42a43833b9fe41",
+        "dirty": false,
+        "raw_dirty": true,
+        "allowed_dirty_paths": [
+          "validation_records/reference_l1d_restore_100k/snapshot_0"
+        ],
+        "dirty_entries": [],
+        "ignored_dirty_entries": []
+      },
+      "gem5": {
+        "path": "<gem5>",
+        "branch": "gem5-integration/uarch/ali/dev",
+        "head": "d6486c3bc7d60fe23f74e5de3bef45956965cb5a",
+        "dirty": false,
+        "raw_dirty": false,
+        "allowed_dirty_paths": [],
+        "dirty_entries": [],
+        "ignored_dirty_entries": []
+      },
+      "qflex": {
+        "path": "<qflex>",
+        "branch": "gem5-integration/update/ali/qpoints-uarch",
+        "head": "5f572ace95e3dbe560c3d0765bd8ec58d823631b",
+        "dirty": false,
+        "raw_dirty": true,
+        "allowed_dirty_paths": [
+          "QPoints"
+        ],
+        "dirty_entries": [],
+        "ignored_dirty_entries": [
+          " M QPoints"
+        ]
+      }
+    }
+  }
+}

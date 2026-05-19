@@ -7,7 +7,7 @@ fi
 
 usage() {
   cat <<'EOF'
-Usage: run_gem5.sh --gem5-ckp-dir DIR --experiment NAME --snapshot NAME --inst N --cores N [--branch-trace] [--data-trace] [--dump-cache-state] [--timing-ruby] [--sim-config FILE]
+Usage: run_gem5.sh --gem5-ckp-dir DIR --experiment NAME --snapshot NAME --inst N --cores N [--branch-trace] [--tage-decision-trace] [--data-trace] [--dump-cache-state] [--timing-ruby] [--sim-config FILE]
 
 Arguments (all required):
   --gem5-ckp-dir  Checkpoint root directory
@@ -17,7 +17,9 @@ Arguments (all required):
   --cores         Number of cores
 
 Options:
-  --branch-trace  Enable per-core branch trace logging
+  --branch-trace  Enable per-core branch trace logging in CSV format
+  --tage-decision-trace
+                  Enable per-core compact TAGE decision logging
   --data-trace    Enable per-core data access trace logging
   --dump-cache-state
                   Enable Ruby cache-state dumping (currently requires
@@ -26,8 +28,9 @@ Options:
                   the existing starter_fs.py AtomicSimpleCPU config is used.
   --sim-config    Optional file containing additional gem5 CLI arguments,
                   one per line. This is appended after the tracked default
-                  config for the selected simulation path, so explicit entries
-                  in the file override the defaults without replacing them.
+                  config for the selected simulation path. This file owns
+                  machine/model configuration only; runner-owned options are
+                  rejected here.
 
 Example:
   run_gem5.sh --gem5-ckp-dir /checkpoints --experiment OoO --snapshot snapshot_0 --inst 100000 --cores 1 --branch-trace
@@ -87,7 +90,35 @@ append_gem5_args_file() {
   local file_args=()
 
   load_gem5_args_file "$args_file" file_args
+  validate_sim_config_args "$args_file" "${file_args[@]}"
   out_array_ref+=("${file_args[@]}")
+}
+
+normalize_gem5_arg_key() {
+  local arg="$1"
+  case "$arg" in
+    --*=*)
+      printf "%s\n" "${arg%%=*}"
+      ;;
+    *)
+      printf "%s\n" "$arg"
+      ;;
+  esac
+}
+
+validate_sim_config_args() {
+  local args_file="$1"
+  shift
+  local arg key
+
+  for arg in "$@"; do
+    key="$(normalize_gem5_arg_key "$arg")"
+    case "$key" in
+      -I|--outdir|--debug-file|--disk-image|--bootloader|--cpu-type|--bp-type|--restore|--num-cores|--mem-size|--branch-trace|--tage-decision-trace|--data-trace|--dump-cache-state|--caches)
+        die "${args_file} sets runner-owned option ${key}. Put run-shape and artifact toggles on run_gem5.sh itself; keep --sim-config for machine/model parameters only."
+        ;;
+    esac
+  done
 }
 
 if [[ "$1" == "-h" || "$1" == "--help" ]]; then
@@ -112,6 +143,7 @@ INST=""
 CORES=""
 SIM_CONFIG=""
 BRANCH_TRACE_ARGS=()
+TAGE_DECISION_TRACE_ARGS=()
 DATA_TRACE_ARGS=()
 DUMP_CACHE_STATE_ARGS=()
 TIMING_RUBY=""
@@ -147,6 +179,10 @@ while [[ $# -gt 0 ]]; do
       BRANCH_TRACE_ARGS=(--branch-trace)
       shift 1
       ;;
+    --tage-decision-trace)
+      TAGE_DECISION_TRACE_ARGS=(--tage-decision-trace)
+      shift 1
+      ;;
     --data-trace)
       DATA_TRACE_ARGS=(--data-trace)
       shift 1
@@ -172,6 +208,12 @@ done
 
 if [[ -z "$GEM5_CKP_DIR" || -z "$EXPERIMENT" || -z "$SNAPSHOT" || -z "$INST" || -z "$CORES" ]]; then
   die "Missing required arguments."
+fi
+
+if [[ -n "$SIM_CONFIG" ]]; then
+  sim_config_validation_args=()
+  load_gem5_args_file "$SIM_CONFIG" sim_config_validation_args
+  validate_sim_config_args "$SIM_CONFIG" "${sim_config_validation_args[@]}"
 fi
 
 CKPT_DIR="${GEM5_CKP_DIR}/${SNAPSHOT}"
@@ -209,12 +251,12 @@ if [[ -n "$TIMING_RUBY" ]]; then
     "--bootloader=${BOOTLOADER}"
     --cpu-type O3CPU
     --bp-type TAGE
-    --btb-entries 4096
     --restore "$CKPT_DIR"
     --num-cores "$CORES"
     --mem-size 16384MiB
     "${TIMING_RUBY_CONFIG_ARGS[@]}"
     "${BRANCH_TRACE_ARGS[@]}"
+    "${TAGE_DECISION_TRACE_ARGS[@]}"
     "${DATA_TRACE_ARGS[@]}"
     "${DUMP_CACHE_STATE_ARGS[@]}"
   )
@@ -245,6 +287,7 @@ else
     --mem-size 16384MiB
     "${CLASSIC_CONFIG_ARGS[@]}"
     "${BRANCH_TRACE_ARGS[@]}"
+    "${TAGE_DECISION_TRACE_ARGS[@]}"
     "${DATA_TRACE_ARGS[@]}"
   )
 fi
