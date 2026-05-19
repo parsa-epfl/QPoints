@@ -7,7 +7,7 @@ fi
 
 usage() {
   cat <<'EOF'
-Usage: run_gem5.sh --gem5-ckp-dir DIR --experiment NAME --snapshot NAME --inst N --cores N [--branch-trace] [--tage-decision-trace] [--data-trace] [--dump-cache-state] [--timing-ruby] [--btb-entries N] [--sim-config FILE]
+Usage: run_gem5.sh --gem5-ckp-dir DIR --experiment NAME --snapshot NAME --inst N --cores N [--branch-trace] [--tage-decision-trace] [--data-trace] [--dump-cache-state] [--timing-ruby] [--sim-config FILE]
 
 Arguments (all required):
   --gem5-ckp-dir  Checkpoint root directory
@@ -26,12 +26,11 @@ Options:
                   --timing-ruby)
   --timing-ruby   Use O3CPU with Ruby MESI_Two_Level. Without this flag,
                   the existing starter_fs.py AtomicSimpleCPU config is used.
-  --btb-entries   Override the timing-Ruby BTB entry count. If omitted, the
-                  tracked gem5 default remains in effect.
   --sim-config    Optional file containing additional gem5 CLI arguments,
                   one per line. This is appended after the tracked default
-                  config for the selected simulation path, so explicit entries
-                  in the file override the defaults without replacing them.
+                  config for the selected simulation path. This file owns
+                  machine/model configuration only; runner-owned options are
+                  rejected here.
 
 Example:
   run_gem5.sh --gem5-ckp-dir /checkpoints --experiment OoO --snapshot snapshot_0 --inst 100000 --cores 1 --branch-trace
@@ -91,7 +90,35 @@ append_gem5_args_file() {
   local file_args=()
 
   load_gem5_args_file "$args_file" file_args
+  validate_sim_config_args "$args_file" "${file_args[@]}"
   out_array_ref+=("${file_args[@]}")
+}
+
+normalize_gem5_arg_key() {
+  local arg="$1"
+  case "$arg" in
+    --*=*)
+      printf "%s\n" "${arg%%=*}"
+      ;;
+    *)
+      printf "%s\n" "$arg"
+      ;;
+  esac
+}
+
+validate_sim_config_args() {
+  local args_file="$1"
+  shift
+  local arg key
+
+  for arg in "$@"; do
+    key="$(normalize_gem5_arg_key "$arg")"
+    case "$key" in
+      -I|--outdir|--debug-file|--disk-image|--bootloader|--cpu-type|--bp-type|--restore|--num-cores|--mem-size|--branch-trace|--tage-decision-trace|--data-trace|--dump-cache-state|--caches|--fdip)
+        die "${args_file} sets runner-owned option ${key}. Put run-shape and artifact toggles on run_gem5.sh itself; keep --sim-config for machine/model parameters only."
+        ;;
+    esac
+  done
 }
 
 if [[ "$1" == "-h" || "$1" == "--help" ]]; then
@@ -115,7 +142,6 @@ SNAPSHOT=""
 INST=""
 CORES=""
 SIM_CONFIG=""
-BTB_ENTRIES=""
 BRANCH_TRACE_ARGS=()
 TAGE_DECISION_TRACE_ARGS=()
 DATA_TRACE_ARGS=()
@@ -165,11 +191,6 @@ while [[ $# -gt 0 ]]; do
       DUMP_CACHE_STATE_ARGS=(--dump-cache-state)
       shift 1
       ;;
-    --btb-entries)
-      require_value "$1" "${2:-}"
-      BTB_ENTRIES="$2"
-      shift 2
-      ;;
     --sim-config)
       require_value "$1" "${2:-}"
       SIM_CONFIG="$2"
@@ -187,6 +208,12 @@ done
 
 if [[ -z "$GEM5_CKP_DIR" || -z "$EXPERIMENT" || -z "$SNAPSHOT" || -z "$INST" || -z "$CORES" ]]; then
   die "Missing required arguments."
+fi
+
+if [[ -n "$SIM_CONFIG" ]]; then
+  sim_config_validation_args=()
+  load_gem5_args_file "$SIM_CONFIG" sim_config_validation_args
+  validate_sim_config_args "$SIM_CONFIG" "${sim_config_validation_args[@]}"
 fi
 
 CKPT_DIR="${GEM5_CKP_DIR}/${SNAPSHOT}"
@@ -212,9 +239,6 @@ if [[ -n "$TIMING_RUBY" ]]; then
   load_gem5_args_file "$DEFAULT_TIMING_RUBY_SIM_CONFIG" TIMING_RUBY_CONFIG_ARGS
   if [[ -n "$SIM_CONFIG" ]]; then
     append_gem5_args_file "$SIM_CONFIG" TIMING_RUBY_CONFIG_ARGS
-  fi
-  if [[ -n "$BTB_ENTRIES" ]]; then
-    TIMING_RUBY_CONFIG_ARGS+=("--btb-entries=${BTB_ENTRIES}")
   fi
 
   gem5_cmd=(
