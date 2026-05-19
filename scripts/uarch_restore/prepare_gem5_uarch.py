@@ -407,7 +407,7 @@ def _select_llc_restore_lines(
 def _select_l1d_restore_candidates(harvard: dict) -> tuple[list[dict], dict]:
     stats = {
         "total_private_lines": 0,
-        "instruction_lines_skipped": 0,
+        "non_l1d_lines_skipped": 0,
         "candidate_l1d_lines": 0,
         "modified_lines": 0,
         "writeable_lines": 0,
@@ -418,7 +418,7 @@ def _select_l1d_restore_candidates(harvard: dict) -> tuple[list[dict], dict]:
         for entry in entries:
             stats["total_private_lines"] += 1
             if entry["cache"] != "d_cache" or entry["is_instruction"]:
-                stats["instruction_lines_skipped"] += 1
+                stats["non_l1d_lines_skipped"] += 1
                 continue
 
             candidate = {

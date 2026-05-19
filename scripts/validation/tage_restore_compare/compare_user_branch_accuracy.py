@@ -88,6 +88,10 @@ def aggregate(records, hot_pcs):
     return total, correct, per_pc
 
 
+def safe_ratio(correct, total):
+    return correct / total if total else 0.0
+
+
 def main():
     args = parse_args()
 
@@ -106,11 +110,11 @@ def main():
     print(f"gem5_hot_pcs={len(hot_pcs)}")
     print(f"gem5_hot_total={gem5_total}")
     print(f"gem5_hot_correct={gem5_correct}")
-    print(f"gem5_hot_accuracy={gem5_correct / gem5_total:.6f}")
+    print(f"gem5_hot_accuracy={safe_ratio(gem5_correct, gem5_total):.6f}")
     print(f"qflex_user_cond_sample={len(qflex_records)}")
     print(f"qflex_hot_total={qflex_total}")
     print(f"qflex_hot_correct={qflex_correct}")
-    print(f"qflex_hot_accuracy={qflex_correct / qflex_total:.6f}")
+    print(f"qflex_hot_accuracy={safe_ratio(qflex_correct, qflex_total):.6f}")
     print("per_pc_accuracy:")
     for pc, _ in gem5_counts.most_common():
         if pc not in hot_pcs:
@@ -119,8 +123,8 @@ def main():
         qflex_pc_correct, qflex_pc_total = qflex_per_pc[pc]
         print(
             f"{pc} "
-            f"gem5={gem5_pc_correct}/{gem5_pc_total} ({gem5_pc_correct / gem5_pc_total:.6f}) "
-            f"qflex={qflex_pc_correct}/{qflex_pc_total} ({qflex_pc_correct / qflex_pc_total:.6f})"
+            f"gem5={gem5_pc_correct}/{gem5_pc_total} ({safe_ratio(gem5_pc_correct, gem5_pc_total):.6f}) "
+            f"qflex={qflex_pc_correct}/{qflex_pc_total} ({safe_ratio(qflex_pc_correct, qflex_pc_total):.6f})"
         )
 
 

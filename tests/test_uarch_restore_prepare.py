@@ -481,7 +481,7 @@ def test_prepare_snapshot_gem5_uarch_writes_outputs_and_manifest(tmp_path: Path)
         manifest["components"]["l1d"]["stats"]["total_private_lines"] == 5
     )
     assert (
-        manifest["components"]["l1d"]["stats"]["instruction_lines_skipped"] == 1
+        manifest["components"]["l1d"]["stats"]["non_l1d_lines_skipped"] == 1
     )
     assert manifest["components"]["l1d"]["stats"]["candidate_l1d_lines"] == 4
     assert manifest["components"]["l1d"]["stats"]["modified_lines"] == 3

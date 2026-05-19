@@ -57,6 +57,13 @@ def discover_user_run(accesses):
                 continue
             vlines[vline] += 1
     addrs = sorted(vlines)
+    if not addrs:
+        raise RuntimeError(
+            "No suitable user-space run could be inferred from the trace: "
+            "all accesses were filtered out or the trace was empty "
+            "(applied filters: ignore vaddr line 0 and exclude kernel/high virtual "
+            "addresses >= 0xFFFF000000000000)."
+        )
     best = None
     start = prev = addrs[0]
     count = 1

@@ -43,15 +43,18 @@ def wc_to_gem5_bank(bank: int) -> int:
 
 def align_qflex_window(qflex_path: Path, gem5_user, prefix: str, signature_len: int):
     signature = [(x["pc"], bool(x["actual"])) for x in gem5_user[:signature_len]]
-    window = collections.deque(maxlen=signature_len)
+    effective_signature_len = len(signature)
+    if effective_signature_len == 0:
+        raise RuntimeError("Cannot align an empty gem5 user-space decision stream")
+    window = collections.deque(maxlen=effective_signature_len)
     offset = -1
     q_index = -1
 
     for item in iter_qflex_user(qflex_path, prefix):
         q_index += 1
         window.append((item["pc"], bool(item["direction"])))
-        if len(window) == signature_len and list(window) == signature:
-            offset = q_index - signature_len + 1
+        if len(window) == effective_signature_len and list(window) == signature:
+            offset = q_index - effective_signature_len + 1
             break
 
     if offset < 0:
