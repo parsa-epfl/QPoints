@@ -30,7 +30,10 @@ def parse_args():
     parser.add_argument(
         "--user-prefix",
         default="aaaa",
-        help="Prefix used to identify user-space PCs in the traces.",
+        help=(
+            "Prefix used to identify user-space PCs in the traces. Matching is "
+            "case-insensitive and ignores a leading 0x on either side."
+        ),
     )
     return parser.parse_args()
 
@@ -58,6 +61,17 @@ def parse_line(line):
     return pc, branch_type, pred, actual
 
 
+def normalize_pc_prefix(token):
+    normalized = token.strip().lower()
+    if normalized.startswith("0x"):
+        normalized = normalized[2:]
+    return normalized
+
+
+def pc_matches_user_prefix(pc, user_prefix):
+    return normalize_pc_prefix(pc).startswith(normalize_pc_prefix(user_prefix))
+
+
 def load_gem5_user_conditionals(trace_path, user_prefix):
     records = []
     for line in Path(trace_path).read_text().splitlines():
@@ -65,7 +79,7 @@ def load_gem5_user_conditionals(trace_path, user_prefix):
         if parsed is None:
             continue
         pc, branch_type, pred, actual = parsed
-        if pc.startswith(user_prefix) and branch_type == 0:
+        if pc_matches_user_prefix(pc, user_prefix) and branch_type == 0:
             records.append((pc, pred, actual))
     return records
 
@@ -79,7 +93,7 @@ def load_qflex_user_conditionals(trace_path, user_prefix, limit):
             if parsed is None:
                 continue
             pc, branch_type, pred, actual = parsed
-            if pc.startswith(user_prefix) and branch_type == 0:
+            if pc_matches_user_prefix(pc, user_prefix) and branch_type == 0:
                 records.append((pc, pred, actual))
                 if len(records) >= limit:
                     break
