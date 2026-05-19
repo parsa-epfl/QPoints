@@ -36,10 +36,26 @@ def parse_args():
 
 
 def parse_line(line):
-    if line.startswith("branch_pc,"):
+    stripped = line.strip()
+    if not stripped:
         return None
-    pc, branch_type, pred, actual = line.rstrip("\n").split(",")
-    return pc, int(branch_type), int(pred), int(actual)
+    if stripped.startswith("branch_pc,"):
+        return None
+
+    if "," in stripped:
+        pc, branch_type, pred, actual = stripped.split(",")
+        return pc, int(branch_type), int(pred), int(actual)
+
+    fields = stripped.split()
+    if len(fields) < 10:
+        raise ValueError(f"Unrecognized branch trace line: {line.rstrip()}")
+
+    _, _, pc, actual_token, mispred_token, *_rest = fields
+    actual = 1 if actual_token == "T" else 0
+    mispredicted = 1 if mispred_token == "T" else 0
+    pred = actual ^ mispredicted
+    branch_type = 0
+    return pc, branch_type, pred, actual
 
 
 def load_gem5_user_conditionals(trace_path, user_prefix):

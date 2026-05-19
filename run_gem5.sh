@@ -7,7 +7,7 @@ fi
 
 usage() {
   cat <<'EOF'
-Usage: run_gem5.sh --gem5-ckp-dir DIR --experiment NAME --snapshot NAME --inst N --cores N [--branch-trace] [--tage-decision-trace] [--data-trace] [--dump-cache-state] [--timing-ruby] [--sim-config FILE]
+Usage: run_gem5.sh --gem5-ckp-dir DIR --experiment NAME --snapshot NAME --inst N --cores N [--branch-trace] [--tage-decision-trace] [--data-trace] [--dump-cache-state] [--timing-ruby] [--btb-entries N] [--sim-config FILE]
 
 Arguments (all required):
   --gem5-ckp-dir  Checkpoint root directory
@@ -26,6 +26,8 @@ Options:
                   --timing-ruby)
   --timing-ruby   Use O3CPU with Ruby MESI_Two_Level. Without this flag,
                   the existing starter_fs.py AtomicSimpleCPU config is used.
+  --btb-entries   Override the timing-Ruby BTB entry count. If omitted, the
+                  tracked gem5 default remains in effect.
   --sim-config    Optional file containing additional gem5 CLI arguments,
                   one per line. This is appended after the tracked default
                   config for the selected simulation path, so explicit entries
@@ -113,6 +115,7 @@ SNAPSHOT=""
 INST=""
 CORES=""
 SIM_CONFIG=""
+BTB_ENTRIES=""
 BRANCH_TRACE_ARGS=()
 TAGE_DECISION_TRACE_ARGS=()
 DATA_TRACE_ARGS=()
@@ -162,6 +165,11 @@ while [[ $# -gt 0 ]]; do
       DUMP_CACHE_STATE_ARGS=(--dump-cache-state)
       shift 1
       ;;
+    --btb-entries)
+      require_value "$1" "${2:-}"
+      BTB_ENTRIES="$2"
+      shift 2
+      ;;
     --sim-config)
       require_value "$1" "${2:-}"
       SIM_CONFIG="$2"
@@ -205,6 +213,9 @@ if [[ -n "$TIMING_RUBY" ]]; then
   if [[ -n "$SIM_CONFIG" ]]; then
     append_gem5_args_file "$SIM_CONFIG" TIMING_RUBY_CONFIG_ARGS
   fi
+  if [[ -n "$BTB_ENTRIES" ]]; then
+    TIMING_RUBY_CONFIG_ARGS+=("--btb-entries=${BTB_ENTRIES}")
+  fi
 
   gem5_cmd=(
     "$GEM5_BIN_TIMING_RUBY"
@@ -216,7 +227,6 @@ if [[ -n "$TIMING_RUBY" ]]; then
     "--bootloader=${BOOTLOADER}"
     --cpu-type O3CPU
     --bp-type TAGE
-    --btb-entries 16384
     --restore "$CKPT_DIR"
     --num-cores "$CORES"
     --mem-size 16384MiB
