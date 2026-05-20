@@ -1,0 +1,10 @@
+{
+  "trace": "/home/dev/qflex_git/QPoints/validation_records/disk_write_smoke_validation/branch_trace_core_0.log",
+  "success_pc": "0x40076c",
+  "failure_pc": "0x400798",
+  "success_hits": 177607,
+  "success_first_line": 762,
+  "failure_hits": 0,
+  "failure_first_line": null,
+  "verdict": "success"
+}

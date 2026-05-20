@@ -1,0 +1,38 @@
+disk_append_log is the second disk-behavior hardening target for restored gem5 full-system validation.
+
+Intent:
+- Validate an append-heavy logging pattern that is closer to commitlog-style
+  workload behavior than the one-shot disk smoke test.
+- Keep the guest workload self-checking and deterministic so success/failure
+  can be judged from existing trusted branch-trace evidence.
+- Strengthen confidence before running heavier services with substantial disk
+  activity and logging.
+
+Behavior:
+- The guest binary creates its own parent directory under `/var/tmp`.
+- It rejects `tmpfs`/`ramfs` targets.
+- It announces `READY_FOR_CHECKPOINT`, spins in a deterministic warmup window,
+  then performs:
+  - create/truncate the log file
+  - append ordered records with sequence numbers and checksums
+  - periodic `fsync(fd)` while the append stream is in flight
+  - a close-and-reopen in append mode midway through the stream
+  - parent-directory `fsync`
+  - `sync()`
+  - final reopen and exact full-file verification
+- On success it enters a distinct infinite success loop.
+- On failure it enters a distinct infinite failure loop.
+
+Why this benchmark exists:
+- Real services such as Cassandra lean on append-heavy, flush-heavy log paths.
+- The disk smoke test proved basic restored disk-backed file IO; this benchmark
+  moves one rung closer to realistic logging behavior without introducing the
+  complexity of the full service stack.
+- The verdict still reuses trusted branch-trace infrastructure, so acceptance
+  remains reviewable and deterministic.
+
+Files:
+- `guest_disk_append_log_ubench.c`
+  - the self-checking guest append-log workload source
+- `Makefile`
+  - builds both host and AArch64 variants for inspection and guest staging

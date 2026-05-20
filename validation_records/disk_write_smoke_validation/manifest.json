@@ -1,0 +1,76 @@
+{
+  "title": "Disk write smoke validation",
+  "question": "Can a restored gem5 full-system run perform sane disk-backed guest file IO on the current single-core lineage?",
+  "feature_claim": "Restored gem5 full-system simulation can execute a guest workload that creates, fsyncs, reopens, rereads, and verifies a disk-backed file on ext4 while running with FDIP enabled.",
+  "benchmark": "guest_disk_trace_ubench",
+  "checkpoint_lineage": {
+    "source_snapshot": "snapshot_1",
+    "prepared_snapshot": "snapshot_2",
+    "gem5_checkpoint_root": "/mnt/sdb/aansari/checkpoints/single-core/snapshot_2"
+  },
+  "run_configuration": {
+    "experiment": "disk_trace_snapshot_2",
+    "cores": 1,
+    "instruction_budget": 250000000,
+    "timing_ruby": true,
+    "fdip": true,
+    "branch_trace": true,
+    "target_path": "/var/tmp/gem5-disk-smoke/payload.bin",
+    "target_fs_expected": "ext4 on /dev/vda3",
+    "payload": "gem5-disk-smoke-payload-v3",
+    "repeat_count": 256,
+    "expected_bytes": 6656,
+    "success_loop_pc": "0x40076c",
+    "failure_loop_pc": "0x400798"
+  },
+  "repos": {
+    "qpoints": {
+      "branch": "ali/real-workload-bringup",
+      "commit": "8e583ef490709895de140b78d3421bcc9fe39351"
+    },
+    "gem5": {
+      "branch": "ali/real-workload-bringup",
+      "commit": "c98e54d31c32024ec8ef92448e5b858a06d7824f"
+    }
+  },
+  "artifacts": {
+    "inputs": [
+      "guest_disk_trace_ubench.c",
+      "Makefile",
+      "ubench_INTENT.txt",
+      "disk_smoke_fdip.args"
+    ],
+    "outputs": [
+      "branch_trace_core_0.log",
+      "stats.txt",
+      "branch_trace_verdict.json"
+    ],
+    "analysis": [
+      "analyze_branch_trace.py"
+    ]
+  },
+  "verdict": {
+    "trace": "/home/dev/qflex_git/QPoints/validation_records/disk_write_smoke_validation/branch_trace_core_0.log",
+    "success_pc": "0x40076c",
+    "failure_pc": "0x400798",
+    "success_hits": 177607,
+    "success_first_line": 762,
+    "failure_hits": 0,
+    "failure_first_line": null,
+    "verdict": "success"
+  },
+  "acceptance": {
+    "status": "accepted",
+    "why": [
+      "The guest binary auto-created and targeted a path under /var/tmp rather than tmpfs.",
+      "The binary performed create/truncate, repeated writes, fsync(fd), parent-directory fsync, sync(), reopen, full readback, and byte-for-byte compare.",
+      "The saved branch trace contains many hits on the success-loop branch PC and zero hits on the failure-loop branch PC.",
+      "The validating gem5 run used FDIP and the same trusted branch-trace infrastructure already used elsewhere in QPoints validation."
+    ],
+    "known_limits": [
+      "This is a single-workload smoke validation, not a concurrency or multi-file logging stress test.",
+      "The reread happens after flush and reopen, but not after a privileged cache-drop or remount.",
+      "This package validates in-simulation disk behavior, not persistence back into the base qcow2 image."
+    ]
+  }
+}

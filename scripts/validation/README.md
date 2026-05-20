@@ -73,6 +73,22 @@ The existing collectors under:
 should use the same manifest contract so their outputs can be trusted and
 compared without hand-reconstructing setup details from memory.
 
+## Existing Guest Validation Targets
+
+The guest-side validation folders such as:
+
+- `tage_family_8x8/`
+- `tage_history_probe/`
+- `l1d_frontend_mix/`
+- `l1d_resident_rw/`
+- `llc_resident_rw/`
+- `disk_smoke/`
+- `disk_append_log/`
+
+should each carry their own intent and build inputs so they can be staged into
+the VM layer and later promoted into `validation_records/` without losing the
+reasoning behind the test.
+
 ## Validated Packages
 
 `sim_outs/` is for local iteration and should remain easy to prune.

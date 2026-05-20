@@ -1,0 +1,1 @@
+Validate that a restored gem5 full-system run can sustain a log-style append workload with periodic flushes and exact replay verification on the current single-core lineage, using a self-checking guest binary and the existing trusted branch-trace verdict path.

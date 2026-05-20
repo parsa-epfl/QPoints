@@ -1,0 +1,39 @@
+disk_smoke is the first real-workload-phase disk-behavior validation target.
+
+Intent:
+- Validate that a restored gem5 full-system run can perform sane disk-backed
+  guest file IO without relying on post-simulation persistence into the base
+  qcow2 image.
+- Keep the guest workload tiny and deterministic so success/failure can be
+  judged from trusted simulator-side evidence rather than interactive guest
+  control.
+- Reuse the existing branch-trace infrastructure as the verdict channel.
+
+Behavior:
+- The guest binary creates its own parent directory under `/var/tmp`.
+- It rejects `tmpfs`/`ramfs` targets up front.
+- It announces `READY_FOR_CHECKPOINT`, spins in a deterministic warmup window,
+  then performs:
+  - create/truncate target file
+  - repeated payload writes
+  - `fsync(fd)`
+  - parent-directory `fsync`
+  - `sync()`
+  - reopen and full readback
+  - exact byte-for-byte comparison
+- On success it enters a distinct infinite success loop.
+- On failure it enters a distinct infinite failure loop.
+
+Why this benchmark exists:
+- We need a concrete proof that restored gem5 can sustain disk-backed guest IO
+  before we trust heavier workloads such as logging-heavy services.
+- The earlier terminal-gated shell approach showed that live guest control is
+  valuable, but it is not required for this first milestone.
+- A self-checking binary plus branch-trace verdict gives us a deterministic,
+  reviewable acceptance test using infrastructure we already trust.
+
+Files:
+- `guest_disk_trace_ubench.c`
+  - the self-checking guest disk-IO binary source
+- `Makefile`
+  - builds both host and AArch64 variants for inspection and guest staging

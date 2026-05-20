@@ -1,0 +1,16 @@
+{
+  "benchmark": "guest_disk_append_log_ubench",
+  "checkpoint": "snapshot_2",
+  "fdip": true,
+  "branch_trace_verdict": {
+    "trace": "/home/dev/qflex_git/QPoints/validation_records/disk_append_log_validation/branch_trace_core_0.log",
+    "success_pc": "0x40076c",
+    "failure_pc": "0x400798",
+    "success_hits": 43394,
+    "success_first_line": 760,
+    "failure_hits": 0,
+    "failure_first_line": null,
+    "verdict": "success"
+  },
+  "accepted_feature_claim": "Restored gem5 full-system simulation can execute a guest append-log workload that appends ordered records with periodic fsync, reopens and continues appending, then reopens and verifies the full log contents on ext4 while running with FDIP enabled."
+}
