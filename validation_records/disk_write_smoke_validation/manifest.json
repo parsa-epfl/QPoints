@@ -26,7 +26,7 @@
   "repos": {
     "qpoints": {
       "branch": "ali/real-workload-bringup",
-      "commit": "8e583ef490709895de140b78d3421bcc9fe39351"
+      "commit": "ad4064fca9"
     },
     "gem5": {
       "branch": "ali/real-workload-bringup",
