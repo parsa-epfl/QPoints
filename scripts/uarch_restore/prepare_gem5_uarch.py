@@ -14,6 +14,8 @@ import subprocess
 GEM5_UARCH_SUFFIX = "gem5_uarch"
 QFLEX_UARCH_SUFFIX = ".uarch"
 LLC_RESTORE_FILE = "llc_restore_addrs.txt"
+L2_SHARED_RESTORE_CANDIDATE_FILE = "l2_shared_restore_candidates.json"
+L2_SHARED_RESTORE_FILE = "l2_shared_restore_addrs.txt"
 L1D_CANDIDATE_FILE = "l1d_restore_candidates.json"
 L1D_RESTORE_FILE_TEMPLATE = "l1d_restore_addrs.core{core}.txt"
 L1D_RESTORE_FILE_GLOB = "l1d_restore_addrs.core*.txt"
@@ -105,6 +107,26 @@ def _write_addr_file(path: Path, addrs: list[int], overwrite: bool) -> None:
         )
     path.write_text(
         "".join(f"{addr:#x}\n" for addr in addrs),
+        encoding="utf-8",
+    )
+
+
+def _write_l2_shared_restore_file(
+    path: Path,
+    entries: list[dict],
+    overwrite: bool,
+) -> None:
+    if path.exists() and not overwrite:
+        raise FileExistsError(
+            f"Refusing to overwrite existing gem5 uarch artifact: {path}. "
+            "Pass --overwrite to replace it."
+        )
+    path.write_text(
+        "".join(
+            f"{int(entry['line_addr'], 16):#x} {int(core)}\n"
+            for entry in entries
+            for core in entry["sharer_cores"]
+        ),
         encoding="utf-8",
     )
 
@@ -512,6 +534,92 @@ def _select_l1i_restore_candidates(harvard: dict) -> tuple[list[dict], dict]:
     return serialized_candidates, stats
 
 
+def _decode_directory_sharer_cores(meta: dict) -> dict[str, list[int]]:
+    sharers = (meta or {}).get("sharers") or {}
+    bits = int(sharers.get("bits", 0))
+    raw_words = sharers.get("data", []) or []
+
+    i_cores = set()
+    d_cores = set()
+    for word_idx, word in enumerate(raw_words):
+        value = int(word)
+        base = word_idx * 64
+        for bit in range(64):
+            slot = base + bit
+            if slot >= bits:
+                break
+            if ((value >> bit) & 1) == 0:
+                continue
+            core = slot // 2
+            if slot % 2 == 0:
+                i_cores.add(core)
+            else:
+                d_cores.add(core)
+
+    return {
+        "i_cores": sorted(i_cores),
+        "d_cores": sorted(d_cores),
+        "all_cores": sorted(i_cores | d_cores),
+    }
+
+
+def _select_l2_shared_restore_candidates(
+    directory: dict,
+    harvard: dict,
+) -> tuple[list[dict], dict]:
+    stats = {
+        "directory_entries": 0,
+        "directory_shared_entries": 0,
+        "private_present_entries": 0,
+        "clean_shared_private_entries": 0,
+        "total_sharer_cores": 0,
+    }
+
+    candidates = []
+    for block_id, meta in directory.items():
+        stats["directory_entries"] += 1
+        if not bool(meta.get("shared", False)):
+            continue
+        stats["directory_shared_entries"] += 1
+
+        private_entries = harvard.get(block_id, [])
+        if not private_entries:
+            continue
+        stats["private_present_entries"] += 1
+
+        if any(entry["writeable"] or entry["modified"] for entry in private_entries):
+            continue
+
+        decoded = _decode_directory_sharer_cores(meta)
+        sharer_cores = decoded["all_cores"]
+        if not sharer_cores:
+            sharer_cores = sorted({int(entry["core"]) for entry in private_entries})
+        if not sharer_cores:
+            continue
+
+        candidate = {
+            "block_id": block_id,
+            "line_addr": f"{block_id * CACHE_LINE_SIZE:#x}",
+            "sharer_cores": sharer_cores,
+            "i_sharer_cores": decoded["i_cores"],
+            "d_sharer_cores": decoded["d_cores"],
+            "in_shared_cache": bool(meta.get("in_shared_cache", False)),
+            "directory_shared": True,
+        }
+        candidates.append(candidate)
+        stats["clean_shared_private_entries"] += 1
+        stats["total_sharer_cores"] += len(sharer_cores)
+
+    ordered_candidates = sorted(
+        candidates,
+        key=lambda candidate: (
+            len(candidate["sharer_cores"]),
+            int(candidate["line_addr"], 16),
+        ),
+    )
+    return ordered_candidates, stats
+
+
 def _select_btb_restore_candidates(fetch_units: list[dict]) -> tuple[list[dict], dict]:
     stats = {
         "total_entries": 0,
@@ -703,6 +811,8 @@ def prepare_snapshot_gem5_uarch(
     harvard_source_file = qflex_uarch_dir / HARVARD_SOURCE_FILE
     fetch_source_file = qflex_uarch_dir / FETCH_SOURCE_FILE
     target_file = gem5_uarch_dir / LLC_RESTORE_FILE
+    l2_shared_restore_candidate_file = gem5_uarch_dir / L2_SHARED_RESTORE_CANDIDATE_FILE
+    l2_shared_restore_file = gem5_uarch_dir / L2_SHARED_RESTORE_FILE
     l1d_candidate_file = gem5_uarch_dir / L1D_CANDIDATE_FILE
     l1i_candidate_file = gem5_uarch_dir / L1I_CANDIDATE_FILE
     btb_candidate_file = gem5_uarch_dir / BTB_CANDIDATE_FILE
@@ -747,6 +857,9 @@ def prepare_snapshot_gem5_uarch(
     clean_lines, modified_lines, stats = _select_llc_restore_lines(
         llc_lines, directory, harvard
     )
+    l2_shared_candidates, l2_shared_stats = _select_l2_shared_restore_candidates(
+        directory, harvard
+    )
     l1d_candidates, l1d_stats = _select_l1d_restore_candidates(harvard)
     l1i_candidates, l1i_stats = _select_l1i_restore_candidates(harvard)
     btb_candidates, btb_stats = _select_btb_restore_candidates(fetch_units)
@@ -763,6 +876,21 @@ def prepare_snapshot_gem5_uarch(
         )
 
     _write_addr_file(target_file, addrs, overwrite)
+    _write_json_file(
+        l2_shared_restore_candidate_file,
+        {
+            "schema_version": 1,
+            "snapshot": snapshot,
+            "cache_line_size": CACHE_LINE_SIZE,
+            "candidates": l2_shared_candidates,
+        },
+        overwrite,
+    )
+    _write_l2_shared_restore_file(
+        l2_shared_restore_file,
+        l2_shared_candidates,
+        overwrite,
+    )
     _write_json_file(
         l1d_candidate_file,
         {
@@ -855,6 +983,22 @@ def prepare_snapshot_gem5_uarch(
                 ),
                 "selected_modified_lines": effective_selected_modified,
                 "stats": stats,
+            },
+            "l2_shared_private": {
+                "source_files": {
+                    "directory": str(directory_source_file),
+                    "harvard": str(harvard_source_file),
+                },
+                "candidate_file": str(l2_shared_restore_candidate_file),
+                "restore_file": str(l2_shared_restore_file),
+                "line_count": len(l2_shared_candidates),
+                "selection_policy": (
+                    "all clean directory-shared private lines, emitted once "
+                    "per unique L1 controller sharer so the inclusive gem5 "
+                    "L2 can reconstruct SS state and sharer metadata during "
+                    "multicore warm restore"
+                ),
+                "stats": l2_shared_stats,
             },
             "l1d": {
                 "source_file": str(harvard_source_file),
