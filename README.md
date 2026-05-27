@@ -57,3 +57,22 @@ to use the O3CPU + Ruby MESI_Two_Level configuration.
 ./run_gem5.sh --gem5-ckp-dir gem5_checkpoints --experiment test \
   --snapshot snapshot_0 --inst 100000 --cores 1 --timing-ruby
 ```
+
+## Current Protocol Direction
+
+The current `--timing-ruby` path still uses the O3CPU + Ruby `MESI_Two_Level`
+configuration as the active bring-up and partial-reference path. That remains
+useful for LLC restore, frontend validation, and the already translated clean
+shared-private restore family.
+
+For faithful multicore private-state restoration, the long-term direction has
+changed. The current WormCache/QFlex checkpoints come from a non-inclusive
+shared-cache model, and the important private-present / shared-missing families
+cannot be represented faithfully in `MESI_Two_Level` without inventing LLC
+residency in gem5. Because that would change LLC occupancy and future
+replacement behavior, the intended end-state migration is toward a
+non-inclusive gem5 Ruby protocol, with `MOESI_CMP_directory` as the leading
+candidate.
+
+Treat the current MESI timing path as the maintained bring-up path, not the
+final faithful target for full multicore private-cache restore.
