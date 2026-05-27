@@ -22,6 +22,16 @@ L1D_RESTORE_FILE_GLOB = "l1d_restore_addrs.core*.txt"
 L1I_CANDIDATE_FILE = "l1i_restore_candidates.json"
 L1I_RESTORE_FILE_TEMPLATE = "l1i_restore_addrs.core{core}.txt"
 L1I_RESTORE_FILE_GLOB = "l1i_restore_addrs.core*.txt"
+MOESI_PRIVATE_OWNER_CANDIDATE_FILE = (
+    "moesi_single_private_data_writeable_restore_candidates.json"
+)
+MOESI_PRIVATE_OWNER_RESTORE_FILE = "moesi_single_private_data_writeable_restore.txt"
+MOESI_PRIVATE_OWNER_L1D_RESTORE_TEMPLATE = (
+    "moesi_l1d_single_private_data_writeable.core{core}.txt"
+)
+MOESI_PRIVATE_OWNER_L1D_RESTORE_GLOB = (
+    "moesi_l1d_single_private_data_writeable.core*.txt"
+)
 BTB_CANDIDATE_FILE = "btb_restore_candidates.json"
 BTB_RESTORE_FILE_TEMPLATE = "btb_restore_addrs.core{core}.txt"
 BTB_RESTORE_FILE_GLOB = "btb_restore_addrs.core*.txt"
@@ -168,6 +178,33 @@ def _write_l2_shared_restore_file(
             f"{int(entry['line_addr'], 16):#x} {int(core)}\n"
             for entry in entries
             for core in entry["sharer_cores"]
+        ),
+        encoding="utf-8",
+    )
+
+
+def _encode_moesi_private_owner_restore_addr(line_addr: int, owner_core: int) -> int:
+    # MOESI private-owner restore preserves non-inclusive residency, so the
+    # shared L2/directory import path needs the owner core without adding a
+    # second parser contract. QFlex cache lines are 64B-aligned, which leaves
+    # the low six bits free to carry the owner core in the one-token warm file.
+    return line_addr | owner_core
+
+
+def _write_moesi_private_owner_restore_file(
+    path: Path,
+    entries: list[dict],
+    overwrite: bool,
+) -> None:
+    if path.exists() and not overwrite:
+        raise FileExistsError(
+            f"Refusing to overwrite existing gem5 uarch artifact: {path}. "
+            "Pass --overwrite to replace it."
+        )
+    path.write_text(
+        "".join(
+            f"{_encode_moesi_private_owner_restore_addr(int(entry['line_addr'], 16), int(entry['owner_core'])):#x}\n"
+            for entry in entries
         ),
         encoding="utf-8",
     )
@@ -662,6 +699,105 @@ def _select_l2_shared_restore_candidates(
     return ordered_candidates, stats
 
 
+def _summarize_private_entries(entries: list[dict]) -> dict:
+    d_entries = [
+        entry
+        for entry in entries
+        if entry["cache"] == "d_cache" and not entry["is_instruction"]
+    ]
+    i_entries = [
+        entry
+        for entry in entries
+        if entry["cache"] == "i_cache" and entry["is_instruction"]
+    ]
+    return {
+        "d_entries": d_entries,
+        "i_entries": i_entries,
+        "d_cores": sorted({entry["core"] for entry in d_entries}),
+        "i_cores": sorted({entry["core"] for entry in i_entries}),
+        "any_d_writeable": any(entry["writeable"] for entry in d_entries),
+        "any_d_modified": any(entry["modified"] for entry in d_entries),
+        "any_i_modified": any(entry["modified"] for entry in i_entries),
+    }
+
+
+def _moesi_private_owner_restore_state(candidate: dict) -> str:
+    return "M"
+
+
+def _select_moesi_single_private_data_writeable_candidates(
+    llc_lines: list[dict],
+    directory: dict,
+    harvard: dict,
+) -> tuple[list[dict], dict]:
+    llc_block_ids = {line["block_id"] for line in llc_lines}
+    stats = {
+        "harvard_block_ids": len(harvard),
+        "directory_backed_block_ids": 0,
+        "single_private_dcore_block_ids": 0,
+        "writeable_block_ids": 0,
+        "modified_block_ids_skipped": 0,
+        "llc_present_block_ids_skipped": 0,
+        "directory_shared_block_ids_skipped": 0,
+        "directory_in_shared_cache_block_ids_skipped": 0,
+        "candidate_lines": 0,
+    }
+
+    candidates = []
+    for block_id, entries in harvard.items():
+        dir_meta = directory.get(block_id)
+        if dir_meta is None:
+            continue
+        stats["directory_backed_block_ids"] += 1
+
+        priv = _summarize_private_entries(entries)
+        if len(priv["d_cores"]) != 1:
+            continue
+        stats["single_private_dcore_block_ids"] += 1
+
+        if not priv["any_d_writeable"]:
+            continue
+        stats["writeable_block_ids"] += 1
+
+        if priv["any_d_modified"]:
+            stats["modified_block_ids_skipped"] += 1
+            continue
+
+        if block_id in llc_block_ids:
+            stats["llc_present_block_ids_skipped"] += 1
+            continue
+
+        if bool(dir_meta.get("shared", False)):
+            stats["directory_shared_block_ids_skipped"] += 1
+            continue
+
+        if bool(dir_meta.get("in_shared_cache", False)):
+            stats["directory_in_shared_cache_block_ids_skipped"] += 1
+            continue
+
+        candidate = {
+            "block_id": block_id,
+            "line_addr": f"{block_id * CACHE_LINE_SIZE:#x}",
+            "owner_core": int(priv["d_cores"][0]),
+            "private_i_cores": priv["i_cores"],
+            "private_d_cores": priv["d_cores"],
+            "l1_state": "M",
+            "l2_state": "ILX",
+            "dir_state": "M",
+        }
+        candidates.append(candidate)
+        stats["candidate_lines"] += 1
+
+    ordered_candidates = sorted(
+        candidates,
+        key=lambda candidate: (
+            candidate["owner_core"],
+            int(candidate["line_addr"], 16),
+        ),
+    )
+    return ordered_candidates, stats
+
+
 def _select_btb_restore_candidates(fetch_units: list[dict]) -> tuple[list[dict], dict]:
     stats = {
         "total_entries": 0,
@@ -859,6 +995,12 @@ def prepare_snapshot_gem5_uarch(
     l2_shared_restore_file = gem5_uarch_dir / L2_SHARED_RESTORE_FILE
     l1d_candidate_file = gem5_uarch_dir / L1D_CANDIDATE_FILE
     l1i_candidate_file = gem5_uarch_dir / L1I_CANDIDATE_FILE
+    moesi_private_owner_candidate_file = (
+        gem5_uarch_dir / MOESI_PRIVATE_OWNER_CANDIDATE_FILE
+    )
+    moesi_private_owner_restore_file = (
+        gem5_uarch_dir / MOESI_PRIVATE_OWNER_RESTORE_FILE
+    )
     btb_candidate_file = gem5_uarch_dir / BTB_CANDIDATE_FILE
     tage_candidate_file = gem5_uarch_dir / TAGE_CANDIDATE_FILE
     manifest_file = gem5_uarch_dir / MANIFEST_FILE
@@ -906,6 +1048,12 @@ def prepare_snapshot_gem5_uarch(
     )
     l1d_candidates, l1d_stats = _select_l1d_restore_candidates(harvard)
     l1i_candidates, l1i_stats = _select_l1i_restore_candidates(harvard)
+    (
+        moesi_private_owner_candidates,
+        moesi_private_owner_stats,
+    ) = _select_moesi_single_private_data_writeable_candidates(
+        llc_lines, directory, harvard
+    )
     btb_candidates, btb_stats = _select_btb_restore_candidates(fetch_units)
     tage_candidates, tage_stats = _select_tage_restore_candidates(fetch_units)
     selected_modified = max(0, llc_debug_modified_count)
@@ -956,6 +1104,21 @@ def prepare_snapshot_gem5_uarch(
         overwrite,
     )
     _write_json_file(
+        moesi_private_owner_candidate_file,
+        {
+            "schema_version": 1,
+            "snapshot": snapshot,
+            "cache_line_size": CACHE_LINE_SIZE,
+            "candidates": moesi_private_owner_candidates,
+        },
+        overwrite,
+    )
+    _write_moesi_private_owner_restore_file(
+        moesi_private_owner_restore_file,
+        moesi_private_owner_candidates,
+        overwrite,
+    )
+    _write_json_file(
         btb_candidate_file,
         {
             "schema_version": 1,
@@ -988,6 +1151,20 @@ def prepare_snapshot_gem5_uarch(
         L1I_RESTORE_FILE_TEMPLATE,
         L1I_RESTORE_FILE_GLOB,
         _l1i_restore_state,
+    )
+    moesi_private_owner_l1d_restore_files = _write_restore_files(
+        gem5_uarch_dir,
+        [
+            {
+                "core": candidate["owner_core"],
+                "line_addr": candidate["line_addr"],
+            }
+            for candidate in moesi_private_owner_candidates
+        ],
+        overwrite,
+        MOESI_PRIVATE_OWNER_L1D_RESTORE_TEMPLATE,
+        MOESI_PRIVATE_OWNER_L1D_RESTORE_GLOB,
+        _moesi_private_owner_restore_state,
     )
     btb_restore_files = _write_btb_restore_files(
         gem5_uarch_dir,
@@ -1074,6 +1251,32 @@ def prepare_snapshot_gem5_uarch(
                     "restore state is always S"
                 ),
                 "stats": l1i_stats,
+            },
+            "moesi_single_private_data_writeable": {
+                "source_files": {
+                    "llc": str(llc_source_file),
+                    "directory": str(directory_source_file),
+                    "harvard": str(harvard_source_file),
+                },
+                "candidate_file": str(moesi_private_owner_candidate_file),
+                "restore_file": str(moesi_private_owner_restore_file),
+                "l1d_restore_files": {
+                    str(core): str(path)
+                    for core, path in sorted(
+                        moesi_private_owner_l1d_restore_files.items()
+                    )
+                },
+                "line_count": len(moesi_private_owner_candidates),
+                "selection_policy": (
+                    "for MOESI_CMP_directory, single-private writable data "
+                    "lines whose source directory entry is private "
+                    "(shared=false, in_shared_cache=false), absent from the "
+                    "shared cache, and clean with respect to memory; restore "
+                    "them as L1D M-state lines with clean data, L2 local "
+                    "directory ILX ownership, and global directory M-state "
+                    "ownership without fabricating LLC residency"
+                ),
+                "stats": moesi_private_owner_stats,
             },
             "btb": {
                 "source_file": str(fetch_source_file),
