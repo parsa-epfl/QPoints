@@ -38,6 +38,7 @@ The tests are split into two groups:
     - `--data-trace`
     - `--dump-cache-state`
     - `--timing-ruby`
+    - `--timing-ruby-moesi`
     - `--sim-config`
 
 - [test_integration_run_gem5.py](/home/dev/qflex_git/QPoints/tests/test_integration_run_gem5.py)

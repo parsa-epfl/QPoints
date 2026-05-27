@@ -48,7 +48,9 @@ Optional environment variables:
 ## Run a Checkpoint in gem5
 
 The default mode preserves the existing classic gem5 flow. Add `--timing-ruby`
-to use the O3CPU + Ruby MESI_Two_Level configuration.
+to use the O3CPU + Ruby MESI_Two_Level configuration, or
+`--timing-ruby-moesi` to use the tracked cold MOESI_CMP_directory bring-up
+path for the non-inclusive migration.
 
 ```bash
 ./run_gem5.sh --gem5-ckp-dir gem5_checkpoints --experiment test \
@@ -58,6 +60,12 @@ to use the O3CPU + Ruby MESI_Two_Level configuration.
 ```bash
 ./run_gem5.sh --gem5-ckp-dir gem5_checkpoints --experiment test \
   --snapshot snapshot_0 --inst 100000 --cores 1 --timing-ruby
+```
+
+
+```bash
+./run_gem5.sh --gem5-ckp-dir gem5_checkpoints --experiment test \
+  --snapshot snapshot_0 --inst 100000 --cores 1 --timing-ruby-moesi
 ```
 
 ## Current Protocol Direction
@@ -77,4 +85,7 @@ non-inclusive gem5 Ruby protocol, with `MOESI_CMP_directory` as the leading
 candidate.
 
 Treat the current MESI timing path as the maintained bring-up path, not the
-final faithful target for full multicore private-cache restore.
+final faithful target for full multicore private-cache restore. The current
+`--timing-ruby-moesi` path is intentionally narrower: it is the tracked cold
+bring-up harness for the non-inclusive migration, not yet a restored-state
+replacement for the MESI flow.
