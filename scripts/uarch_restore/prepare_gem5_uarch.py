@@ -43,6 +43,13 @@ BTB_RESTORABLE_BRANCH_TYPES = {
     "IndirectCall",
     "IndirectBranch",
 }
+RUBY_PROTOCOL_MESI_TWO_LEVEL = "mesi_two_level"
+RUBY_PROTOCOL_MOESI_CMP_DIRECTORY = "moesi_cmp_directory"
+SUPPORTED_RUBY_PROTOCOLS = (
+    RUBY_PROTOCOL_MESI_TWO_LEVEL,
+    RUBY_PROTOCOL_MOESI_CMP_DIRECTORY,
+)
+
 
 
 def parse_args() -> argparse.Namespace:
@@ -75,6 +82,16 @@ def parse_args() -> argparse.Namespace:
         help="Overwrite existing gem5-side artifacts if they already exist.",
     )
     parser.add_argument(
+        "--ruby-protocol",
+        choices=SUPPORTED_RUBY_PROTOCOLS,
+        default=RUBY_PROTOCOL_MESI_TWO_LEVEL,
+        help=(
+            "Target gem5 Ruby protocol for this prepared restore bundle. "
+            "Keep the canonical single-script conversion flow and switch only "
+            "the protocol-specific emit sidecar behavior."
+        ),
+    )
+    parser.add_argument(
         "--llc-debug-modified-count",
         type=int,
         default=0,
@@ -84,6 +101,31 @@ def parse_args() -> argparse.Namespace:
         ),
     )
     return parser.parse_args()
+
+
+def _validate_ruby_protocol(ruby_protocol: str) -> str:
+    if ruby_protocol not in SUPPORTED_RUBY_PROTOCOLS:
+        raise ValueError(
+            f"Unsupported Ruby protocol '{ruby_protocol}'. Expected one of: "
+            + ", ".join(SUPPORTED_RUBY_PROTOCOLS)
+        )
+    return ruby_protocol
+
+
+def _l2_shared_restore_selection_policy(ruby_protocol: str) -> str:
+    if ruby_protocol == RUBY_PROTOCOL_MESI_TWO_LEVEL:
+        return (
+            "all clean directory-shared private lines, emitted once "
+            "per unique L1 controller sharer so the inclusive gem5 "
+            "L2 can reconstruct SS state and sharer metadata during "
+            "multicore warm restore"
+        )
+    return (
+        "all clean directory-shared private lines, emitted once per "
+        "unique L1 controller sharer and preserved as a compatibility "
+        "artifact while the MOESI migration is still LLC-only; the "
+        "current MOESI restore path does not consume this file yet"
+    )
 
 
 def _normalize_restore_lines(lines: list[dict]) -> list[dict]:
@@ -797,9 +839,11 @@ def prepare_snapshot_gem5_uarch(
     snapshot: str,
     overwrite: bool = False,
     llc_debug_modified_count: int = 0,
+    ruby_protocol: str = RUBY_PROTOCOL_MESI_TWO_LEVEL,
 ) -> dict:
     qflex_run_dir = qflex_run_dir.resolve()
     gem5_workload_root = gem5_workload_root.resolve()
+    ruby_protocol = _validate_ruby_protocol(ruby_protocol)
 
     gem5_snapshot_dir = gem5_workload_root / snapshot
     qflex_uarch_dir = qflex_run_dir / f"{snapshot}{QFLEX_UARCH_SUFFIX}"
@@ -963,6 +1007,7 @@ def prepare_snapshot_gem5_uarch(
     manifest = {
         "schema_version": 1,
         "snapshot": snapshot,
+        "target_ruby_protocol": ruby_protocol,
         "qflex_source_dir": str(qflex_uarch_dir),
         "gem5_uarch_dir": str(gem5_uarch_dir),
         "components": {
@@ -992,11 +1037,8 @@ def prepare_snapshot_gem5_uarch(
                 "candidate_file": str(l2_shared_restore_candidate_file),
                 "restore_file": str(l2_shared_restore_file),
                 "line_count": len(l2_shared_candidates),
-                "selection_policy": (
-                    "all clean directory-shared private lines, emitted once "
-                    "per unique L1 controller sharer so the inclusive gem5 "
-                    "L2 can reconstruct SS state and sharer metadata during "
-                    "multicore warm restore"
+                "selection_policy": _l2_shared_restore_selection_policy(
+                    ruby_protocol
                 ),
                 "stats": l2_shared_stats,
             },
@@ -1085,9 +1127,11 @@ def main() -> int:
         snapshot=args.snapshot,
         overwrite=args.overwrite,
         llc_debug_modified_count=args.llc_debug_modified_count,
+        ruby_protocol=args.ruby_protocol,
     )
 
     print(f"Prepared gem5 uarch artifacts in: {manifest['gem5_uarch_dir']}")
+    print(f"  protocol: {manifest['target_ruby_protocol']}")
     print(f"  source: {manifest['components']['llc']['source_files']['llc']}")
     print(f"  output: {manifest['components']['llc']['output_file']}")
     print(f"  lines : {manifest['components']['llc']['line_count']}")

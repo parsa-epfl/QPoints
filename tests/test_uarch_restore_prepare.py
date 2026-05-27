@@ -463,6 +463,10 @@ def test_prepare_snapshot_gem5_uarch_writes_outputs_and_manifest(tmp_path: Path)
     assert manifest_disk == manifest
     assert manifest["schema_version"] == 1
     assert manifest["snapshot"] == "snapshot_0"
+    assert (
+        manifest["target_ruby_protocol"]
+        == module.RUBY_PROTOCOL_MESI_TWO_LEVEL
+    )
     assert manifest["components"]["llc"]["line_count"] == 2
     assert manifest["components"]["llc"]["stats"]["total_llc_lines"] == 5
     assert manifest["components"]["llc"]["stats"]["llc_modified_lines"] == 1
@@ -515,6 +519,60 @@ def test_prepare_snapshot_gem5_uarch_writes_outputs_and_manifest(tmp_path: Path)
     assert manifest["components"]["tage"]["stats"]["total_fetch_units"] == 1
     assert manifest["components"]["tage"]["stats"]["units_with_tage"] == 1
     assert manifest["components"]["tage"]["stats"]["cores_emitted"] == 1
+
+
+def test_prepare_snapshot_gem5_uarch_records_moesi_target_protocol(
+    tmp_path: Path,
+):
+    module = _load_prepare_module()
+
+    qflex_run_dir = tmp_path / "qflex-run"
+    gem5_workload_root = tmp_path / "gem5-workload"
+    source_dir = qflex_run_dir / "snapshot_0.uarch"
+    source_dir.mkdir(parents=True)
+    gem5_workload_root.mkdir()
+    (gem5_workload_root / "snapshot_0").mkdir()
+
+    _write_zstd_json(
+        source_dir / "llc-0.json.zstd",
+        {
+            "blocks": [
+                {
+                    "blocks": [
+                        {
+                            "block_id_with_v": _encode_block_id_with_v(0x100),
+                            "ts": 10,
+                            "modified": False,
+                        }
+                    ]
+                }
+            ]
+        },
+    )
+    _write_zstd_json(source_dir / "directory-0.json.zstd", {"entries": [{}]})
+    _write_zstd_json(
+        source_dir / "harvard-0.json.zstd",
+        [{"i_cache": [{"lines": []}], "d_cache": [{"lines": []}]}],
+    )
+
+    manifest = module.prepare_snapshot_gem5_uarch(
+        qflex_run_dir=qflex_run_dir,
+        gem5_workload_root=gem5_workload_root,
+        snapshot="snapshot_0",
+        overwrite=True,
+        ruby_protocol=module.RUBY_PROTOCOL_MOESI_CMP_DIRECTORY,
+    )
+
+    assert (
+        manifest["target_ruby_protocol"]
+        == module.RUBY_PROTOCOL_MOESI_CMP_DIRECTORY
+    )
+    assert "does not consume this file yet" in manifest["components"][
+        "l2_shared_private"
+    ]["selection_policy"]
+    assert (
+        gem5_workload_root / "snapshot_0" / "gem5_uarch" / "llc_restore_addrs.txt"
+    ).is_file()
 
 
 def test_prepare_snapshot_gem5_uarch_can_append_controlled_modified_lines(
