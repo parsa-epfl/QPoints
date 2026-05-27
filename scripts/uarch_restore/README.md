@@ -37,6 +37,10 @@ Later, this directory can grow to include richer postprocessing for:
 
 - `prepare_gem5_uarch.py`
 
+This remains the single canonical restore-prep entrypoint. Protocol-specific
+emit behavior lives behind flags inside this script rather than branching into
+separate top-level conversion scripts.
+
 Usage:
 
 ```bash
@@ -45,6 +49,11 @@ python3 scripts/uarch_restore/prepare_gem5_uarch.py \
   --gem5-workload-root /mnt/sdb/aansari/checkpoints/single-core \
   --snapshot snapshot_0
 ```
+
+Optional protocol selection:
+
+- `--ruby-protocol mesi_two_level`
+- `--ruby-protocol moesi_cmp_directory`
 
 Current behavior:
 
