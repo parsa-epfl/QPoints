@@ -17,5 +17,6 @@ def test_run_gem5_help_exposes_tracing_options():
     assert "--data-trace" in result.stdout
     assert "--dump-cache-state" in result.stdout
     assert "--timing-ruby" in result.stdout
+    assert "--timing-ruby-moesi" in result.stdout
     assert "--sim-config" in result.stdout
     assert "machine/model configuration only; runner-owned options are" in result.stdout
