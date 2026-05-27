@@ -575,6 +575,122 @@ def test_prepare_snapshot_gem5_uarch_records_moesi_target_protocol(
     ).is_file()
 
 
+def test_prepare_snapshot_gem5_uarch_emits_first_moesi_private_owner_slice(
+    tmp_path: Path,
+):
+    module = _load_prepare_module()
+
+    qflex_run_dir = tmp_path / "qflex-run"
+    gem5_workload_root = tmp_path / "gem5-workload"
+    source_dir = qflex_run_dir / "snapshot_0.uarch"
+    source_dir.mkdir(parents=True)
+    gem5_workload_root.mkdir()
+    (gem5_workload_root / "snapshot_0").mkdir()
+
+    llc_line = 0x100
+    private_owner_line = 0x200
+
+    _write_zstd_json(
+        source_dir / "llc-0.json.zstd",
+        {
+            "blocks": [
+                {
+                    "blocks": [
+                        {
+                            "block_id_with_v": _encode_block_id_with_v(llc_line),
+                            "ts": 10,
+                            "modified": False,
+                        }
+                    ]
+                }
+            ]
+        },
+    )
+    _write_zstd_json(
+        source_dir / "directory-0.json.zstd",
+        {
+            "entries": [
+                {
+                    str(private_owner_line // 64): {
+                        "shared": False,
+                        "in_shared_cache": False,
+                    }
+                }
+            ]
+        },
+    )
+    _write_zstd_json(
+        source_dir / "harvard-0.json.zstd",
+        [
+            {"i_cache": [{"lines": []}], "d_cache": [{"lines": []}]},
+            {
+                "i_cache": [{"lines": []}],
+                "d_cache": [
+                    {
+                        "lines": [
+                            _make_harvard_line(
+                                private_owner_line,
+                                writeable=True,
+                                modified=False,
+                                ts=7,
+                            )
+                        ]
+                    }
+                ],
+            },
+        ],
+    )
+
+    manifest = module.prepare_snapshot_gem5_uarch(
+        qflex_run_dir=qflex_run_dir,
+        gem5_workload_root=gem5_workload_root,
+        snapshot="snapshot_0",
+        overwrite=True,
+        ruby_protocol=module.RUBY_PROTOCOL_MOESI_CMP_DIRECTORY,
+    )
+
+    gem5_uarch_dir = gem5_workload_root / "snapshot_0" / "gem5_uarch"
+    candidate_file = (
+        gem5_uarch_dir
+        / "moesi_single_private_data_writeable_restore_candidates.json"
+    )
+    restore_file = (
+        gem5_uarch_dir / "moesi_single_private_data_writeable_restore.txt"
+    )
+    l1d_restore_file = (
+        gem5_uarch_dir / "moesi_l1d_single_private_data_writeable.core1.txt"
+    )
+
+    assert restore_file.read_text(encoding="utf-8") == "0x201\n"
+    assert l1d_restore_file.read_text(encoding="utf-8") == "0x200 M\n"
+
+    candidates = json.loads(candidate_file.read_text(encoding="utf-8"))
+    assert candidates == {
+        "schema_version": 1,
+        "snapshot": "snapshot_0",
+        "cache_line_size": 64,
+        "candidates": [
+            {
+                "block_id": private_owner_line // 64,
+                "dir_state": "M",
+                "l1_state": "M",
+                "l2_state": "ILX",
+                "line_addr": "0x200",
+                "owner_core": 1,
+                "private_d_cores": [1],
+                "private_i_cores": [],
+            }
+        ],
+    }
+
+    component = manifest["components"]["moesi_single_private_data_writeable"]
+    assert component["candidate_file"] == str(candidate_file)
+    assert component["restore_file"] == str(restore_file)
+    assert component["l1d_restore_files"] == {"1": str(l1d_restore_file)}
+    assert component["line_count"] == 1
+    assert component["stats"]["candidate_lines"] == 1
+
+
 def test_prepare_snapshot_gem5_uarch_can_append_controlled_modified_lines(
     tmp_path: Path,
 ):
