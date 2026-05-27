@@ -142,9 +142,9 @@ ROOT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 export M5_PATH="${ROOT_DIR}/bin/m5"
 GEM5_HOME="${ROOT_DIR}/gem5"
 GEM5_CFG_CLASSIC="${GEM5_HOME}/configs/example/arm/starter_fs.py"
-# Despite the filename, the current Ruby FS launcher is shared by the MESI
-# bring-up path and the early MOESI cold-bring-up path.
-GEM5_CFG_TIMING_RUBY_FS="${GEM5_HOME}/configs/example/arm/qpoints_mesi_fs.py"
+# The current timing-Ruby FS launcher is shared by the MESI bring-up path
+# and the early MOESI cold-bring-up path.
+GEM5_CFG_TIMING_RUBY_FS="${GEM5_HOME}/configs/example/arm/qpoints_timing_ruby_fs.py"
 GEM5_BIN_CLASSIC="${GEM5_HOME}/build/ARM/gem5.opt"
 GEM5_BIN_TIMING_RUBY_MESI="${GEM5_HOME}/build/ARM_MESI_Two_Level/gem5.opt"
 GEM5_BIN_TIMING_RUBY_MOESI="${GEM5_HOME}/build/ARM_MOESI_CMP_directory/gem5.opt"
