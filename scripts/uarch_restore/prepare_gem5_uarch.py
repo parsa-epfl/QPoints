@@ -844,10 +844,6 @@ def _select_moesi_single_private_data_writeable_candidates(
             continue
         stats["writeable_block_ids"] += 1
 
-        if priv["any_d_modified"]:
-            stats["modified_block_ids_skipped"] += 1
-            continue
-
         if block_id in llc_block_ids:
             stats["llc_present_block_ids_skipped"] += 1
             continue
@@ -1743,10 +1739,10 @@ def prepare_snapshot_gem5_uarch(
                 "selection_policy": (
                     "for MOESI_CMP_directory, single-private writable data "
                     "lines whose source directory entry is private "
-                    "(shared=false, in_shared_cache=false), absent from the "
-                    "shared cache, and clean with respect to memory; restore "
-                    "them as L1D M-state lines with clean data, L2 local "
-                    "directory ILX ownership, and global directory M-state "
+                    "(shared=false, in_shared_cache=false) and absent from "
+                    "the shared cache; restore them as L1D M-state lines "
+                    "using checkpoint-backed memory data, plus L2 local "
+                    "directory ILX ownership and global directory M-state "
                     "ownership without fabricating LLC residency"
                 ),
                 "stats": moesi_private_owner_stats,
