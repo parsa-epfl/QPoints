@@ -846,6 +846,7 @@ def test_prepare_snapshot_gem5_uarch_emits_moesi_multi_private_clean_slice(
     (gem5_workload_root / "snapshot_0").mkdir()
 
     multi_private_clean_line = 0x300
+    multi_private_clean_nonllc_line = 0x340
 
     _write_zstd_json(
         source_dir / "llc-0.json.zstd",
@@ -874,6 +875,11 @@ def test_prepare_snapshot_gem5_uarch_emits_moesi_multi_private_clean_slice(
                         "shared": True,
                         "in_shared_cache": False,
                         "directory_mask": 0b1010,
+                    },
+                    str(multi_private_clean_nonllc_line // 64): {
+                        "shared": True,
+                        "in_shared_cache": False,
+                        "directory_mask": 0b1010,
                     }
                 }
             ]
@@ -892,6 +898,12 @@ def test_prepare_snapshot_gem5_uarch_emits_moesi_multi_private_clean_slice(
                                 writeable=False,
                                 modified=False,
                                 ts=7,
+                            ),
+                            _make_harvard_line(
+                                multi_private_clean_nonllc_line,
+                                writeable=False,
+                                modified=False,
+                                ts=9,
                             )
                         ]
                     }
@@ -908,6 +920,12 @@ def test_prepare_snapshot_gem5_uarch_emits_moesi_multi_private_clean_slice(
                                 writeable=False,
                                 modified=False,
                                 ts=8,
+                            ),
+                            _make_harvard_line(
+                                multi_private_clean_nonllc_line,
+                                writeable=False,
+                                modified=False,
+                                ts=10,
                             )
                         ]
                     }
@@ -930,6 +948,9 @@ def test_prepare_snapshot_gem5_uarch_emits_moesi_multi_private_clean_slice(
         gem5_uarch_dir / "moesi_multi_private_data_clean_restore_candidates.json"
     )
     restore_file = gem5_uarch_dir / "moesi_multi_private_data_clean_restore.txt"
+    nonllc_restore_file = (
+        gem5_uarch_dir / "moesi_multi_private_data_clean_nonllc_restore.txt"
+    )
     l1d_restore_file0 = (
         gem5_uarch_dir / "moesi_l1d_multi_private_data_clean.core0.txt"
     )
@@ -939,8 +960,9 @@ def test_prepare_snapshot_gem5_uarch_emits_moesi_multi_private_clean_slice(
 
     assert llc_restore_file.read_text(encoding="utf-8") == "0x300\n"
     assert restore_file.read_text(encoding="utf-8") == "0x300\n0x302\n"
-    assert l1d_restore_file0.read_text(encoding="utf-8") == "0x300 S\n"
-    assert l1d_restore_file2.read_text(encoding="utf-8") == "0x300 S\n"
+    assert nonllc_restore_file.read_text(encoding="utf-8") == "0x340\n0x342\n"
+    assert l1d_restore_file0.read_text(encoding="utf-8") == "0x300 S\n0x340 S\n"
+    assert l1d_restore_file2.read_text(encoding="utf-8") == "0x300 S\n0x340 S\n"
 
     candidates = json.loads(candidate_file.read_text(encoding="utf-8"))
     assert candidates == {
@@ -954,6 +976,18 @@ def test_prepare_snapshot_gem5_uarch_emits_moesi_multi_private_clean_slice(
                 "l1_state": "S",
                 "l2_state": "SLS",
                 "line_addr": "0x300",
+                "llc_backed": True,
+                "private_d_cores": [0, 2],
+                "private_i_cores": [],
+                "sharer_cores": [0, 2],
+            },
+            {
+                "block_id": multi_private_clean_nonllc_line // 64,
+                "dir_state": "S",
+                "l1_state": "S",
+                "l2_state": "ILS",
+                "line_addr": "0x340",
+                "llc_backed": False,
                 "private_d_cores": [0, 2],
                 "private_i_cores": [],
                 "sharer_cores": [0, 2],
@@ -968,9 +1002,11 @@ def test_prepare_snapshot_gem5_uarch_emits_moesi_multi_private_clean_slice(
         "0": str(l1d_restore_file0),
         "2": str(l1d_restore_file2),
     }
-    assert component["line_count"] == 1
-    assert component["stats"]["candidate_lines"] == 1
-    assert component["stats"]["total_sharer_cores"] == 2
+    assert component["line_count"] == 2
+    assert component["stats"]["candidate_lines"] == 2
+    assert component["stats"]["total_sharer_cores"] == 4
+    assert component["stats"]["llc_backed_block_ids"] == 1
+    assert component["stats"]["non_llc_backed_block_ids"] == 1
     assert manifest["components"]["llc"]["line_count"] == 1
     assert manifest["components"]["llc"]["selected_modified_lines"] == 0
     assert manifest["components"]["llc"]["protocol_required_modified_lines"] == 1
