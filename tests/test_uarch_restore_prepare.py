@@ -811,6 +811,149 @@ def test_prepare_snapshot_gem5_uarch_emits_first_moesi_private_clean_slice(
     assert manifest["components"]["llc"]["protocol_required_modified_lines"] == 1
 
 
+def test_prepare_snapshot_gem5_uarch_emits_moesi_multi_private_clean_slice(
+    tmp_path: Path,
+):
+    module = _load_prepare_module()
+
+    qflex_run_dir = tmp_path / "qflex-run"
+    gem5_workload_root = tmp_path / "gem5-workload"
+    source_dir = qflex_run_dir / "snapshot_0.uarch"
+    source_dir.mkdir(parents=True)
+    gem5_workload_root.mkdir()
+    (gem5_workload_root / "snapshot_0").mkdir()
+
+    multi_private_clean_line = 0x300
+
+    _write_zstd_json(
+        source_dir / "llc-0.json.zstd",
+        {
+            "blocks": [
+                {
+                    "blocks": [
+                        {
+                            "block_id_with_v": _encode_block_id_with_v(
+                                multi_private_clean_line
+                            ),
+                            "ts": 6,
+                            "modified": True,
+                        }
+                    ]
+                }
+            ]
+        },
+    )
+    _write_zstd_json(
+        source_dir / "directory-0.json.zstd",
+        {
+            "entries": [
+                {
+                    str(multi_private_clean_line // 64): {
+                        "shared": True,
+                        "in_shared_cache": False,
+                        "directory_mask": 0b1010,
+                    }
+                }
+            ]
+        },
+    )
+    _write_zstd_json(
+        source_dir / "harvard-0.json.zstd",
+        [
+            {
+                "i_cache": [{"lines": []}],
+                "d_cache": [
+                    {
+                        "lines": [
+                            _make_harvard_line(
+                                multi_private_clean_line,
+                                writeable=False,
+                                modified=False,
+                                ts=7,
+                            )
+                        ]
+                    }
+                ],
+            },
+            {"i_cache": [{"lines": []}], "d_cache": [{"lines": []}]},
+            {
+                "i_cache": [{"lines": []}],
+                "d_cache": [
+                    {
+                        "lines": [
+                            _make_harvard_line(
+                                multi_private_clean_line,
+                                writeable=False,
+                                modified=False,
+                                ts=8,
+                            )
+                        ]
+                    }
+                ],
+            },
+        ],
+    )
+
+    manifest = module.prepare_snapshot_gem5_uarch(
+        qflex_run_dir=qflex_run_dir,
+        gem5_workload_root=gem5_workload_root,
+        snapshot="snapshot_0",
+        overwrite=True,
+        ruby_protocol=module.RUBY_PROTOCOL_MOESI_CMP_DIRECTORY,
+    )
+
+    gem5_uarch_dir = gem5_workload_root / "snapshot_0" / "gem5_uarch"
+    llc_restore_file = gem5_uarch_dir / "llc_restore_addrs.txt"
+    candidate_file = (
+        gem5_uarch_dir / "moesi_multi_private_data_clean_restore_candidates.json"
+    )
+    restore_file = gem5_uarch_dir / "moesi_multi_private_data_clean_restore.txt"
+    l1d_restore_file0 = (
+        gem5_uarch_dir / "moesi_l1d_multi_private_data_clean.core0.txt"
+    )
+    l1d_restore_file2 = (
+        gem5_uarch_dir / "moesi_l1d_multi_private_data_clean.core2.txt"
+    )
+
+    assert llc_restore_file.read_text(encoding="utf-8") == "0x300\n"
+    assert restore_file.read_text(encoding="utf-8") == "0x300\n0x302\n"
+    assert l1d_restore_file0.read_text(encoding="utf-8") == "0x300 S\n"
+    assert l1d_restore_file2.read_text(encoding="utf-8") == "0x300 S\n"
+
+    candidates = json.loads(candidate_file.read_text(encoding="utf-8"))
+    assert candidates == {
+        "schema_version": 1,
+        "snapshot": "snapshot_0",
+        "cache_line_size": 64,
+        "candidates": [
+            {
+                "block_id": multi_private_clean_line // 64,
+                "dir_state": "S",
+                "l1_state": "S",
+                "l2_state": "SLS",
+                "line_addr": "0x300",
+                "private_d_cores": [0, 2],
+                "private_i_cores": [],
+                "sharer_cores": [0, 2],
+            }
+        ],
+    }
+
+    component = manifest["components"]["moesi_multi_private_data_clean"]
+    assert component["candidate_file"] == str(candidate_file)
+    assert component["restore_file"] == str(restore_file)
+    assert component["l1d_restore_files"] == {
+        "0": str(l1d_restore_file0),
+        "2": str(l1d_restore_file2),
+    }
+    assert component["line_count"] == 1
+    assert component["stats"]["candidate_lines"] == 1
+    assert component["stats"]["total_sharer_cores"] == 2
+    assert manifest["components"]["llc"]["line_count"] == 1
+    assert manifest["components"]["llc"]["selected_modified_lines"] == 0
+    assert manifest["components"]["llc"]["protocol_required_modified_lines"] == 1
+
+
 def test_prepare_snapshot_gem5_uarch_can_append_controlled_modified_lines(
     tmp_path: Path,
 ):
