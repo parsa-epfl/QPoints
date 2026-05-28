@@ -967,6 +967,7 @@ def test_prepare_snapshot_gem5_uarch_emits_moesi_private_instruction_only_slice(
     (gem5_workload_root / "snapshot_0").mkdir()
 
     private_instruction_line = 0x340
+    private_instruction_nonllc_line = 0x380
 
     _write_zstd_json(
         source_dir / "llc-0.json.zstd",
@@ -995,6 +996,11 @@ def test_prepare_snapshot_gem5_uarch_emits_moesi_private_instruction_only_slice(
                         "shared": True,
                         "in_shared_cache": False,
                         "directory_mask": 0b0101,
+                    },
+                    str(private_instruction_nonllc_line // 64): {
+                        "shared": True,
+                        "in_shared_cache": False,
+                        "directory_mask": 0b0010,
                     }
                 }
             ]
@@ -1013,6 +1019,13 @@ def test_prepare_snapshot_gem5_uarch_emits_moesi_private_instruction_only_slice(
                                 modified=False,
                                 ts=3,
                                 is_instruction=True,
+                            ),
+                            _make_harvard_line(
+                                private_instruction_nonllc_line,
+                                writeable=False,
+                                modified=False,
+                                ts=5,
+                                is_instruction=True,
                             )
                         ]
                     }
@@ -1028,6 +1041,13 @@ def test_prepare_snapshot_gem5_uarch_emits_moesi_private_instruction_only_slice(
                                 writeable=False,
                                 modified=False,
                                 ts=4,
+                                is_instruction=True,
+                            ),
+                            _make_harvard_line(
+                                private_instruction_nonllc_line,
+                                writeable=False,
+                                modified=False,
+                                ts=6,
                                 is_instruction=True,
                             )
                         ]
@@ -1052,6 +1072,9 @@ def test_prepare_snapshot_gem5_uarch_emits_moesi_private_instruction_only_slice(
         gem5_uarch_dir / "moesi_private_instruction_only_restore_candidates.json"
     )
     restore_file = gem5_uarch_dir / "moesi_private_instruction_only_restore.txt"
+    nonllc_restore_file = (
+        gem5_uarch_dir / "moesi_private_instruction_only_nonllc_restore.txt"
+    )
     l1i_restore_file0 = (
         gem5_uarch_dir / "moesi_l1i_private_instruction_only.core0.txt"
     )
@@ -1061,8 +1084,9 @@ def test_prepare_snapshot_gem5_uarch_emits_moesi_private_instruction_only_slice(
 
     assert llc_restore_file.read_text(encoding="utf-8") == "0x340\n"
     assert restore_file.read_text(encoding="utf-8") == "0x340\n0x341\n"
-    assert l1i_restore_file0.read_text(encoding="utf-8") == "0x340 S\n"
-    assert l1i_restore_file1.read_text(encoding="utf-8") == "0x340 S\n"
+    assert nonllc_restore_file.read_text(encoding="utf-8") == "0x380\n0x381\n"
+    assert l1i_restore_file0.read_text(encoding="utf-8") == "0x340 S\n0x380 S\n"
+    assert l1i_restore_file1.read_text(encoding="utf-8") == "0x340 S\n0x380 S\n"
 
     candidates = json.loads(candidate_file.read_text(encoding="utf-8"))
     assert candidates == {
@@ -1076,23 +1100,38 @@ def test_prepare_snapshot_gem5_uarch_emits_moesi_private_instruction_only_slice(
                 "l1_state": "S",
                 "l2_state": "SLS",
                 "line_addr": "0x340",
+                "llc_backed": True,
                 "private_d_cores": [],
                 "private_i_cores": [0, 1],
                 "sharer_cores": [0, 1],
-            }
+            },
+            {
+                "block_id": private_instruction_nonllc_line // 64,
+                "dir_state": "S",
+                "l1_state": "S",
+                "l2_state": "ILS",
+                "line_addr": "0x380",
+                "llc_backed": False,
+                "private_d_cores": [],
+                "private_i_cores": [0, 1],
+                "sharer_cores": [0, 1],
+            },
         ],
     }
 
     component = manifest["components"]["moesi_private_instruction_only"]
     assert component["candidate_file"] == str(candidate_file)
     assert component["restore_file"] == str(restore_file)
+    assert component["nonllc_restore_file"] == str(nonllc_restore_file)
     assert component["l1i_restore_files"] == {
         "0": str(l1i_restore_file0),
         "1": str(l1i_restore_file1),
     }
-    assert component["line_count"] == 1
-    assert component["stats"]["candidate_lines"] == 1
-    assert component["stats"]["total_sharer_cores"] == 2
+    assert component["line_count"] == 2
+    assert component["stats"]["candidate_lines"] == 2
+    assert component["stats"]["total_sharer_cores"] == 4
+    assert component["stats"]["llc_backed_block_ids"] == 1
+    assert component["stats"]["non_llc_backed_block_ids"] == 1
 
 
 def test_prepare_snapshot_gem5_uarch_can_append_controlled_modified_lines(
