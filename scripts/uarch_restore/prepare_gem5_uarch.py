@@ -58,6 +58,9 @@ MOESI_PRIVATE_INSTRUCTION_ONLY_CANDIDATE_FILE = (
 MOESI_PRIVATE_INSTRUCTION_ONLY_RESTORE_FILE = (
     "moesi_private_instruction_only_restore.txt"
 )
+MOESI_PRIVATE_INSTRUCTION_ONLY_NONLLC_RESTORE_FILE = (
+    "moesi_private_instruction_only_nonllc_restore.txt"
+)
 MOESI_PRIVATE_INSTRUCTION_ONLY_L1I_RESTORE_TEMPLATE = (
     "moesi_l1i_private_instruction_only.core{core}.txt"
 )
@@ -1041,7 +1044,8 @@ def _select_moesi_private_instruction_only_candidates(
         "directory_backed_block_ids": 0,
         "d_sharer_block_ids_skipped": 0,
         "instruction_only_block_ids": 0,
-        "llc_missing_block_ids_skipped": 0,
+        "llc_backed_block_ids": 0,
+        "non_llc_backed_block_ids": 0,
         "directory_nonshared_block_ids_skipped": 0,
         "candidate_lines": 0,
         "total_sharer_cores": 0,
@@ -1063,13 +1067,15 @@ def _select_moesi_private_instruction_only_candidates(
             continue
         stats["instruction_only_block_ids"] += 1
 
-        if block_id not in llc_block_ids:
-            stats["llc_missing_block_ids_skipped"] += 1
-            continue
-
         if not bool(dir_meta.get("shared", False)):
             stats["directory_nonshared_block_ids_skipped"] += 1
             continue
+
+        llc_backed = block_id in llc_block_ids
+        if llc_backed:
+            stats["llc_backed_block_ids"] += 1
+        else:
+            stats["non_llc_backed_block_ids"] += 1
 
         sharer_cores = [int(core) for core in priv["i_cores"]]
         candidate = {
@@ -1078,8 +1084,9 @@ def _select_moesi_private_instruction_only_candidates(
             "sharer_cores": sharer_cores,
             "private_i_cores": priv["i_cores"],
             "private_d_cores": priv["d_cores"],
+            "llc_backed": llc_backed,
             "l1_state": "S",
-            "l2_state": "SLS",
+            "l2_state": "SLS" if llc_backed else "ILS",
             "dir_state": "S",
         }
         candidates.append(candidate)
@@ -1089,6 +1096,7 @@ def _select_moesi_private_instruction_only_candidates(
     ordered_candidates = sorted(
         candidates,
         key=lambda candidate: (
+            not candidate["llc_backed"],
             len(candidate["sharer_cores"]),
             candidate["sharer_cores"],
             int(candidate["line_addr"], 16),
@@ -1318,6 +1326,9 @@ def prepare_snapshot_gem5_uarch(
     moesi_private_instruction_only_restore_file = (
         gem5_uarch_dir / MOESI_PRIVATE_INSTRUCTION_ONLY_RESTORE_FILE
     )
+    moesi_private_instruction_only_nonllc_restore_file = (
+        gem5_uarch_dir / MOESI_PRIVATE_INSTRUCTION_ONLY_NONLLC_RESTORE_FILE
+    )
     btb_candidate_file = gem5_uarch_dir / BTB_CANDIDATE_FILE
     tage_candidate_file = gem5_uarch_dir / TAGE_CANDIDATE_FILE
     manifest_file = gem5_uarch_dir / MANIFEST_FILE
@@ -1523,7 +1534,20 @@ def prepare_snapshot_gem5_uarch(
     )
     _write_moesi_private_clean_restore_file(
         moesi_private_instruction_only_restore_file,
-        moesi_private_instruction_only_candidates,
+        [
+            candidate
+            for candidate in moesi_private_instruction_only_candidates
+            if candidate["llc_backed"]
+        ],
+        overwrite,
+    )
+    _write_moesi_private_clean_restore_file(
+        moesi_private_instruction_only_nonllc_restore_file,
+        [
+            candidate
+            for candidate in moesi_private_instruction_only_candidates
+            if not candidate["llc_backed"]
+        ],
         overwrite,
     )
     _write_json_file(
@@ -1790,6 +1814,9 @@ def prepare_snapshot_gem5_uarch(
                     moesi_private_instruction_only_candidate_file
                 ),
                 "restore_file": str(moesi_private_instruction_only_restore_file),
+                "nonllc_restore_file": str(
+                    moesi_private_instruction_only_nonllc_restore_file
+                ),
                 "l1i_restore_files": {
                     str(core): str(path)
                     for core, path in sorted(
@@ -1799,12 +1826,12 @@ def prepare_snapshot_gem5_uarch(
                 "line_count": len(moesi_private_instruction_only_candidates),
                 "selection_policy": (
                     "for MOESI_CMP_directory, private instruction-only lines "
-                    "whose source directory entry is shared, whose shared "
-                    "cache line is present in the LLC snapshot, and whose "
+                    "whose source directory entry is shared and whose "
                     "private sharers are all instruction-cache sharers; "
-                    "restore them as LLC-backed L1I S-state lines plus L2 "
-                    "local directory SLS sharer metadata without changing the "
-                    "global directory's existing LLC-sharer S-state story"
+                    "restore LLC-backed lines as L1I S-state lines plus L2 "
+                    "SLS sharer metadata, and restore non-LLC-backed lines as "
+                    "L1I S-state lines plus L2 local-directory ILS sharer "
+                    "metadata without fabricating LLC residency"
                 ),
                 "stats": moesi_private_instruction_only_stats,
             },
