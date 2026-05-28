@@ -52,6 +52,18 @@ MOESI_MULTI_PRIVATE_CLEAN_L1D_RESTORE_TEMPLATE = (
 MOESI_MULTI_PRIVATE_CLEAN_L1D_RESTORE_GLOB = (
     "moesi_l1d_multi_private_data_clean.core*.txt"
 )
+MOESI_PRIVATE_INSTRUCTION_ONLY_CANDIDATE_FILE = (
+    "moesi_private_instruction_only_restore_candidates.json"
+)
+MOESI_PRIVATE_INSTRUCTION_ONLY_RESTORE_FILE = (
+    "moesi_private_instruction_only_restore.txt"
+)
+MOESI_PRIVATE_INSTRUCTION_ONLY_L1I_RESTORE_TEMPLATE = (
+    "moesi_l1i_private_instruction_only.core{core}.txt"
+)
+MOESI_PRIVATE_INSTRUCTION_ONLY_L1I_RESTORE_GLOB = (
+    "moesi_l1i_private_instruction_only.core*.txt"
+)
 BTB_CANDIDATE_FILE = "btb_restore_candidates.json"
 BTB_RESTORE_FILE_TEMPLATE = "btb_restore_addrs.core{core}.txt"
 BTB_RESTORE_FILE_GLOB = "btb_restore_addrs.core*.txt"
@@ -1018,6 +1030,73 @@ def _select_moesi_multi_private_data_clean_candidates(
     return ordered_candidates, stats
 
 
+def _select_moesi_private_instruction_only_candidates(
+    llc_lines: list[dict],
+    directory: dict,
+    harvard: dict,
+) -> tuple[list[dict], dict]:
+    llc_block_ids = {line["block_id"] for line in llc_lines}
+    stats = {
+        "harvard_block_ids": len(harvard),
+        "directory_backed_block_ids": 0,
+        "d_sharer_block_ids_skipped": 0,
+        "instruction_only_block_ids": 0,
+        "llc_missing_block_ids_skipped": 0,
+        "directory_nonshared_block_ids_skipped": 0,
+        "candidate_lines": 0,
+        "total_sharer_cores": 0,
+    }
+
+    candidates = []
+    for block_id, entries in harvard.items():
+        dir_meta = directory.get(block_id)
+        if dir_meta is None:
+            continue
+        stats["directory_backed_block_ids"] += 1
+
+        priv = _summarize_private_entries(entries)
+        if priv["d_cores"]:
+            stats["d_sharer_block_ids_skipped"] += 1
+            continue
+
+        if not priv["i_cores"]:
+            continue
+        stats["instruction_only_block_ids"] += 1
+
+        if block_id not in llc_block_ids:
+            stats["llc_missing_block_ids_skipped"] += 1
+            continue
+
+        if not bool(dir_meta.get("shared", False)):
+            stats["directory_nonshared_block_ids_skipped"] += 1
+            continue
+
+        sharer_cores = [int(core) for core in priv["i_cores"]]
+        candidate = {
+            "block_id": block_id,
+            "line_addr": f"{block_id * CACHE_LINE_SIZE:#x}",
+            "sharer_cores": sharer_cores,
+            "private_i_cores": priv["i_cores"],
+            "private_d_cores": priv["d_cores"],
+            "l1_state": "S",
+            "l2_state": "SLS",
+            "dir_state": "S",
+        }
+        candidates.append(candidate)
+        stats["candidate_lines"] += 1
+        stats["total_sharer_cores"] += len(sharer_cores)
+
+    ordered_candidates = sorted(
+        candidates,
+        key=lambda candidate: (
+            len(candidate["sharer_cores"]),
+            candidate["sharer_cores"],
+            int(candidate["line_addr"], 16),
+        ),
+    )
+    return ordered_candidates, stats
+
+
 def _select_btb_restore_candidates(fetch_units: list[dict]) -> tuple[list[dict], dict]:
     stats = {
         "total_entries": 0,
@@ -1233,6 +1312,12 @@ def prepare_snapshot_gem5_uarch(
     moesi_multi_private_clean_restore_file = (
         gem5_uarch_dir / MOESI_MULTI_PRIVATE_CLEAN_RESTORE_FILE
     )
+    moesi_private_instruction_only_candidate_file = (
+        gem5_uarch_dir / MOESI_PRIVATE_INSTRUCTION_ONLY_CANDIDATE_FILE
+    )
+    moesi_private_instruction_only_restore_file = (
+        gem5_uarch_dir / MOESI_PRIVATE_INSTRUCTION_ONLY_RESTORE_FILE
+    )
     btb_candidate_file = gem5_uarch_dir / BTB_CANDIDATE_FILE
     tage_candidate_file = gem5_uarch_dir / TAGE_CANDIDATE_FILE
     manifest_file = gem5_uarch_dir / MANIFEST_FILE
@@ -1298,6 +1383,12 @@ def prepare_snapshot_gem5_uarch(
     ) = _select_moesi_multi_private_data_clean_candidates(
         llc_lines, directory, harvard
     )
+    (
+        moesi_private_instruction_only_candidates,
+        moesi_private_instruction_only_stats,
+    ) = _select_moesi_private_instruction_only_candidates(
+        llc_lines, directory, harvard
+    )
     btb_candidates, btb_stats = _select_btb_restore_candidates(fetch_units)
     tage_candidates, tage_stats = _select_tage_restore_candidates(fetch_units)
     moesi_private_clean_block_ids = {
@@ -1306,8 +1397,14 @@ def prepare_snapshot_gem5_uarch(
     moesi_multi_private_clean_block_ids = {
         candidate["block_id"] for candidate in moesi_multi_private_clean_candidates
     }
+    moesi_private_instruction_only_block_ids = {
+        candidate["block_id"]
+        for candidate in moesi_private_instruction_only_candidates
+    }
     moesi_clean_private_block_ids = (
-        moesi_private_clean_block_ids | moesi_multi_private_clean_block_ids
+        moesi_private_clean_block_ids
+        | moesi_multi_private_clean_block_ids
+        | moesi_private_instruction_only_block_ids
     )
     moesi_private_clean_llc_support_lines = []
     if ruby_protocol == RUBY_PROTOCOL_MOESI_CMP_DIRECTORY:
@@ -1415,6 +1512,21 @@ def prepare_snapshot_gem5_uarch(
         overwrite,
     )
     _write_json_file(
+        moesi_private_instruction_only_candidate_file,
+        {
+            "schema_version": 1,
+            "snapshot": snapshot,
+            "cache_line_size": CACHE_LINE_SIZE,
+            "candidates": moesi_private_instruction_only_candidates,
+        },
+        overwrite,
+    )
+    _write_moesi_private_clean_restore_file(
+        moesi_private_instruction_only_restore_file,
+        moesi_private_instruction_only_candidates,
+        overwrite,
+    )
+    _write_json_file(
         btb_candidate_file,
         {
             "schema_version": 1,
@@ -1490,6 +1602,21 @@ def prepare_snapshot_gem5_uarch(
         MOESI_MULTI_PRIVATE_CLEAN_L1D_RESTORE_TEMPLATE,
         MOESI_MULTI_PRIVATE_CLEAN_L1D_RESTORE_GLOB,
         _moesi_private_clean_restore_state,
+    )
+    moesi_private_instruction_only_l1i_restore_files = _write_restore_files(
+        gem5_uarch_dir,
+        [
+            {
+                "core": core,
+                "line_addr": candidate["line_addr"],
+            }
+            for candidate in moesi_private_instruction_only_candidates
+            for core in candidate["sharer_cores"]
+        ],
+        overwrite,
+        MOESI_PRIVATE_INSTRUCTION_ONLY_L1I_RESTORE_TEMPLATE,
+        MOESI_PRIVATE_INSTRUCTION_ONLY_L1I_RESTORE_GLOB,
+        _l1i_restore_state,
     )
     btb_restore_files = _write_btb_restore_files(
         gem5_uarch_dir,
@@ -1652,6 +1779,34 @@ def prepare_snapshot_gem5_uarch(
                     "S-state story"
                 ),
                 "stats": moesi_multi_private_clean_stats,
+            },
+            "moesi_private_instruction_only": {
+                "source_files": {
+                    "llc": str(llc_source_file),
+                    "directory": str(directory_source_file),
+                    "harvard": str(harvard_source_file),
+                },
+                "candidate_file": str(
+                    moesi_private_instruction_only_candidate_file
+                ),
+                "restore_file": str(moesi_private_instruction_only_restore_file),
+                "l1i_restore_files": {
+                    str(core): str(path)
+                    for core, path in sorted(
+                        moesi_private_instruction_only_l1i_restore_files.items()
+                    )
+                },
+                "line_count": len(moesi_private_instruction_only_candidates),
+                "selection_policy": (
+                    "for MOESI_CMP_directory, private instruction-only lines "
+                    "whose source directory entry is shared, whose shared "
+                    "cache line is present in the LLC snapshot, and whose "
+                    "private sharers are all instruction-cache sharers; "
+                    "restore them as LLC-backed L1I S-state lines plus L2 "
+                    "local directory SLS sharer metadata without changing the "
+                    "global directory's existing LLC-sharer S-state story"
+                ),
+                "stats": moesi_private_instruction_only_stats,
             },
             "btb": {
                 "source_file": str(fetch_source_file),
