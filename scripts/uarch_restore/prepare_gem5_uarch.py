@@ -42,6 +42,16 @@ MOESI_PRIVATE_CLEAN_L1D_RESTORE_TEMPLATE = (
 MOESI_PRIVATE_CLEAN_L1D_RESTORE_GLOB = (
     "moesi_l1d_single_private_data_clean.core*.txt"
 )
+MOESI_MULTI_PRIVATE_CLEAN_CANDIDATE_FILE = (
+    "moesi_multi_private_data_clean_restore_candidates.json"
+)
+MOESI_MULTI_PRIVATE_CLEAN_RESTORE_FILE = "moesi_multi_private_data_clean_restore.txt"
+MOESI_MULTI_PRIVATE_CLEAN_L1D_RESTORE_TEMPLATE = (
+    "moesi_l1d_multi_private_data_clean.core{core}.txt"
+)
+MOESI_MULTI_PRIVATE_CLEAN_L1D_RESTORE_GLOB = (
+    "moesi_l1d_multi_private_data_clean.core*.txt"
+)
 BTB_CANDIDATE_FILE = "btb_restore_candidates.json"
 BTB_RESTORE_FILE_TEMPLATE = "btb_restore_addrs.core{core}.txt"
 BTB_RESTORE_FILE_GLOB = "btb_restore_addrs.core*.txt"
@@ -160,7 +170,7 @@ def _llc_restore_selection_policy(ruby_protocol: str) -> str:
     return (
         "clean LLC lines with no private modified/writeable copy, "
         "plus the LLC-modified subset required to preserve source-side "
-        "residency for MOESI single_private_data_clean layering, plus "
+        "residency for MOESI clean-private layering, plus "
         "the first N restorable LLC-modified lines for controlled "
         "debugging, ordered per-set by ascending LLC timestamp so "
         "startup insertion reconstructs warm replacement state "
@@ -240,6 +250,12 @@ def _write_moesi_private_owner_restore_file(
     )
 
 
+def _moesi_private_clean_sharer_cores(entry: dict) -> list[int]:
+    if "sharer_cores" in entry:
+        return [int(core) for core in entry["sharer_cores"]]
+    return [int(entry["sharer_core"])]
+
+
 def _write_moesi_private_clean_restore_file(
     path: Path,
     entries: list[dict],
@@ -252,8 +268,9 @@ def _write_moesi_private_clean_restore_file(
         )
     path.write_text(
         "".join(
-            f"{_encode_moesi_private_owner_restore_addr(int(entry['line_addr'], 16), int(entry['sharer_core'])):#x}\n"
+            f"{_encode_moesi_private_owner_restore_addr(int(entry['line_addr'], 16), int(core)):#x}\n"
             for entry in entries
+            for core in _moesi_private_clean_sharer_cores(entry)
         ),
         encoding="utf-8",
     )
@@ -924,6 +941,83 @@ def _select_moesi_single_private_data_clean_candidates(
     return ordered_candidates, stats
 
 
+def _select_moesi_multi_private_data_clean_candidates(
+    llc_lines: list[dict],
+    directory: dict,
+    harvard: dict,
+) -> tuple[list[dict], dict]:
+    llc_block_ids = {line["block_id"] for line in llc_lines}
+    stats = {
+        "harvard_block_ids": len(harvard),
+        "directory_backed_block_ids": 0,
+        "multi_private_dcore_block_ids": 0,
+        "instruction_sharer_block_ids_skipped": 0,
+        "writeable_block_ids_skipped": 0,
+        "modified_block_ids_skipped": 0,
+        "llc_missing_block_ids_skipped": 0,
+        "directory_nonshared_block_ids_skipped": 0,
+        "candidate_lines": 0,
+        "total_sharer_cores": 0,
+    }
+
+    candidates = []
+    for block_id, entries in harvard.items():
+        dir_meta = directory.get(block_id)
+        if dir_meta is None:
+            continue
+        stats["directory_backed_block_ids"] += 1
+
+        priv = _summarize_private_entries(entries)
+        if len(priv["d_cores"]) <= 1:
+            continue
+        stats["multi_private_dcore_block_ids"] += 1
+
+        if priv["i_cores"]:
+            stats["instruction_sharer_block_ids_skipped"] += 1
+            continue
+
+        if priv["any_d_writeable"]:
+            stats["writeable_block_ids_skipped"] += 1
+            continue
+
+        if priv["any_d_modified"]:
+            stats["modified_block_ids_skipped"] += 1
+            continue
+
+        if block_id not in llc_block_ids:
+            stats["llc_missing_block_ids_skipped"] += 1
+            continue
+
+        if not bool(dir_meta.get("shared", False)):
+            stats["directory_nonshared_block_ids_skipped"] += 1
+            continue
+
+        sharer_cores = [int(core) for core in priv["d_cores"]]
+        candidate = {
+            "block_id": block_id,
+            "line_addr": f"{block_id * CACHE_LINE_SIZE:#x}",
+            "sharer_cores": sharer_cores,
+            "private_i_cores": priv["i_cores"],
+            "private_d_cores": priv["d_cores"],
+            "l1_state": "S",
+            "l2_state": "SLS",
+            "dir_state": "S",
+        }
+        candidates.append(candidate)
+        stats["candidate_lines"] += 1
+        stats["total_sharer_cores"] += len(sharer_cores)
+
+    ordered_candidates = sorted(
+        candidates,
+        key=lambda candidate: (
+            len(candidate["sharer_cores"]),
+            candidate["sharer_cores"],
+            int(candidate["line_addr"], 16),
+        ),
+    )
+    return ordered_candidates, stats
+
+
 def _select_btb_restore_candidates(fetch_units: list[dict]) -> tuple[list[dict], dict]:
     stats = {
         "total_entries": 0,
@@ -1133,6 +1227,12 @@ def prepare_snapshot_gem5_uarch(
     moesi_private_clean_restore_file = (
         gem5_uarch_dir / MOESI_PRIVATE_CLEAN_RESTORE_FILE
     )
+    moesi_multi_private_clean_candidate_file = (
+        gem5_uarch_dir / MOESI_MULTI_PRIVATE_CLEAN_CANDIDATE_FILE
+    )
+    moesi_multi_private_clean_restore_file = (
+        gem5_uarch_dir / MOESI_MULTI_PRIVATE_CLEAN_RESTORE_FILE
+    )
     btb_candidate_file = gem5_uarch_dir / BTB_CANDIDATE_FILE
     tage_candidate_file = gem5_uarch_dir / TAGE_CANDIDATE_FILE
     manifest_file = gem5_uarch_dir / MANIFEST_FILE
@@ -1192,17 +1292,29 @@ def prepare_snapshot_gem5_uarch(
     ) = _select_moesi_single_private_data_clean_candidates(
         llc_lines, directory, harvard
     )
+    (
+        moesi_multi_private_clean_candidates,
+        moesi_multi_private_clean_stats,
+    ) = _select_moesi_multi_private_data_clean_candidates(
+        llc_lines, directory, harvard
+    )
     btb_candidates, btb_stats = _select_btb_restore_candidates(fetch_units)
     tage_candidates, tage_stats = _select_tage_restore_candidates(fetch_units)
     moesi_private_clean_block_ids = {
         candidate["block_id"] for candidate in moesi_private_clean_candidates
     }
+    moesi_multi_private_clean_block_ids = {
+        candidate["block_id"] for candidate in moesi_multi_private_clean_candidates
+    }
+    moesi_clean_private_block_ids = (
+        moesi_private_clean_block_ids | moesi_multi_private_clean_block_ids
+    )
     moesi_private_clean_llc_support_lines = []
     if ruby_protocol == RUBY_PROTOCOL_MOESI_CMP_DIRECTORY:
         moesi_private_clean_llc_support_lines = [
             line
             for line in modified_lines
-            if line["block_id"] in moesi_private_clean_block_ids
+            if line["block_id"] in moesi_clean_private_block_ids
         ]
     selected_modified = max(0, llc_debug_modified_count)
     selected_modified_lines = modified_lines[:selected_modified]
@@ -1288,6 +1400,21 @@ def prepare_snapshot_gem5_uarch(
         overwrite,
     )
     _write_json_file(
+        moesi_multi_private_clean_candidate_file,
+        {
+            "schema_version": 1,
+            "snapshot": snapshot,
+            "cache_line_size": CACHE_LINE_SIZE,
+            "candidates": moesi_multi_private_clean_candidates,
+        },
+        overwrite,
+    )
+    _write_moesi_private_clean_restore_file(
+        moesi_multi_private_clean_restore_file,
+        moesi_multi_private_clean_candidates,
+        overwrite,
+    )
+    _write_json_file(
         btb_candidate_file,
         {
             "schema_version": 1,
@@ -1347,6 +1474,21 @@ def prepare_snapshot_gem5_uarch(
         overwrite,
         MOESI_PRIVATE_CLEAN_L1D_RESTORE_TEMPLATE,
         MOESI_PRIVATE_CLEAN_L1D_RESTORE_GLOB,
+        _moesi_private_clean_restore_state,
+    )
+    moesi_multi_private_clean_l1d_restore_files = _write_restore_files(
+        gem5_uarch_dir,
+        [
+            {
+                "core": core,
+                "line_addr": candidate["line_addr"],
+            }
+            for candidate in moesi_multi_private_clean_candidates
+            for core in candidate["sharer_cores"]
+        ],
+        overwrite,
+        MOESI_MULTI_PRIVATE_CLEAN_L1D_RESTORE_TEMPLATE,
+        MOESI_MULTI_PRIVATE_CLEAN_L1D_RESTORE_GLOB,
         _moesi_private_clean_restore_state,
     )
     btb_restore_files = _write_btb_restore_files(
@@ -1483,6 +1625,33 @@ def prepare_snapshot_gem5_uarch(
                     "global directory's existing LLC-sharer S-state story"
                 ),
                 "stats": moesi_private_clean_stats,
+            },
+            "moesi_multi_private_data_clean": {
+                "source_files": {
+                    "llc": str(llc_source_file),
+                    "directory": str(directory_source_file),
+                    "harvard": str(harvard_source_file),
+                },
+                "candidate_file": str(moesi_multi_private_clean_candidate_file),
+                "restore_file": str(moesi_multi_private_clean_restore_file),
+                "l1d_restore_files": {
+                    str(core): str(path)
+                    for core, path in sorted(
+                        moesi_multi_private_clean_l1d_restore_files.items()
+                    )
+                },
+                "line_count": len(moesi_multi_private_clean_candidates),
+                "selection_policy": (
+                    "for MOESI_CMP_directory, multi-private clean data "
+                    "lines whose source directory entry is shared, whose "
+                    "shared cache line is present in the LLC snapshot, and "
+                    "whose private D-cache holders are all read-only; restore "
+                    "them as LLC-backed L1D S-state lines for each sharer "
+                    "plus L2 local directory SLS sharer metadata without "
+                    "changing the global directory's existing LLC-sharer "
+                    "S-state story"
+                ),
+                "stats": moesi_multi_private_clean_stats,
             },
             "btb": {
                 "source_file": str(fetch_source_file),
