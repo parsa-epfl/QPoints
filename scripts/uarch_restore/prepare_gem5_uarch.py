@@ -111,6 +111,18 @@ def _write_addr_file(path: Path, addrs: list[int], overwrite: bool) -> None:
     )
 
 
+def _encode_l2_shared_restore_addr(line_addr: int, sharer_core: int) -> int:
+    if line_addr % CACHE_LINE_SIZE != 0:
+        raise ValueError(
+            f"Shared-private restore line address is not cache-line aligned: {line_addr:#x}"
+        )
+    if sharer_core < 0 or sharer_core >= CACHE_LINE_SIZE:
+        raise ValueError(
+            f"Shared-private restore core {sharer_core} exceeds the {CACHE_LINE_SIZE}-way low-bit encoding budget"
+        )
+    return line_addr | sharer_core
+
+
 def _write_l2_shared_restore_file(
     path: Path,
     entries: list[dict],
@@ -123,7 +135,7 @@ def _write_l2_shared_restore_file(
         )
     path.write_text(
         "".join(
-            f"{int(entry['line_addr'], 16):#x} {int(core)}\n"
+            f"{_encode_l2_shared_restore_addr(int(entry['line_addr'], 16), int(core)):#x}\n"
             for entry in entries
             for core in entry["sharer_cores"]
         ),
@@ -995,7 +1007,8 @@ def prepare_snapshot_gem5_uarch(
                 "block_count": len(l2_shared_candidates),
                 "selection_policy": (
                     "all clean directory-shared private lines, emitted once "
-                    "per unique core sharer so the inclusive gem5 L2 can "
+                    "per unique core sharer with the core encoded in the "
+                    "low address bits so the inclusive gem5 L2 can "
                     "reconstruct SS state and sharer metadata during "
                     "multicore warm restore"
                 ),
