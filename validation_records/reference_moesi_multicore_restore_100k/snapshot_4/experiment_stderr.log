@@ -1,0 +1,253 @@
+build/ARM_MOESI_CMP_directory/base/statistics.hh:277: warn: One of the stats is a legacy stat. Legacy stat is a stat that does not belong to any statistics::Group. Legacy stat is deprecated.
+warn: FDIP is disabled: the frontend runs in decode-discovery mode and does not use the BTB for branch discovery or basic-block chaining.
+warn: network.slave is deprecated. `slave` is now called `in_port`
+warn: requestFromL1Cache.master is deprecated. `master` is now called `out_port`
+warn: network.slave is deprecated. `slave` is now called `in_port`
+warn: responseFromL1Cache.master is deprecated. `master` is now called `out_port`
+warn: network.master is deprecated. `master` is now called `out_port`
+warn: requestToL1Cache.slave is deprecated. `slave` is now called `in_port`
+warn: network.master is deprecated. `master` is now called `out_port`
+warn: responseToL1Cache.slave is deprecated. `slave` is now called `in_port`
+warn: network.slave is deprecated. `slave` is now called `in_port`
+warn: requestFromL1Cache.master is deprecated. `master` is now called `out_port`
+warn: network.slave is deprecated. `slave` is now called `in_port`
+warn: responseFromL1Cache.master is deprecated. `master` is now called `out_port`
+warn: network.master is deprecated. `master` is now called `out_port`
+warn: requestToL1Cache.slave is deprecated. `slave` is now called `in_port`
+warn: network.master is deprecated. `master` is now called `out_port`
+warn: responseToL1Cache.slave is deprecated. `slave` is now called `in_port`
+warn: network.slave is deprecated. `slave` is now called `in_port`
+warn: requestFromL1Cache.master is deprecated. `master` is now called `out_port`
+warn: network.slave is deprecated. `slave` is now called `in_port`
+warn: responseFromL1Cache.master is deprecated. `master` is now called `out_port`
+warn: network.master is deprecated. `master` is now called `out_port`
+warn: requestToL1Cache.slave is deprecated. `slave` is now called `in_port`
+warn: network.master is deprecated. `master` is now called `out_port`
+warn: responseToL1Cache.slave is deprecated. `slave` is now called `in_port`
+warn: network.slave is deprecated. `slave` is now called `in_port`
+warn: requestFromL1Cache.master is deprecated. `master` is now called `out_port`
+warn: network.slave is deprecated. `slave` is now called `in_port`
+warn: responseFromL1Cache.master is deprecated. `master` is now called `out_port`
+warn: network.master is deprecated. `master` is now called `out_port`
+warn: requestToL1Cache.slave is deprecated. `slave` is now called `in_port`
+warn: network.master is deprecated. `master` is now called `out_port`
+warn: responseToL1Cache.slave is deprecated. `slave` is now called `in_port`
+warn: network.slave is deprecated. `slave` is now called `in_port`
+warn: requestFromL1Cache.master is deprecated. `master` is now called `out_port`
+warn: network.slave is deprecated. `slave` is now called `in_port`
+warn: responseFromL1Cache.master is deprecated. `master` is now called `out_port`
+warn: network.master is deprecated. `master` is now called `out_port`
+warn: requestToL1Cache.slave is deprecated. `slave` is now called `in_port`
+warn: network.master is deprecated. `master` is now called `out_port`
+warn: responseToL1Cache.slave is deprecated. `slave` is now called `in_port`
+warn: network.slave is deprecated. `slave` is now called `in_port`
+warn: requestFromL1Cache.master is deprecated. `master` is now called `out_port`
+warn: network.slave is deprecated. `slave` is now called `in_port`
+warn: responseFromL1Cache.master is deprecated. `master` is now called `out_port`
+warn: network.master is deprecated. `master` is now called `out_port`
+warn: requestToL1Cache.slave is deprecated. `slave` is now called `in_port`
+warn: network.master is deprecated. `master` is now called `out_port`
+warn: responseToL1Cache.slave is deprecated. `slave` is now called `in_port`
+warn: network.slave is deprecated. `slave` is now called `in_port`
+warn: requestFromL1Cache.master is deprecated. `master` is now called `out_port`
+warn: network.slave is deprecated. `slave` is now called `in_port`
+warn: responseFromL1Cache.master is deprecated. `master` is now called `out_port`
+warn: network.master is deprecated. `master` is now called `out_port`
+warn: requestToL1Cache.slave is deprecated. `slave` is now called `in_port`
+warn: network.master is deprecated. `master` is now called `out_port`
+warn: responseToL1Cache.slave is deprecated. `slave` is now called `in_port`
+warn: network.slave is deprecated. `slave` is now called `in_port`
+warn: requestFromL1Cache.master is deprecated. `master` is now called `out_port`
+warn: network.slave is deprecated. `slave` is now called `in_port`
+warn: responseFromL1Cache.master is deprecated. `master` is now called `out_port`
+warn: network.master is deprecated. `master` is now called `out_port`
+warn: requestToL1Cache.slave is deprecated. `slave` is now called `in_port`
+warn: network.master is deprecated. `master` is now called `out_port`
+warn: responseToL1Cache.slave is deprecated. `slave` is now called `in_port`
+warn: network.slave is deprecated. `slave` is now called `in_port`
+warn: GlobalRequestFromL2Cache.master is deprecated. `master` is now called `out_port`
+warn: network.slave is deprecated. `slave` is now called `in_port`
+warn: L1RequestFromL2Cache.master is deprecated. `master` is now called `out_port`
+warn: network.slave is deprecated. `slave` is now called `in_port`
+warn: responseFromL2Cache.master is deprecated. `master` is now called `out_port`
+warn: network.master is deprecated. `master` is now called `out_port`
+warn: GlobalRequestToL2Cache.slave is deprecated. `slave` is now called `in_port`
+warn: network.master is deprecated. `master` is now called `out_port`
+warn: L1RequestToL2Cache.slave is deprecated. `slave` is now called `in_port`
+warn: network.master is deprecated. `master` is now called `out_port`
+warn: responseToL2Cache.slave is deprecated. `slave` is now called `in_port`
+warn: network.master is deprecated. `master` is now called `out_port`
+warn: requestToDir.slave is deprecated. `slave` is now called `in_port`
+warn: network.master is deprecated. `master` is now called `out_port`
+warn: responseToDir.slave is deprecated. `slave` is now called `in_port`
+warn: network.slave is deprecated. `slave` is now called `in_port`
+warn: responseFromDir.master is deprecated. `master` is now called `out_port`
+warn: network.slave is deprecated. `slave` is now called `in_port`
+warn: forwardFromDir.master is deprecated. `master` is now called `out_port`
+warn: network.master is deprecated. `master` is now called `out_port`
+warn: requestToDir.slave is deprecated. `slave` is now called `in_port`
+warn: network.master is deprecated. `master` is now called `out_port`
+warn: responseToDir.slave is deprecated. `slave` is now called `in_port`
+warn: network.slave is deprecated. `slave` is now called `in_port`
+warn: responseFromDir.master is deprecated. `master` is now called `out_port`
+warn: network.slave is deprecated. `slave` is now called `in_port`
+warn: forwardFromDir.master is deprecated. `master` is now called `out_port`
+warn: network.master is deprecated. `master` is now called `out_port`
+warn: responseFromDir.slave is deprecated. `slave` is now called `in_port`
+warn: network.slave is deprecated. `slave` is now called `in_port`
+warn: reqToDir.master is deprecated. `master` is now called `out_port`
+warn: network.slave is deprecated. `slave` is now called `in_port`
+warn: respToDir.master is deprecated. `master` is now called `out_port`
+warn: No dot file generated. Please install pydot to generate the dot file and pdf.
+build/ARM_MOESI_CMP_directory/sim/kernel_workload.cc:46: info: kernel located at: /home/dev/qflex_git/QPoints/bin/m5/binaries/vmlinux.arm64
+build/ARM_MOESI_CMP_directory/cpu/o3/fetch.cc:221: warn: ftqSize is 0
+build/ARM_MOESI_CMP_directory/cpu/o3/fetch.cc:221: warn: ftqSize is 0
+build/ARM_MOESI_CMP_directory/cpu/o3/fetch.cc:221: warn: ftqSize is 0
+build/ARM_MOESI_CMP_directory/cpu/o3/fetch.cc:221: warn: ftqSize is 0
+build/ARM_MOESI_CMP_directory/cpu/o3/fetch.cc:221: warn: ftqSize is 0
+build/ARM_MOESI_CMP_directory/cpu/o3/fetch.cc:221: warn: ftqSize is 0
+build/ARM_MOESI_CMP_directory/cpu/o3/fetch.cc:221: warn: ftqSize is 0
+build/ARM_MOESI_CMP_directory/cpu/o3/fetch.cc:221: warn: ftqSize is 0
+system.terminal: Listening for connections on port 3456
+build/ARM_MOESI_CMP_directory/base/statistics.hh:277: warn: One of the stats is a legacy stat. Legacy stat is a stat that does not belong to any statistics::Group. Legacy stat is deprecated.
+system.vncserver: Listening for connections on port 5900
+0: system.remote_gdb: listening for remote gdb on port 7000
+build/ARM_MOESI_CMP_directory/sim/serialize.hh:363: warn: optional parameter system:quiesceEndTick_1 not present
+build/ARM_MOESI_CMP_directory/sim/serialize.hh:363: warn: optional parameter system:quiesceEndTick_2 not present
+build/ARM_MOESI_CMP_directory/sim/serialize.hh:363: warn: optional parameter system:quiesceEndTick_3 not present
+build/ARM_MOESI_CMP_directory/sim/serialize.hh:363: warn: optional parameter system:quiesceEndTick_4 not present
+build/ARM_MOESI_CMP_directory/sim/serialize.hh:363: warn: optional parameter system:quiesceEndTick_5 not present
+build/ARM_MOESI_CMP_directory/sim/serialize.hh:363: warn: optional parameter system:quiesceEndTick_6 not present
+build/ARM_MOESI_CMP_directory/sim/serialize.hh:363: warn: optional parameter system:quiesceEndTick_7 not present
+build/ARM_MOESI_CMP_directory/sim/simulate.cc:107: info: Entering event queue @ 9943912964000.  Starting simulation...
+build/ARM_MOESI_CMP_directory/mem/ruby/system/Sequencer.cc:616: warn: Replacement policy updates recently became the responsibility of SLICC state machines. Make sure to setMRU() near callbacks in .sm files!
+build/ARM_MOESI_CMP_directory/arch/arm/insts/pseudo.cc:173: warn: 	instruction 'bti' unimplemented
+build/ARM_MOESI_CMP_directory/arch/arm/insts/pseudo.cc:173: warn: 	instruction 'csdb' unimplemented
+build/ARM_MOESI_CMP_directory/arch/arm/isa.cc:2427: warn: Doing AT (address translation) in functional mode! Fix Me!
+build/ARM_MOESI_CMP_directory/base/statistics.hh:277: warn: One of the stats is a legacy stat. Legacy stat is a stat that does not belong to any statistics::Group. Legacy stat is deprecated.
+warn: FDIP is disabled: the frontend runs in decode-discovery mode and does not use the BTB for branch discovery or basic-block chaining.
+warn: network.slave is deprecated. `slave` is now called `in_port`
+warn: requestFromL1Cache.master is deprecated. `master` is now called `out_port`
+warn: network.slave is deprecated. `slave` is now called `in_port`
+warn: responseFromL1Cache.master is deprecated. `master` is now called `out_port`
+warn: network.master is deprecated. `master` is now called `out_port`
+warn: requestToL1Cache.slave is deprecated. `slave` is now called `in_port`
+warn: network.master is deprecated. `master` is now called `out_port`
+warn: responseToL1Cache.slave is deprecated. `slave` is now called `in_port`
+warn: network.slave is deprecated. `slave` is now called `in_port`
+warn: requestFromL1Cache.master is deprecated. `master` is now called `out_port`
+warn: network.slave is deprecated. `slave` is now called `in_port`
+warn: responseFromL1Cache.master is deprecated. `master` is now called `out_port`
+warn: network.master is deprecated. `master` is now called `out_port`
+warn: requestToL1Cache.slave is deprecated. `slave` is now called `in_port`
+warn: network.master is deprecated. `master` is now called `out_port`
+warn: responseToL1Cache.slave is deprecated. `slave` is now called `in_port`
+warn: network.slave is deprecated. `slave` is now called `in_port`
+warn: requestFromL1Cache.master is deprecated. `master` is now called `out_port`
+warn: network.slave is deprecated. `slave` is now called `in_port`
+warn: responseFromL1Cache.master is deprecated. `master` is now called `out_port`
+warn: network.master is deprecated. `master` is now called `out_port`
+warn: requestToL1Cache.slave is deprecated. `slave` is now called `in_port`
+warn: network.master is deprecated. `master` is now called `out_port`
+warn: responseToL1Cache.slave is deprecated. `slave` is now called `in_port`
+warn: network.slave is deprecated. `slave` is now called `in_port`
+warn: requestFromL1Cache.master is deprecated. `master` is now called `out_port`
+warn: network.slave is deprecated. `slave` is now called `in_port`
+warn: responseFromL1Cache.master is deprecated. `master` is now called `out_port`
+warn: network.master is deprecated. `master` is now called `out_port`
+warn: requestToL1Cache.slave is deprecated. `slave` is now called `in_port`
+warn: network.master is deprecated. `master` is now called `out_port`
+warn: responseToL1Cache.slave is deprecated. `slave` is now called `in_port`
+warn: network.slave is deprecated. `slave` is now called `in_port`
+warn: requestFromL1Cache.master is deprecated. `master` is now called `out_port`
+warn: network.slave is deprecated. `slave` is now called `in_port`
+warn: responseFromL1Cache.master is deprecated. `master` is now called `out_port`
+warn: network.master is deprecated. `master` is now called `out_port`
+warn: requestToL1Cache.slave is deprecated. `slave` is now called `in_port`
+warn: network.master is deprecated. `master` is now called `out_port`
+warn: responseToL1Cache.slave is deprecated. `slave` is now called `in_port`
+warn: network.slave is deprecated. `slave` is now called `in_port`
+warn: requestFromL1Cache.master is deprecated. `master` is now called `out_port`
+warn: network.slave is deprecated. `slave` is now called `in_port`
+warn: responseFromL1Cache.master is deprecated. `master` is now called `out_port`
+warn: network.master is deprecated. `master` is now called `out_port`
+warn: requestToL1Cache.slave is deprecated. `slave` is now called `in_port`
+warn: network.master is deprecated. `master` is now called `out_port`
+warn: responseToL1Cache.slave is deprecated. `slave` is now called `in_port`
+warn: network.slave is deprecated. `slave` is now called `in_port`
+warn: requestFromL1Cache.master is deprecated. `master` is now called `out_port`
+warn: network.slave is deprecated. `slave` is now called `in_port`
+warn: responseFromL1Cache.master is deprecated. `master` is now called `out_port`
+warn: network.master is deprecated. `master` is now called `out_port`
+warn: requestToL1Cache.slave is deprecated. `slave` is now called `in_port`
+warn: network.master is deprecated. `master` is now called `out_port`
+warn: responseToL1Cache.slave is deprecated. `slave` is now called `in_port`
+warn: network.slave is deprecated. `slave` is now called `in_port`
+warn: requestFromL1Cache.master is deprecated. `master` is now called `out_port`
+warn: network.slave is deprecated. `slave` is now called `in_port`
+warn: responseFromL1Cache.master is deprecated. `master` is now called `out_port`
+warn: network.master is deprecated. `master` is now called `out_port`
+warn: requestToL1Cache.slave is deprecated. `slave` is now called `in_port`
+warn: network.master is deprecated. `master` is now called `out_port`
+warn: responseToL1Cache.slave is deprecated. `slave` is now called `in_port`
+warn: network.slave is deprecated. `slave` is now called `in_port`
+warn: GlobalRequestFromL2Cache.master is deprecated. `master` is now called `out_port`
+warn: network.slave is deprecated. `slave` is now called `in_port`
+warn: L1RequestFromL2Cache.master is deprecated. `master` is now called `out_port`
+warn: network.slave is deprecated. `slave` is now called `in_port`
+warn: responseFromL2Cache.master is deprecated. `master` is now called `out_port`
+warn: network.master is deprecated. `master` is now called `out_port`
+warn: GlobalRequestToL2Cache.slave is deprecated. `slave` is now called `in_port`
+warn: network.master is deprecated. `master` is now called `out_port`
+warn: L1RequestToL2Cache.slave is deprecated. `slave` is now called `in_port`
+warn: network.master is deprecated. `master` is now called `out_port`
+warn: responseToL2Cache.slave is deprecated. `slave` is now called `in_port`
+warn: network.master is deprecated. `master` is now called `out_port`
+warn: requestToDir.slave is deprecated. `slave` is now called `in_port`
+warn: network.master is deprecated. `master` is now called `out_port`
+warn: responseToDir.slave is deprecated. `slave` is now called `in_port`
+warn: network.slave is deprecated. `slave` is now called `in_port`
+warn: responseFromDir.master is deprecated. `master` is now called `out_port`
+warn: network.slave is deprecated. `slave` is now called `in_port`
+warn: forwardFromDir.master is deprecated. `master` is now called `out_port`
+warn: network.master is deprecated. `master` is now called `out_port`
+warn: requestToDir.slave is deprecated. `slave` is now called `in_port`
+warn: network.master is deprecated. `master` is now called `out_port`
+warn: responseToDir.slave is deprecated. `slave` is now called `in_port`
+warn: network.slave is deprecated. `slave` is now called `in_port`
+warn: responseFromDir.master is deprecated. `master` is now called `out_port`
+warn: network.slave is deprecated. `slave` is now called `in_port`
+warn: forwardFromDir.master is deprecated. `master` is now called `out_port`
+warn: network.master is deprecated. `master` is now called `out_port`
+warn: responseFromDir.slave is deprecated. `slave` is now called `in_port`
+warn: network.slave is deprecated. `slave` is now called `in_port`
+warn: reqToDir.master is deprecated. `master` is now called `out_port`
+warn: network.slave is deprecated. `slave` is now called `in_port`
+warn: respToDir.master is deprecated. `master` is now called `out_port`
+warn: No dot file generated. Please install pydot to generate the dot file and pdf.
+build/ARM_MOESI_CMP_directory/sim/kernel_workload.cc:46: info: kernel located at: /home/dev/qflex_git/QPoints/bin/m5/binaries/vmlinux.arm64
+build/ARM_MOESI_CMP_directory/cpu/o3/fetch.cc:221: warn: ftqSize is 0
+build/ARM_MOESI_CMP_directory/cpu/o3/fetch.cc:221: warn: ftqSize is 0
+build/ARM_MOESI_CMP_directory/cpu/o3/fetch.cc:221: warn: ftqSize is 0
+build/ARM_MOESI_CMP_directory/cpu/o3/fetch.cc:221: warn: ftqSize is 0
+build/ARM_MOESI_CMP_directory/cpu/o3/fetch.cc:221: warn: ftqSize is 0
+build/ARM_MOESI_CMP_directory/cpu/o3/fetch.cc:221: warn: ftqSize is 0
+build/ARM_MOESI_CMP_directory/cpu/o3/fetch.cc:221: warn: ftqSize is 0
+build/ARM_MOESI_CMP_directory/cpu/o3/fetch.cc:221: warn: ftqSize is 0
+system.terminal: Listening for connections on port 3456
+build/ARM_MOESI_CMP_directory/base/statistics.hh:277: warn: One of the stats is a legacy stat. Legacy stat is a stat that does not belong to any statistics::Group. Legacy stat is deprecated.
+system.vncserver: Listening for connections on port 5900
+0: system.remote_gdb: listening for remote gdb on port 7000
+build/ARM_MOESI_CMP_directory/sim/serialize.hh:363: warn: optional parameter system:quiesceEndTick_1 not present
+build/ARM_MOESI_CMP_directory/sim/serialize.hh:363: warn: optional parameter system:quiesceEndTick_2 not present
+build/ARM_MOESI_CMP_directory/sim/serialize.hh:363: warn: optional parameter system:quiesceEndTick_3 not present
+build/ARM_MOESI_CMP_directory/sim/serialize.hh:363: warn: optional parameter system:quiesceEndTick_4 not present
+build/ARM_MOESI_CMP_directory/sim/serialize.hh:363: warn: optional parameter system:quiesceEndTick_5 not present
+build/ARM_MOESI_CMP_directory/sim/serialize.hh:363: warn: optional parameter system:quiesceEndTick_6 not present
+build/ARM_MOESI_CMP_directory/sim/serialize.hh:363: warn: optional parameter system:quiesceEndTick_7 not present
+build/ARM_MOESI_CMP_directory/sim/simulate.cc:107: info: Entering event queue @ 9943912964000.  Starting simulation...
+build/ARM_MOESI_CMP_directory/mem/ruby/system/Sequencer.cc:616: warn: Replacement policy updates recently became the responsibility of SLICC state machines. Make sure to setMRU() near callbacks in .sm files!
+build/ARM_MOESI_CMP_directory/arch/arm/insts/pseudo.cc:173: warn: 	instruction 'bti' unimplemented
+build/ARM_MOESI_CMP_directory/arch/arm/insts/pseudo.cc:173: warn: 	instruction 'csdb' unimplemented
+build/ARM_MOESI_CMP_directory/arch/arm/isa.cc:2427: warn: Doing AT (address translation) in functional mode! Fix Me!
+deep: line 226: warning: here-document at line 59 delimited by end-of-file (wanted `PY')

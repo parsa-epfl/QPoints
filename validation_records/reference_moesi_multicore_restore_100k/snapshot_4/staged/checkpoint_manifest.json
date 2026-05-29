@@ -1,0 +1,307 @@
+{
+  "components": {
+    "btb": {
+      "candidate_file": "/mnt/sdb/aansari/checkpoints/data-caching-8core/snapshot_4/gem5_uarch/btb_restore_candidates.json",
+      "line_count": 56310,
+      "restore_files": {
+        "0": "/mnt/sdb/aansari/checkpoints/data-caching-8core/snapshot_4/gem5_uarch/btb_restore_addrs.core0.txt",
+        "1": "/mnt/sdb/aansari/checkpoints/data-caching-8core/snapshot_4/gem5_uarch/btb_restore_addrs.core1.txt",
+        "2": "/mnt/sdb/aansari/checkpoints/data-caching-8core/snapshot_4/gem5_uarch/btb_restore_addrs.core2.txt",
+        "3": "/mnt/sdb/aansari/checkpoints/data-caching-8core/snapshot_4/gem5_uarch/btb_restore_addrs.core3.txt",
+        "4": "/mnt/sdb/aansari/checkpoints/data-caching-8core/snapshot_4/gem5_uarch/btb_restore_addrs.core4.txt",
+        "5": "/mnt/sdb/aansari/checkpoints/data-caching-8core/snapshot_4/gem5_uarch/btb_restore_addrs.core5.txt",
+        "6": "/mnt/sdb/aansari/checkpoints/data-caching-8core/snapshot_4/gem5_uarch/btb_restore_addrs.core6.txt",
+        "7": "/mnt/sdb/aansari/checkpoints/data-caching-8core/snapshot_4/gem5_uarch/btb_restore_addrs.core7.txt"
+      },
+      "selection_policy": "all restorable BTB entries from the QFlex fetch-side state for branch types Conditional, Unconditional, DirectCall, Return, IndirectCall, and IndirectBranch, ordered oldest-to-newest per source set by timestamp; each staged entry carries both the source branch PC and the derived basic-block start address (branch_pc - bbl_bytes) so local gem5 can reconstruct its BBL-indexed BTB entries while preserving the original branch identity",
+      "source_file": "/mnt/sdb/aansari/experiments/single-core/run/snapshot_4.uarch/fetch.json.zstd",
+      "stats": {
+        "branch_type_counts": {
+          "Conditional": 22504,
+          "DirectCall": 14801,
+          "IndirectBranch": 189,
+          "IndirectCall": 981,
+          "NonBranch": 74762,
+          "Return": 10513,
+          "Unconditional": 7322
+        },
+        "nonbranch_entries": 74762,
+        "restorable_branch_candidates": 56310,
+        "total_entries": 131072
+      }
+    },
+    "l1d": {
+      "candidate_file": "/mnt/sdb/aansari/checkpoints/data-caching-8core/snapshot_4/gem5_uarch/l1d_restore_candidates.json",
+      "line_count": 7905,
+      "restore_files": {
+        "0": "/mnt/sdb/aansari/checkpoints/data-caching-8core/snapshot_4/gem5_uarch/l1d_restore_addrs.core0.txt",
+        "1": "/mnt/sdb/aansari/checkpoints/data-caching-8core/snapshot_4/gem5_uarch/l1d_restore_addrs.core1.txt",
+        "2": "/mnt/sdb/aansari/checkpoints/data-caching-8core/snapshot_4/gem5_uarch/l1d_restore_addrs.core2.txt",
+        "3": "/mnt/sdb/aansari/checkpoints/data-caching-8core/snapshot_4/gem5_uarch/l1d_restore_addrs.core3.txt",
+        "4": "/mnt/sdb/aansari/checkpoints/data-caching-8core/snapshot_4/gem5_uarch/l1d_restore_addrs.core4.txt",
+        "5": "/mnt/sdb/aansari/checkpoints/data-caching-8core/snapshot_4/gem5_uarch/l1d_restore_addrs.core5.txt",
+        "6": "/mnt/sdb/aansari/checkpoints/data-caching-8core/snapshot_4/gem5_uarch/l1d_restore_addrs.core6.txt",
+        "7": "/mnt/sdb/aansari/checkpoints/data-caching-8core/snapshot_4/gem5_uarch/l1d_restore_addrs.core7.txt"
+      },
+      "selection_policy": "all valid private L1D lines from the QFlex Harvard state, ordered per-set by ascending L1D timestamp so future restore experiments can preserve source-side recency oldest-to-newest; staged restore state is S for writeable=false lines and M for writeable=true lines",
+      "source_file": "/mnt/sdb/aansari/experiments/single-core/run/snapshot_4.uarch/harvard-0.json.zstd",
+      "stats": {
+        "candidate_l1d_lines": 7905,
+        "modified_lines": 4354,
+        "non_l1d_lines_skipped": 8192,
+        "total_private_lines": 16097,
+        "writeable_lines": 5620
+      }
+    },
+    "l1i": {
+      "candidate_file": "/mnt/sdb/aansari/checkpoints/data-caching-8core/snapshot_4/gem5_uarch/l1i_restore_candidates.json",
+      "line_count": 8192,
+      "restore_files": {
+        "0": "/mnt/sdb/aansari/checkpoints/data-caching-8core/snapshot_4/gem5_uarch/l1i_restore_addrs.core0.txt",
+        "1": "/mnt/sdb/aansari/checkpoints/data-caching-8core/snapshot_4/gem5_uarch/l1i_restore_addrs.core1.txt",
+        "2": "/mnt/sdb/aansari/checkpoints/data-caching-8core/snapshot_4/gem5_uarch/l1i_restore_addrs.core2.txt",
+        "3": "/mnt/sdb/aansari/checkpoints/data-caching-8core/snapshot_4/gem5_uarch/l1i_restore_addrs.core3.txt",
+        "4": "/mnt/sdb/aansari/checkpoints/data-caching-8core/snapshot_4/gem5_uarch/l1i_restore_addrs.core4.txt",
+        "5": "/mnt/sdb/aansari/checkpoints/data-caching-8core/snapshot_4/gem5_uarch/l1i_restore_addrs.core5.txt",
+        "6": "/mnt/sdb/aansari/checkpoints/data-caching-8core/snapshot_4/gem5_uarch/l1i_restore_addrs.core6.txt",
+        "7": "/mnt/sdb/aansari/checkpoints/data-caching-8core/snapshot_4/gem5_uarch/l1i_restore_addrs.core7.txt"
+      },
+      "selection_policy": "all valid private L1I lines from the QFlex Harvard state, ordered per-set by ascending L1I timestamp so restore replays source-side recency oldest-to-newest; staged restore state is always S",
+      "source_file": "/mnt/sdb/aansari/experiments/single-core/run/snapshot_4.uarch/harvard-0.json.zstd",
+      "stats": {
+        "candidate_l1i_lines": 8192,
+        "data_lines_skipped": 7905,
+        "modified_lines": 0,
+        "total_private_lines": 16097,
+        "writeable_lines": 0
+      }
+    },
+    "l2_shared_private": {
+      "candidate_file": "/mnt/sdb/aansari/checkpoints/data-caching-8core/snapshot_4/gem5_uarch/l2_shared_restore_candidates.json",
+      "line_count": 3182,
+      "restore_file": "/mnt/sdb/aansari/checkpoints/data-caching-8core/snapshot_4/gem5_uarch/l2_shared_restore_addrs.txt",
+      "selection_policy": "all clean directory-shared private lines, emitted once per unique L1 controller sharer and preserved as a compatibility artifact while the MOESI migration is still LLC-only; the current MOESI restore path does not consume this file yet",
+      "source_files": {
+        "directory": "/mnt/sdb/aansari/experiments/single-core/run/snapshot_4.uarch/directory-0.json.zstd",
+        "harvard": "/mnt/sdb/aansari/experiments/single-core/run/snapshot_4.uarch/harvard-0.json.zstd"
+      },
+      "stats": {
+        "clean_shared_private_entries": 3182,
+        "directory_entries": 8802,
+        "directory_shared_entries": 3182,
+        "private_present_entries": 3182,
+        "total_sharer_cores": 10477
+      }
+    },
+    "llc": {
+      "line_count": 68842,
+      "output_file": "/mnt/sdb/aansari/checkpoints/data-caching-8core/snapshot_4/gem5_uarch/llc_restore_addrs.txt",
+      "protocol_required_modified_lines": 601,
+      "selected_modified_lines": 0,
+      "selection_policy": "clean LLC lines with no private modified/writeable copy, plus the LLC-modified subset required to preserve source-side residency for MOESI clean-private layering, plus the first N restorable LLC-modified lines for controlled debugging, ordered per-set by ascending LLC timestamp so startup insertion reconstructs warm replacement state oldest-to-newest without fabricating shared-cache presence",
+      "source_files": {
+        "directory": "/mnt/sdb/aansari/experiments/single-core/run/snapshot_4.uarch/directory-0.json.zstd",
+        "harvard": "/mnt/sdb/aansari/experiments/single-core/run/snapshot_4.uarch/harvard-0.json.zstd",
+        "llc": "/mnt/sdb/aansari/experiments/single-core/run/snapshot_4.uarch/llc-0.json.zstd"
+      },
+      "stats": {
+        "candidate_restorable_clean_lines": 68241,
+        "candidate_restorable_llc_lines": 126502,
+        "candidate_restorable_modified_lines": 58261,
+        "lines_with_directory_entry": 3180,
+        "llc_modified_lines": 58261,
+        "private_modified_lines": 0,
+        "private_writeable_lines": 0,
+        "total_llc_lines": 126502
+      }
+    },
+    "moesi_multi_private_data_clean": {
+      "candidate_file": "/mnt/sdb/aansari/checkpoints/data-caching-8core/snapshot_4/gem5_uarch/moesi_multi_private_data_clean_restore_candidates.json",
+      "l1d_restore_files": {
+        "0": "/mnt/sdb/aansari/checkpoints/data-caching-8core/snapshot_4/gem5_uarch/moesi_l1d_multi_private_data_clean.core0.txt",
+        "1": "/mnt/sdb/aansari/checkpoints/data-caching-8core/snapshot_4/gem5_uarch/moesi_l1d_multi_private_data_clean.core1.txt",
+        "2": "/mnt/sdb/aansari/checkpoints/data-caching-8core/snapshot_4/gem5_uarch/moesi_l1d_multi_private_data_clean.core2.txt",
+        "3": "/mnt/sdb/aansari/checkpoints/data-caching-8core/snapshot_4/gem5_uarch/moesi_l1d_multi_private_data_clean.core3.txt",
+        "4": "/mnt/sdb/aansari/checkpoints/data-caching-8core/snapshot_4/gem5_uarch/moesi_l1d_multi_private_data_clean.core4.txt",
+        "5": "/mnt/sdb/aansari/checkpoints/data-caching-8core/snapshot_4/gem5_uarch/moesi_l1d_multi_private_data_clean.core5.txt",
+        "6": "/mnt/sdb/aansari/checkpoints/data-caching-8core/snapshot_4/gem5_uarch/moesi_l1d_multi_private_data_clean.core6.txt",
+        "7": "/mnt/sdb/aansari/checkpoints/data-caching-8core/snapshot_4/gem5_uarch/moesi_l1d_multi_private_data_clean.core7.txt"
+      },
+      "line_count": 561,
+      "nonllc_restore_file": "/mnt/sdb/aansari/checkpoints/data-caching-8core/snapshot_4/gem5_uarch/moesi_multi_private_data_clean_nonllc_restore.txt",
+      "restore_file": "/mnt/sdb/aansari/checkpoints/data-caching-8core/snapshot_4/gem5_uarch/moesi_multi_private_data_clean_restore.txt",
+      "selection_policy": "for MOESI_CMP_directory, multi-private clean data lines whose source directory entry is shared and whose private D-cache holders are all read-only; restore LLC-backed lines as L1D S-state lines plus L2 SLS sharer metadata, and restore non-LLC-backed lines as L1D S-state lines plus L2 local-directory ILS sharer metadata without fabricating LLC residency",
+      "source_files": {
+        "directory": "/mnt/sdb/aansari/experiments/single-core/run/snapshot_4.uarch/directory-0.json.zstd",
+        "harvard": "/mnt/sdb/aansari/experiments/single-core/run/snapshot_4.uarch/harvard-0.json.zstd",
+        "llc": "/mnt/sdb/aansari/experiments/single-core/run/snapshot_4.uarch/llc-0.json.zstd"
+      },
+      "stats": {
+        "candidate_lines": 561,
+        "directory_backed_block_ids": 8802,
+        "directory_nonshared_block_ids_skipped": 0,
+        "harvard_block_ids": 8802,
+        "instruction_sharer_block_ids_skipped": 0,
+        "llc_backed_block_ids": 560,
+        "modified_block_ids_skipped": 0,
+        "multi_private_dcore_block_ids": 561,
+        "non_llc_backed_block_ids": 1,
+        "total_sharer_cores": 1729,
+        "writeable_block_ids_skipped": 0
+      }
+    },
+    "moesi_private_family_guardrails": {
+      "implemented_families": {
+        "moesi_multi_private_data_clean": "multiple read-only private D-cache sharers, no I-cache sharers, shared=true, LLC-backed or non-LLC local-sharer form",
+        "moesi_private_instruction_only": "instruction-only private sharers, no D-cache sharers, shared=true, LLC-backed or non-LLC local-sharer form",
+        "moesi_single_private_data_clean": "one read-only private D-cache sharer, no I-cache sharers, shared=true, LLC backed",
+        "moesi_single_private_data_writeable": "one writable private D-cache owner, no I-cache sharers, shared=false, in_shared_cache=false, LLC absent"
+      },
+      "implemented_family_counts": {
+        "moesi_multi_private_data_clean": 561,
+        "moesi_private_instruction_only": 2065,
+        "moesi_single_private_data_clean": 556,
+        "moesi_single_private_data_writeable": 5620
+      },
+      "known_unimplemented_families": {
+        "anything_else": "any private coherent block family that does not match the current implemented or explicitly named unsupported MOESI families",
+        "multi_private_data_clean_mixed_instruction_data": "multiple read-only private D-cache sharers plus private I-cache sharers",
+        "private_instruction_only_directory_nonshared": "instruction-only private sharers with directory shared=false",
+        "single_private_data_clean_mixed_instruction_data": "one read-only private D-cache sharer plus private I-cache sharers",
+        "single_private_data_clean_nonllc": "one read-only private D-cache sharer, no I-cache sharers, shared=true, LLC absent",
+        "single_private_data_writeable_directory_shared": "one writable private D-cache owner, no I-cache sharers, but directory metadata still claims shared or in-shared-cache",
+        "single_private_data_writeable_llc_backed": "one writable private D-cache owner, no I-cache sharers, LLC backed",
+        "single_private_data_writeable_mixed_instruction_data": "one writable private D-cache owner plus private I-cache sharers"
+      },
+      "observed_unsupported_families": {},
+      "report_file": "/mnt/sdb/aansari/checkpoints/data-caching-8core/snapshot_4/gem5_uarch/moesi_unsupported_private_family_report.json",
+      "selection_policy": "classify every directory-backed private block into an implemented MOESI family, a named-but-unimplemented family, or anything_else; fail conversion if any unsupported family is observed",
+      "strict_mode": true,
+      "unsupported_block_count": 0
+    },
+    "moesi_private_instruction_only": {
+      "candidate_file": "/mnt/sdb/aansari/checkpoints/data-caching-8core/snapshot_4/gem5_uarch/moesi_private_instruction_only_restore_candidates.json",
+      "l1i_restore_files": {
+        "0": "/mnt/sdb/aansari/checkpoints/data-caching-8core/snapshot_4/gem5_uarch/moesi_l1i_private_instruction_only.core0.txt",
+        "1": "/mnt/sdb/aansari/checkpoints/data-caching-8core/snapshot_4/gem5_uarch/moesi_l1i_private_instruction_only.core1.txt",
+        "2": "/mnt/sdb/aansari/checkpoints/data-caching-8core/snapshot_4/gem5_uarch/moesi_l1i_private_instruction_only.core2.txt",
+        "3": "/mnt/sdb/aansari/checkpoints/data-caching-8core/snapshot_4/gem5_uarch/moesi_l1i_private_instruction_only.core3.txt",
+        "4": "/mnt/sdb/aansari/checkpoints/data-caching-8core/snapshot_4/gem5_uarch/moesi_l1i_private_instruction_only.core4.txt",
+        "5": "/mnt/sdb/aansari/checkpoints/data-caching-8core/snapshot_4/gem5_uarch/moesi_l1i_private_instruction_only.core5.txt",
+        "6": "/mnt/sdb/aansari/checkpoints/data-caching-8core/snapshot_4/gem5_uarch/moesi_l1i_private_instruction_only.core6.txt",
+        "7": "/mnt/sdb/aansari/checkpoints/data-caching-8core/snapshot_4/gem5_uarch/moesi_l1i_private_instruction_only.core7.txt"
+      },
+      "line_count": 2065,
+      "nonllc_restore_file": "/mnt/sdb/aansari/checkpoints/data-caching-8core/snapshot_4/gem5_uarch/moesi_private_instruction_only_nonllc_restore.txt",
+      "restore_file": "/mnt/sdb/aansari/checkpoints/data-caching-8core/snapshot_4/gem5_uarch/moesi_private_instruction_only_restore.txt",
+      "selection_policy": "for MOESI_CMP_directory, private instruction-only lines whose source directory entry is shared and whose private sharers are all instruction-cache sharers; restore LLC-backed lines as L1I S-state lines plus L2 SLS sharer metadata, and restore non-LLC-backed lines as L1I S-state lines plus L2 local-directory ILS sharer metadata without fabricating LLC residency",
+      "source_files": {
+        "directory": "/mnt/sdb/aansari/experiments/single-core/run/snapshot_4.uarch/directory-0.json.zstd",
+        "harvard": "/mnt/sdb/aansari/experiments/single-core/run/snapshot_4.uarch/harvard-0.json.zstd",
+        "llc": "/mnt/sdb/aansari/experiments/single-core/run/snapshot_4.uarch/llc-0.json.zstd"
+      },
+      "stats": {
+        "candidate_lines": 2065,
+        "d_sharer_block_ids_skipped": 6737,
+        "directory_backed_block_ids": 8802,
+        "directory_nonshared_block_ids_skipped": 0,
+        "harvard_block_ids": 8802,
+        "instruction_only_block_ids": 2065,
+        "llc_backed_block_ids": 2064,
+        "non_llc_backed_block_ids": 1,
+        "total_sharer_cores": 8192
+      }
+    },
+    "moesi_single_private_data_clean": {
+      "candidate_file": "/mnt/sdb/aansari/checkpoints/data-caching-8core/snapshot_4/gem5_uarch/moesi_single_private_data_clean_restore_candidates.json",
+      "l1d_restore_files": {
+        "0": "/mnt/sdb/aansari/checkpoints/data-caching-8core/snapshot_4/gem5_uarch/moesi_l1d_single_private_data_clean.core0.txt",
+        "1": "/mnt/sdb/aansari/checkpoints/data-caching-8core/snapshot_4/gem5_uarch/moesi_l1d_single_private_data_clean.core1.txt",
+        "2": "/mnt/sdb/aansari/checkpoints/data-caching-8core/snapshot_4/gem5_uarch/moesi_l1d_single_private_data_clean.core2.txt",
+        "3": "/mnt/sdb/aansari/checkpoints/data-caching-8core/snapshot_4/gem5_uarch/moesi_l1d_single_private_data_clean.core3.txt",
+        "4": "/mnt/sdb/aansari/checkpoints/data-caching-8core/snapshot_4/gem5_uarch/moesi_l1d_single_private_data_clean.core4.txt",
+        "5": "/mnt/sdb/aansari/checkpoints/data-caching-8core/snapshot_4/gem5_uarch/moesi_l1d_single_private_data_clean.core5.txt",
+        "6": "/mnt/sdb/aansari/checkpoints/data-caching-8core/snapshot_4/gem5_uarch/moesi_l1d_single_private_data_clean.core6.txt",
+        "7": "/mnt/sdb/aansari/checkpoints/data-caching-8core/snapshot_4/gem5_uarch/moesi_l1d_single_private_data_clean.core7.txt"
+      },
+      "line_count": 556,
+      "restore_file": "/mnt/sdb/aansari/checkpoints/data-caching-8core/snapshot_4/gem5_uarch/moesi_single_private_data_clean_restore.txt",
+      "selection_policy": "for MOESI_CMP_directory, single-private clean data lines whose source directory entry is shared, whose shared cache line is present in the LLC snapshot, and whose only private D-cache holder is read-only; restore them as LLC-backed L1D S-state lines plus L2 local directory SLS sharer metadata without changing the global directory's existing LLC-sharer S-state story",
+      "source_files": {
+        "directory": "/mnt/sdb/aansari/experiments/single-core/run/snapshot_4.uarch/directory-0.json.zstd",
+        "harvard": "/mnt/sdb/aansari/experiments/single-core/run/snapshot_4.uarch/harvard-0.json.zstd",
+        "llc": "/mnt/sdb/aansari/experiments/single-core/run/snapshot_4.uarch/llc-0.json.zstd"
+      },
+      "stats": {
+        "candidate_lines": 556,
+        "directory_backed_block_ids": 8802,
+        "directory_nonshared_block_ids_skipped": 0,
+        "harvard_block_ids": 8802,
+        "instruction_sharer_block_ids_skipped": 0,
+        "llc_missing_block_ids_skipped": 0,
+        "modified_block_ids_skipped": 0,
+        "single_private_dcore_block_ids": 6176,
+        "writeable_block_ids_skipped": 5620
+      }
+    },
+    "moesi_single_private_data_writeable": {
+      "candidate_file": "/mnt/sdb/aansari/checkpoints/data-caching-8core/snapshot_4/gem5_uarch/moesi_single_private_data_writeable_restore_candidates.json",
+      "l1d_restore_files": {
+        "0": "/mnt/sdb/aansari/checkpoints/data-caching-8core/snapshot_4/gem5_uarch/moesi_l1d_single_private_data_writeable.core0.txt",
+        "1": "/mnt/sdb/aansari/checkpoints/data-caching-8core/snapshot_4/gem5_uarch/moesi_l1d_single_private_data_writeable.core1.txt",
+        "2": "/mnt/sdb/aansari/checkpoints/data-caching-8core/snapshot_4/gem5_uarch/moesi_l1d_single_private_data_writeable.core2.txt",
+        "3": "/mnt/sdb/aansari/checkpoints/data-caching-8core/snapshot_4/gem5_uarch/moesi_l1d_single_private_data_writeable.core3.txt",
+        "4": "/mnt/sdb/aansari/checkpoints/data-caching-8core/snapshot_4/gem5_uarch/moesi_l1d_single_private_data_writeable.core4.txt",
+        "5": "/mnt/sdb/aansari/checkpoints/data-caching-8core/snapshot_4/gem5_uarch/moesi_l1d_single_private_data_writeable.core5.txt",
+        "6": "/mnt/sdb/aansari/checkpoints/data-caching-8core/snapshot_4/gem5_uarch/moesi_l1d_single_private_data_writeable.core6.txt",
+        "7": "/mnt/sdb/aansari/checkpoints/data-caching-8core/snapshot_4/gem5_uarch/moesi_l1d_single_private_data_writeable.core7.txt"
+      },
+      "line_count": 5620,
+      "restore_file": "/mnt/sdb/aansari/checkpoints/data-caching-8core/snapshot_4/gem5_uarch/moesi_single_private_data_writeable_restore.txt",
+      "selection_policy": "for MOESI_CMP_directory, single-private writable data lines whose source directory entry is private (shared=false, in_shared_cache=false) and absent from the shared cache; restore them as L1D M-state lines using checkpoint-backed memory data, plus L2 local directory ILX ownership and global directory M-state ownership without fabricating LLC residency",
+      "source_files": {
+        "directory": "/mnt/sdb/aansari/experiments/single-core/run/snapshot_4.uarch/directory-0.json.zstd",
+        "harvard": "/mnt/sdb/aansari/experiments/single-core/run/snapshot_4.uarch/harvard-0.json.zstd",
+        "llc": "/mnt/sdb/aansari/experiments/single-core/run/snapshot_4.uarch/llc-0.json.zstd"
+      },
+      "stats": {
+        "candidate_lines": 5620,
+        "directory_backed_block_ids": 8802,
+        "directory_in_shared_cache_block_ids_skipped": 0,
+        "directory_shared_block_ids_skipped": 0,
+        "harvard_block_ids": 8802,
+        "instruction_sharer_block_ids_skipped": 0,
+        "llc_present_block_ids_skipped": 0,
+        "modified_block_ids_skipped": 0,
+        "single_private_dcore_block_ids": 6176,
+        "writeable_block_ids": 5620
+      }
+    },
+    "tage": {
+      "candidate_file": "/mnt/sdb/aansari/checkpoints/data-caching-8core/snapshot_4/gem5_uarch/tage_restore_candidates.json",
+      "line_count": 8,
+      "restore_files": {
+        "0": "/mnt/sdb/aansari/checkpoints/data-caching-8core/snapshot_4/gem5_uarch/tage_restore_state.core0.json",
+        "1": "/mnt/sdb/aansari/checkpoints/data-caching-8core/snapshot_4/gem5_uarch/tage_restore_state.core1.json",
+        "2": "/mnt/sdb/aansari/checkpoints/data-caching-8core/snapshot_4/gem5_uarch/tage_restore_state.core2.json",
+        "3": "/mnt/sdb/aansari/checkpoints/data-caching-8core/snapshot_4/gem5_uarch/tage_restore_state.core3.json",
+        "4": "/mnt/sdb/aansari/checkpoints/data-caching-8core/snapshot_4/gem5_uarch/tage_restore_state.core4.json",
+        "5": "/mnt/sdb/aansari/checkpoints/data-caching-8core/snapshot_4/gem5_uarch/tage_restore_state.core5.json",
+        "6": "/mnt/sdb/aansari/checkpoints/data-caching-8core/snapshot_4/gem5_uarch/tage_restore_state.core6.json",
+        "7": "/mnt/sdb/aansari/checkpoints/data-caching-8core/snapshot_4/gem5_uarch/tage_restore_state.core7.json"
+      },
+      "selection_policy": "serialize the per-core WormCache TAGE checkpoint payload into human-readable JSON without cross-implementation translation; gem5-side restore code is responsible for bank remapping, bimodal hysteresis grouping, folded-history recomputation, and policy-state defaults",
+      "source_file": "/mnt/sdb/aansari/experiments/single-core/run/snapshot_4.uarch/fetch.json.zstd",
+      "stats": {
+        "cores_emitted": 8,
+        "total_fetch_units": 8,
+        "units_with_tage": 8
+      }
+    }
+  },
+  "gem5_uarch_dir": "/mnt/sdb/aansari/checkpoints/data-caching-8core/snapshot_4/gem5_uarch",
+  "qflex_source_dir": "/mnt/sdb/aansari/experiments/single-core/run/snapshot_4.uarch",
+  "schema_version": 1,
+  "snapshot": "snapshot_4",
+  "target_ruby_protocol": "moesi_cmp_directory"
+}

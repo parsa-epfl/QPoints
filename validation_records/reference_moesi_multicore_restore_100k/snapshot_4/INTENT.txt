@@ -1,0 +1,34 @@
+Question: Does the current MOESI_CMP_directory multicore restore stack for
+snapshot_4 provide a trustworthy warm-start restoration for all observed
+steady-state private/coherent families under the agreed validation process?
+
+Setup:
+- data-caching-8core snapshot_4 checkpoint lineage
+- gem5 timing-ruby MOESI_CMP_directory full-system O3CPU run
+- 8 cores, 8MB shared L2/LLC, 64kB private L1I/L1D caches
+- current canonical QPoints converter with strict MOESI private-family
+  guardrails enabled
+- one 100k restored reference run and one 100k cold comparison run
+- previously staged 1k MOESI smoke ladder used to assess incremental family
+  usefulness across LLC-only, owner, clean, multi-clean, and instruction-only
+  slices
+
+Acceptance:
+- the strict MOESI guardrail report observes zero unsupported private families
+  in snapshot_4
+- emitted checkpoint family counts match the staged restore artifacts
+- restored gem5 load counters reconcile exactly with the emitted manifest counts
+  for L1D, L1I, and LLC
+- the restored 100k run completes naturally and uses restored state in L1D,
+  L1I, and L2
+- the 1k family ladder shows directionally sensible activation/usefulness as
+  additional families are enabled
+- the restored 100k run is directionally better than the cold 100k comparison
+  on warm-start metrics without surfacing protocol/runtime failures
+
+Artifacts:
+- exact sim-config files for the cold and restored 100k runs
+- staged checkpoint manifest and MOESI guardrail report
+- cold and restored 100k stats/config outputs
+- staged 1k smoke-ladder stats used for family-by-family comparison
+- compact validation report and machine-readable summary

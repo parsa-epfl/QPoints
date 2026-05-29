@@ -1,0 +1,382 @@
+{
+  "acceptance": [
+    {
+      "expected": 0,
+      "kind": "process_exit_code",
+      "name": "command_exit_zero"
+    },
+    {
+      "expected": 100000,
+      "kind": "stats_check",
+      "name": "simInsts",
+      "operator": "gt"
+    },
+    {
+      "expected": 68842,
+      "kind": "stats_check",
+      "name": "system.ruby.l2_cntrl0.L2cache.m_checkpoint_load_total",
+      "operator": "eq"
+    },
+    {
+      "expected": 0,
+      "kind": "stats_check",
+      "name": "system.ruby.l2_cntrl0.L2cache.m_checkpoint_load_hits",
+      "operator": "gt"
+    },
+    {
+      "expected": 0,
+      "kind": "stats_check",
+      "name": "system.ruby.l1_cntrl0.L1Dcache.m_checkpoint_load_total",
+      "operator": "gt"
+    },
+    {
+      "expected": 0,
+      "kind": "stats_check",
+      "name": "system.ruby.l1_cntrl0.L1Icache.m_checkpoint_load_total",
+      "operator": "gt"
+    }
+  ],
+  "analyses": [
+    {
+      "label": "moesi_restore_validation_summary",
+      "question": "Do the snapshot_4 MOESI restore artifacts satisfy the agreed family-coverage, restore-count, activation, and warm-usefulness gates?",
+      "script": "analyses/summarize_moesi_restore_validation.py",
+      "inputs": [
+        "staged/checkpoint_manifest.json",
+        "staged/checkpoint_guardrails.json",
+        "cold_100k/stats.txt",
+        "restored_100k/stats.txt",
+        "smoke_ladder"
+      ],
+      "outputs": [
+        "analyses/moesi_restore_validation_report.json",
+        "analyses/MOESI_RESTORE_VALIDATION.md"
+      ],
+      "status": "passed",
+      "conclusion": "snapshot_4 MOESI restore meets the agreed validation gates: guardrails are clean, restore counts reconcile exactly, warm-state structures are exercised, the 1k family ladder behaves sensibly, and the restored 100k reference run is directionally better than cold."
+    }
+  ],
+  "artifacts": [
+    {
+      "category": "intent",
+      "description": "Captured experiment intent for this run.",
+      "label": "intent",
+      "path": "INTENT.txt",
+      "protected": true,
+      "required": true,
+      "retention": "keep"
+    },
+    {
+      "category": "log",
+      "description": "Captured stdout from the experiment command.",
+      "label": "stdout",
+      "path": "experiment_stdout.log",
+      "protected": true,
+      "required": true,
+      "retention": "keep"
+    },
+    {
+      "category": "log",
+      "description": "Captured stderr from the experiment command.",
+      "label": "stderr",
+      "path": "experiment_stderr.log",
+      "protected": true,
+      "required": true,
+      "retention": "keep"
+    },
+    {
+      "category": "path",
+      "description": "Protected reference artifact.",
+      "label": "protected:staged",
+      "path": "staged",
+      "protected": true,
+      "required": true,
+      "retention": "keep"
+    },
+    {
+      "category": "path",
+      "description": "Protected reference artifact.",
+      "label": "protected:cold_100k",
+      "path": "cold_100k",
+      "protected": true,
+      "required": true,
+      "retention": "keep"
+    },
+    {
+      "category": "path",
+      "description": "Protected reference artifact.",
+      "label": "protected:restored_100k",
+      "path": "restored_100k",
+      "protected": true,
+      "required": true,
+      "retention": "keep"
+    },
+    {
+      "category": "path",
+      "description": "Protected reference artifact.",
+      "label": "protected:smoke_ladder",
+      "path": "smoke_ladder",
+      "protected": true,
+      "required": true,
+      "retention": "keep"
+    },
+    {
+      "category": "path",
+      "description": "Protected reference artifact.",
+      "label": "protected:analyses",
+      "path": "analyses",
+      "protected": true,
+      "required": true,
+      "retention": "keep"
+    },
+    {
+      "category": "stats",
+      "description": "Stats file used for acceptance checks.",
+      "label": "stats",
+      "path": "restored_100k/stats.txt",
+      "protected": true,
+      "required": true,
+      "retention": "keep"
+    },
+    {
+      "label": "protected:analyses_script",
+      "path": "analyses/summarize_moesi_restore_validation.py",
+      "category": "script",
+      "description": "Analysis script used to summarize the MOESI snapshot_4 validation package.",
+      "protected": true,
+      "required": true,
+      "retention": "keep"
+    },
+    {
+      "label": "protected:analyses_report_json",
+      "path": "analyses/moesi_restore_validation_report.json",
+      "category": "analysis",
+      "description": "Machine-readable MOESI snapshot_4 validation verdict and metrics.",
+      "protected": true,
+      "required": true,
+      "retention": "keep"
+    },
+    {
+      "label": "protected:analyses_report_md",
+      "path": "analyses/MOESI_RESTORE_VALIDATION.md",
+      "category": "analysis",
+      "description": "Human-readable MOESI snapshot_4 validation summary.",
+      "protected": true,
+      "required": true,
+      "retention": "keep"
+    }
+  ],
+  "commands": [
+    {
+      "argv": [
+        "bash",
+        "-lc",
+        "set -euo pipefail\nOUT=\"/home/dev/qflex_git/QPoints/validation_records/reference_moesi_multicore_restore_100k/snapshot_4\"\nQ=\"/home/dev/qflex_git/QPoints\"\nCKP=\"/mnt/sdb/aansari/checkpoints/data-caching-8core\"\nSNAP=\"snapshot_4\"\nUARCH=\"${CKP}/${SNAP}/gem5_uarch\"\nRESTORE_EXP=\"moesi_snapshot4_restore_reference_100k\"\nCOLD_EXP=\"moesi_snapshot4_cold_reference_100k\"\nPYBIN=\"/home/dev/qflex/.venv/bin/python\"\nif [[ ! -x \"${PYBIN}\" ]]; then\n  PYBIN=\"python3\"\nfi\nmkdir -p \"${OUT}/staged\" \"${OUT}/cold_100k\" \"${OUT}/restored_100k\" \"${OUT}/smoke_ladder\" \"${OUT}/analyses\"\ncat > \"${OUT}/staged/cold_moesi_8mb.args\" <<\"EOF\"\n--l1i_size=64kB\n--l1i_assoc=8\n--l1d_size=64kB\n--l1d_assoc=8\n--l2_size=8MB\n--l2_assoc=16\n--mem-channels=1\n--mem-ranks=4\nEOF\ncat > \"${OUT}/staged/restore_moesi_all_families_8mb.args\" <<\"EOF\"\n--l1i_size=64kB\n--l1i_assoc=8\n--l1d_size=64kB\n--l1d_assoc=8\n--l2_size=8MB\n--l2_assoc=16\n--mem-channels=1\n--mem-ranks=4\n--restore-llc-state\n--restore-l1d-state\n--restore-l1i-state\nEOF\ncd \"${Q}\"\n\"${PYBIN}\" scripts/uarch_restore/prepare_gem5_uarch.py --qflex-run-dir /mnt/sdb/aansari/experiments/single-core/run --gem5-workload-root \"${CKP}\" --snapshot \"${SNAP}\" --overwrite --ruby-protocol moesi_cmp_directory\ncp \"${UARCH}/manifest.json\" \"${OUT}/staged/checkpoint_manifest.json\"\ncp \"${UARCH}/moesi_unsupported_private_family_report.json\" \"${OUT}/staged/checkpoint_guardrails.json\"\n./run_gem5.sh --gem5-ckp-dir \"${CKP}\" --experiment \"${COLD_EXP}\" --snapshot \"${SNAP}\" --inst 100000 --cores 8 --timing-ruby-moesi --sim-config \"${OUT}/staged/cold_moesi_8mb.args\"\ncp \"sim_outs/${COLD_EXP}/${SNAP}/stats.txt\" \"${OUT}/cold_100k/stats.txt\"\ncp \"sim_outs/${COLD_EXP}/${SNAP}/config.ini\" \"${OUT}/cold_100k/config.ini\"\n./run_gem5.sh --gem5-ckp-dir \"${CKP}\" --experiment \"${RESTORE_EXP}\" --snapshot \"${SNAP}\" --inst 100000 --cores 8 --timing-ruby-moesi --sim-config \"${OUT}/staged/restore_moesi_all_families_8mb.args\"\ncp \"sim_outs/${RESTORE_EXP}/${SNAP}/stats.txt\" \"${OUT}/restored_100k/stats.txt\"\ncp \"sim_outs/${RESTORE_EXP}/${SNAP}/config.ini\" \"${OUT}/restored_100k/config.ini\"\nfor RUN in \\\n  moesi_snapshot4_llc_restore_smoke_1k_v2 \\\n  moesi_snapshot4_private_owner_restore_smoke_1k_v2 \\\n  moesi_snapshot4_private_plus_clean_restore_smoke_1k_v3 \\\n  moesi_snapshot4_private_plus_single_plus_multi_clean_restore_smoke_1k_v1 \\\n  moesi_snapshot4_private_plus_clean_plus_i_nonllc_restore_smoke_1k_v1 \\\n  moesi_snapshot4_ownerfull_plus_clean_plus_i_restore_smoke_1k_v1 \\\n  moesi_snapshot4_all_families_restore_smoke_1k_v1; do\n  mkdir -p \"${OUT}/smoke_ladder/${RUN}\"\n  cp \"sim_outs/${RUN}/${SNAP}/stats.txt\" \"${OUT}/smoke_ladder/${RUN}/stats.txt\"\n  cp \"sim_outs/${RUN}/${SNAP}/config.ini\" \"${OUT}/smoke_ladder/${RUN}/config.ini\"\ndone\ncat > \"${OUT}/analyses/summarize_moesi_restore_validation.py\" <<\"PY\"\n#!/usr/bin/env python3\nimport json\nfrom pathlib import Path\n\nOUT = Path(__file__).resolve().parents[1]\nmanifest = json.loads((OUT / staged / checkpoint_manifest.json).read_text())\nguardrails = json.loads((OUT / staged / checkpoint_guardrails.json).read_text())\n\ndef read_stats(path: Path):\n    stats = {}\n    with path.open() as fh:\n        for line in fh:\n            parts = line.split()\n            if len(parts) >= 2 and not parts[0].startswith(-):\n                name, val = parts[0], parts[1]\n                try:\n                    stats[name] = int(float(val))\n                except ValueError:\n                    pass\n    return stats\n\ndef sum_suffix(stats, suffix):\n    return sum(v for k, v in stats.items() if k.endswith(suffix))\n\nrestored = read_stats(OUT / restored_100k / stats.txt)\ncold = read_stats(OUT / cold_100k / stats.txt)\nladder_order = [\n    moesi_snapshot4_llc_restore_smoke_1k_v2,\n    moesi_snapshot4_private_owner_restore_smoke_1k_v2,\n    moesi_snapshot4_private_plus_clean_restore_smoke_1k_v3,\n    moesi_snapshot4_private_plus_single_plus_multi_clean_restore_smoke_1k_v1,\n    moesi_snapshot4_private_plus_clean_plus_i_nonllc_restore_smoke_1k_v1,\n    moesi_snapshot4_ownerfull_plus_clean_plus_i_restore_smoke_1k_v1,\n    moesi_snapshot4_all_families_restore_smoke_1k_v1,\n]\nladder_labels = {\n    moesi_snapshot4_llc_restore_smoke_1k_v2: llc_only,\n    moesi_snapshot4_private_owner_restore_smoke_1k_v2: owner_only,\n    moesi_snapshot4_private_plus_clean_restore_smoke_1k_v3: owner_plus_single_clean,\n    moesi_snapshot4_private_plus_single_plus_multi_clean_restore_smoke_1k_v1: owner_plus_single_plus_multi_clean,\n    moesi_snapshot4_private_plus_clean_plus_i_nonllc_restore_smoke_1k_v1: clean_plus_instruction_only,\n    moesi_snapshot4_ownerfull_plus_clean_plus_i_restore_smoke_1k_v1: ownerfull_plus_clean_plus_instruction,\n    moesi_snapshot4_all_families_restore_smoke_1k_v1: all_families,\n}\nladder = []\nfor run in ladder_order:\n    stats = read_stats(OUT / smoke_ladder / run / stats.txt)\n    ladder.append({\n        run: run,\n        label: ladder_labels[run],\n        simInsts: stats[simInsts],\n        simTicks: stats[simTicks],\n        l2_load: stats[system.ruby.l2_cntrl0.L2cache.m_checkpoint_load_total],\n        l2_load_hits: stats[system.ruby.l2_cntrl0.L2cache.m_checkpoint_load_hits],\n        l2_hits: stats[system.ruby.l2_cntrl0.L2cache.m_demand_hits],\n        l2_misses: stats[system.ruby.l2_cntrl0.L2cache.m_demand_misses],\n        l1d_load: sum_suffix(stats, L1Dcache.m_checkpoint_load_total),\n        l1i_load: sum_suffix(stats, L1Icache.m_checkpoint_load_total),\n        l1d_hits: sum_suffix(stats, L1Dcache.m_demand_hits),\n        l1d_misses: sum_suffix(stats, L1Dcache.m_demand_misses),\n        l1i_hits: sum_suffix(stats, L1Icache.m_demand_hits),\n        l1i_misses: sum_suffix(stats, L1Icache.m_demand_misses),\n    })\n\nexpected_family_counts = {\n    moesi_single_private_data_writeable: 5620,\n    moesi_single_private_data_clean: 556,\n    moesi_multi_private_data_clean: 561,\n    moesi_private_instruction_only: 2065,\n}\nphase1 = {\n    unsupported_block_count: guardrails[unsupported_block_count],\n    implemented_family_counts: guardrails[implemented_family_counts],\n    expected_family_counts: expected_family_counts,\n}\nphase1[pass] = (\n    phase1[unsupported_block_count] == 0\n    and phase1[implemented_family_counts] == expected_family_counts\n)\n\nmanifest_counts = {\n    l1d: manifest[components][l1d][line_count],\n    l1i: manifest[components][l1i][line_count],\n    llc: manifest[components][llc][line_count],\n}\nrestored_counts = {\n    l1d: sum_suffix(restored, L1Dcache.m_checkpoint_load_total),\n    l1i: sum_suffix(restored, L1Icache.m_checkpoint_load_total),\n    llc: restored[system.ruby.l2_cntrl0.L2cache.m_checkpoint_load_total],\n}\nphase2 = {\n    manifest_counts: manifest_counts,\n    restored_counts: restored_counts,\n    pass: manifest_counts == restored_counts,\n}\n\nphase3 = {\n    restored_100k: {\n        simInsts: restored[simInsts],\n        simTicks: restored[simTicks],\n        l2_checkpoint_load_hits: restored[system.ruby.l2_cntrl0.L2cache.m_checkpoint_load_hits],\n        l2_demand_hits: restored[system.ruby.l2_cntrl0.L2cache.m_demand_hits],\n        l2_demand_misses: restored[system.ruby.l2_cntrl0.L2cache.m_demand_misses],\n        l1d_checkpoint_loads: restored_counts[l1d],\n        l1i_checkpoint_loads: restored_counts[l1i],\n        l1d_demand_hits: sum_suffix(restored, L1Dcache.m_demand_hits),\n        l1i_demand_hits: sum_suffix(restored, L1Icache.m_demand_hits),\n    }\n}\nphase3[pass] = (\n    phase3[restored_100k][simInsts] > 100000\n    and phase3[restored_100k][l2_checkpoint_load_hits] > 0\n    and phase3[restored_100k][l2_demand_hits] > 0\n    and phase3[restored_100k][l1d_checkpoint_loads] > 0\n    and phase3[restored_100k][l1i_checkpoint_loads] > 0\n    and phase3[restored_100k][l1d_demand_hits] > 0\n    and phase3[restored_100k][l1i_demand_hits] > 0\n)\n\nl2_load_seq = [entry[l2_load] for entry in ladder]\nl1d_load_seq = [entry[l1d_load] for entry in ladder]\nl1i_load_seq = [entry[l1i_load] for entry in ladder]\nphase4_checks = {\n    l2_load_monotonic_non_decreasing: all(b >= a for a, b in zip(l2_load_seq, l2_load_seq[1:])),\n    l1d_load_monotonic_non_decreasing: all(b >= a for a, b in zip(l1d_load_seq, l1d_load_seq[1:])),\n    instruction_restore_activates_l1i: l1i_load_seq[0] == 0 and l1i_load_seq[-1] == manifest_counts[l1i],\n    final_l2_checkpoint_load_hits_exceed_llc_only: ladder[-1][l2_load_hits] > ladder[0][l2_load_hits],\n    final_simticks_below_llc_only: ladder[-1][simTicks] < ladder[0][simTicks],\n}\nphase4 = {\n    ladder: ladder,\n    checks: phase4_checks,\n    pass: all(phase4_checks.values()),\n}\n\ncomparison_100k = {\n    cold: {\n        simInsts: cold[simInsts],\n        simTicks: cold[simTicks],\n        l2_demand_hits: cold[system.ruby.l2_cntrl0.L2cache.m_demand_hits],\n        l2_demand_misses: cold[system.ruby.l2_cntrl0.L2cache.m_demand_misses],\n        l1d_demand_hits: sum_suffix(cold, L1Dcache.m_demand_hits),\n        l1d_demand_misses: sum_suffix(cold, L1Dcache.m_demand_misses),\n        l1i_demand_hits: sum_suffix(cold, L1Icache.m_demand_hits),\n        l1i_demand_misses: sum_suffix(cold, L1Icache.m_demand_misses),\n    },\n    restored: phase3[restored_100k],\n}\ncomparison_100k[delta] = {\n    simTicks: comparison_100k[restored][simTicks] - comparison_100k[cold][simTicks],\n    l2_demand_hits: comparison_100k[restored][l2_demand_hits] - comparison_100k[cold][l2_demand_hits],\n    l2_demand_misses: comparison_100k[restored][l2_demand_misses] - comparison_100k[cold][l2_demand_misses],\n    l1d_demand_hits: comparison_100k[restored][l1d_demand_hits] - comparison_100k[cold][l1d_demand_hits],\n    l1d_demand_misses: comparison_100k[restored][l1d_demand_misses] - comparison_100k[cold][l1d_demand_misses],\n    l1i_demand_hits: comparison_100k[restored][l1i_demand_hits] - comparison_100k[cold][l1i_demand_hits],\n    l1i_demand_misses: comparison_100k[restored][l1i_demand_misses] - comparison_100k[cold][l1i_demand_misses],\n}\ncomparison_100k[directionally_better] = (\n    comparison_100k[delta][simTicks] < 0\n    and comparison_100k[delta][l2_demand_misses] <= 0\n    and comparison_100k[restored][l2_checkpoint_load_hits] > 0\n)\n\nphase5 = {\n    invoked: False,\n    reason: (\n        Residual-miss",
+        "deep",
+        "dive",
+        "was",
+        "not",
+        "required",
+        "because",
+        "phases",
+        "1-4",
+        "were",
+        "\n        clean",
+        "and",
+        "the",
+        "100k",
+        "cold-vs-restored",
+        "comparison",
+        "remained",
+        "\n        directionally",
+        "sensible",
+        "without",
+        "unexplained",
+        "protocol",
+        "symptoms.\n    ),\n}\n\nvalidated = phase1[pass] and phase2[pass] and phase3[pass] and phase4[pass] and comparison_100k[directionally_better]\nreport = {\n    schema_version: 1,\n    validated: validated,\n    phase1: phase1,\n    phase2: phase2,\n    phase3: phase3,\n    phase4: phase4,\n    phase5: phase5,\n    comparison_100k: comparison_100k,\n}\n(OUT / analyses / moesi_restore_validation_report.json).write_text(json.dumps(report, indent=2) + n)\nmd = []\nmd.append(#",
+        "MOESI",
+        "Restore",
+        "Validation)\nmd.append()\nmd.append(f\"Verdict: {validated if validated else not",
+        "yet",
+        "validated}\")\nmd.append()\nmd.append(##",
+        "Snapshot_4",
+        "Family",
+        "Coverage)\nmd.append(f\"- unsupported families observed: {phase1[unsupported_block_count]}\")\nfor name, count in sorted(phase1[implemented_family_counts].items()):\n    md.append(f\"- {name}: {count}\")\nmd.append()\nmd.append(##",
+        "Restore",
+        "Count",
+        "Reconciliation)\nfor name in (l1d,l1i,llc):\n    md.append(f\"- {name}: manifest {manifest_counts[name]}, restored {restored_counts[name]}\")\nmd.append()\nmd.append(##",
+        "100k",
+        "Cold",
+        "vs",
+        "Restored)\nmd.append(f\"- cold simTicks: {comparison_100k[cold][simTicks]}\")\nmd.append(f\"- restored simTicks: {comparison_100k[restored][simTicks]}\")\nmd.append(f\"- delta simTicks: {comparison_100k[delta][simTicks]}\")\nmd.append(f\"- cold L2 demand misses: {comparison_100k[cold][l2_demand_misses]}\")\nmd.append(f\"- restored L2 demand misses: {comparison_100k[restored][l2_demand_misses]}\")\nmd.append(f\"- restored L2 checkpoint load hits: {comparison_100k[restored][l2_checkpoint_load_hits]}\")\nmd.append()\nmd.append(##",
+        "1k",
+        "Family",
+        "Ladder",
+        "Checks)\nfor name, passed in phase4_checks.items():\n    md.append(f\"- {name}: {pass if passed else fail}\")\nmd.append()\nmd.append(##",
+        "Residual-Miss",
+        "Deep",
+        "Dive)\nmd.append(f\"- invoked: {phase5[invoked]}\")\nmd.append(f\"- reason: {phase5[reason]}\")\n(OUT / analyses / MOESI_RESTORE_VALIDATION.md).write_text(n.join(md) + n)\nPY\npython3 \"${OUT}/analyses/summarize_moesi_restore_validation.py\"\n"
+      ],
+      "cwd": "<QPoints>",
+      "exit_code": 0,
+      "label": "experiment",
+      "stderr_path": "experiment_stderr.log",
+      "stdout_path": "experiment_stdout.log"
+    }
+  ],
+  "component": "moesi_restore",
+  "details": {},
+  "inputs": {
+    "command": [
+      "bash",
+      "-lc",
+      "set -euo pipefail\nOUT=\"/home/dev/qflex_git/QPoints/validation_records/reference_moesi_multicore_restore_100k/snapshot_4\"\nQ=\"/home/dev/qflex_git/QPoints\"\nCKP=\"/mnt/sdb/aansari/checkpoints/data-caching-8core\"\nSNAP=\"snapshot_4\"\nUARCH=\"${CKP}/${SNAP}/gem5_uarch\"\nRESTORE_EXP=\"moesi_snapshot4_restore_reference_100k\"\nCOLD_EXP=\"moesi_snapshot4_cold_reference_100k\"\nPYBIN=\"/home/dev/qflex/.venv/bin/python\"\nif [[ ! -x \"${PYBIN}\" ]]; then\n  PYBIN=\"python3\"\nfi\nmkdir -p \"${OUT}/staged\" \"${OUT}/cold_100k\" \"${OUT}/restored_100k\" \"${OUT}/smoke_ladder\" \"${OUT}/analyses\"\ncat > \"${OUT}/staged/cold_moesi_8mb.args\" <<\"EOF\"\n--l1i_size=64kB\n--l1i_assoc=8\n--l1d_size=64kB\n--l1d_assoc=8\n--l2_size=8MB\n--l2_assoc=16\n--mem-channels=1\n--mem-ranks=4\nEOF\ncat > \"${OUT}/staged/restore_moesi_all_families_8mb.args\" <<\"EOF\"\n--l1i_size=64kB\n--l1i_assoc=8\n--l1d_size=64kB\n--l1d_assoc=8\n--l2_size=8MB\n--l2_assoc=16\n--mem-channels=1\n--mem-ranks=4\n--restore-llc-state\n--restore-l1d-state\n--restore-l1i-state\nEOF\ncd \"${Q}\"\n\"${PYBIN}\" scripts/uarch_restore/prepare_gem5_uarch.py --qflex-run-dir /mnt/sdb/aansari/experiments/single-core/run --gem5-workload-root \"${CKP}\" --snapshot \"${SNAP}\" --overwrite --ruby-protocol moesi_cmp_directory\ncp \"${UARCH}/manifest.json\" \"${OUT}/staged/checkpoint_manifest.json\"\ncp \"${UARCH}/moesi_unsupported_private_family_report.json\" \"${OUT}/staged/checkpoint_guardrails.json\"\n./run_gem5.sh --gem5-ckp-dir \"${CKP}\" --experiment \"${COLD_EXP}\" --snapshot \"${SNAP}\" --inst 100000 --cores 8 --timing-ruby-moesi --sim-config \"${OUT}/staged/cold_moesi_8mb.args\"\ncp \"sim_outs/${COLD_EXP}/${SNAP}/stats.txt\" \"${OUT}/cold_100k/stats.txt\"\ncp \"sim_outs/${COLD_EXP}/${SNAP}/config.ini\" \"${OUT}/cold_100k/config.ini\"\n./run_gem5.sh --gem5-ckp-dir \"${CKP}\" --experiment \"${RESTORE_EXP}\" --snapshot \"${SNAP}\" --inst 100000 --cores 8 --timing-ruby-moesi --sim-config \"${OUT}/staged/restore_moesi_all_families_8mb.args\"\ncp \"sim_outs/${RESTORE_EXP}/${SNAP}/stats.txt\" \"${OUT}/restored_100k/stats.txt\"\ncp \"sim_outs/${RESTORE_EXP}/${SNAP}/config.ini\" \"${OUT}/restored_100k/config.ini\"\nfor RUN in \\\n  moesi_snapshot4_llc_restore_smoke_1k_v2 \\\n  moesi_snapshot4_private_owner_restore_smoke_1k_v2 \\\n  moesi_snapshot4_private_plus_clean_restore_smoke_1k_v3 \\\n  moesi_snapshot4_private_plus_single_plus_multi_clean_restore_smoke_1k_v1 \\\n  moesi_snapshot4_private_plus_clean_plus_i_nonllc_restore_smoke_1k_v1 \\\n  moesi_snapshot4_ownerfull_plus_clean_plus_i_restore_smoke_1k_v1 \\\n  moesi_snapshot4_all_families_restore_smoke_1k_v1; do\n  mkdir -p \"${OUT}/smoke_ladder/${RUN}\"\n  cp \"sim_outs/${RUN}/${SNAP}/stats.txt\" \"${OUT}/smoke_ladder/${RUN}/stats.txt\"\n  cp \"sim_outs/${RUN}/${SNAP}/config.ini\" \"${OUT}/smoke_ladder/${RUN}/config.ini\"\ndone\ncat > \"${OUT}/analyses/summarize_moesi_restore_validation.py\" <<\"PY\"\n#!/usr/bin/env python3\nimport json\nfrom pathlib import Path\n\nOUT = Path(__file__).resolve().parents[1]\nmanifest = json.loads((OUT / staged / checkpoint_manifest.json).read_text())\nguardrails = json.loads((OUT / staged / checkpoint_guardrails.json).read_text())\n\ndef read_stats(path: Path):\n    stats = {}\n    with path.open() as fh:\n        for line in fh:\n            parts = line.split()\n            if len(parts) >= 2 and not parts[0].startswith(-):\n                name, val = parts[0], parts[1]\n                try:\n                    stats[name] = int(float(val))\n                except ValueError:\n                    pass\n    return stats\n\ndef sum_suffix(stats, suffix):\n    return sum(v for k, v in stats.items() if k.endswith(suffix))\n\nrestored = read_stats(OUT / restored_100k / stats.txt)\ncold = read_stats(OUT / cold_100k / stats.txt)\nladder_order = [\n    moesi_snapshot4_llc_restore_smoke_1k_v2,\n    moesi_snapshot4_private_owner_restore_smoke_1k_v2,\n    moesi_snapshot4_private_plus_clean_restore_smoke_1k_v3,\n    moesi_snapshot4_private_plus_single_plus_multi_clean_restore_smoke_1k_v1,\n    moesi_snapshot4_private_plus_clean_plus_i_nonllc_restore_smoke_1k_v1,\n    moesi_snapshot4_ownerfull_plus_clean_plus_i_restore_smoke_1k_v1,\n    moesi_snapshot4_all_families_restore_smoke_1k_v1,\n]\nladder_labels = {\n    moesi_snapshot4_llc_restore_smoke_1k_v2: llc_only,\n    moesi_snapshot4_private_owner_restore_smoke_1k_v2: owner_only,\n    moesi_snapshot4_private_plus_clean_restore_smoke_1k_v3: owner_plus_single_clean,\n    moesi_snapshot4_private_plus_single_plus_multi_clean_restore_smoke_1k_v1: owner_plus_single_plus_multi_clean,\n    moesi_snapshot4_private_plus_clean_plus_i_nonllc_restore_smoke_1k_v1: clean_plus_instruction_only,\n    moesi_snapshot4_ownerfull_plus_clean_plus_i_restore_smoke_1k_v1: ownerfull_plus_clean_plus_instruction,\n    moesi_snapshot4_all_families_restore_smoke_1k_v1: all_families,\n}\nladder = []\nfor run in ladder_order:\n    stats = read_stats(OUT / smoke_ladder / run / stats.txt)\n    ladder.append({\n        run: run,\n        label: ladder_labels[run],\n        simInsts: stats[simInsts],\n        simTicks: stats[simTicks],\n        l2_load: stats[system.ruby.l2_cntrl0.L2cache.m_checkpoint_load_total],\n        l2_load_hits: stats[system.ruby.l2_cntrl0.L2cache.m_checkpoint_load_hits],\n        l2_hits: stats[system.ruby.l2_cntrl0.L2cache.m_demand_hits],\n        l2_misses: stats[system.ruby.l2_cntrl0.L2cache.m_demand_misses],\n        l1d_load: sum_suffix(stats, L1Dcache.m_checkpoint_load_total),\n        l1i_load: sum_suffix(stats, L1Icache.m_checkpoint_load_total),\n        l1d_hits: sum_suffix(stats, L1Dcache.m_demand_hits),\n        l1d_misses: sum_suffix(stats, L1Dcache.m_demand_misses),\n        l1i_hits: sum_suffix(stats, L1Icache.m_demand_hits),\n        l1i_misses: sum_suffix(stats, L1Icache.m_demand_misses),\n    })\n\nexpected_family_counts = {\n    moesi_single_private_data_writeable: 5620,\n    moesi_single_private_data_clean: 556,\n    moesi_multi_private_data_clean: 561,\n    moesi_private_instruction_only: 2065,\n}\nphase1 = {\n    unsupported_block_count: guardrails[unsupported_block_count],\n    implemented_family_counts: guardrails[implemented_family_counts],\n    expected_family_counts: expected_family_counts,\n}\nphase1[pass] = (\n    phase1[unsupported_block_count] == 0\n    and phase1[implemented_family_counts] == expected_family_counts\n)\n\nmanifest_counts = {\n    l1d: manifest[components][l1d][line_count],\n    l1i: manifest[components][l1i][line_count],\n    llc: manifest[components][llc][line_count],\n}\nrestored_counts = {\n    l1d: sum_suffix(restored, L1Dcache.m_checkpoint_load_total),\n    l1i: sum_suffix(restored, L1Icache.m_checkpoint_load_total),\n    llc: restored[system.ruby.l2_cntrl0.L2cache.m_checkpoint_load_total],\n}\nphase2 = {\n    manifest_counts: manifest_counts,\n    restored_counts: restored_counts,\n    pass: manifest_counts == restored_counts,\n}\n\nphase3 = {\n    restored_100k: {\n        simInsts: restored[simInsts],\n        simTicks: restored[simTicks],\n        l2_checkpoint_load_hits: restored[system.ruby.l2_cntrl0.L2cache.m_checkpoint_load_hits],\n        l2_demand_hits: restored[system.ruby.l2_cntrl0.L2cache.m_demand_hits],\n        l2_demand_misses: restored[system.ruby.l2_cntrl0.L2cache.m_demand_misses],\n        l1d_checkpoint_loads: restored_counts[l1d],\n        l1i_checkpoint_loads: restored_counts[l1i],\n        l1d_demand_hits: sum_suffix(restored, L1Dcache.m_demand_hits),\n        l1i_demand_hits: sum_suffix(restored, L1Icache.m_demand_hits),\n    }\n}\nphase3[pass] = (\n    phase3[restored_100k][simInsts] > 100000\n    and phase3[restored_100k][l2_checkpoint_load_hits] > 0\n    and phase3[restored_100k][l2_demand_hits] > 0\n    and phase3[restored_100k][l1d_checkpoint_loads] > 0\n    and phase3[restored_100k][l1i_checkpoint_loads] > 0\n    and phase3[restored_100k][l1d_demand_hits] > 0\n    and phase3[restored_100k][l1i_demand_hits] > 0\n)\n\nl2_load_seq = [entry[l2_load] for entry in ladder]\nl1d_load_seq = [entry[l1d_load] for entry in ladder]\nl1i_load_seq = [entry[l1i_load] for entry in ladder]\nphase4_checks = {\n    l2_load_monotonic_non_decreasing: all(b >= a for a, b in zip(l2_load_seq, l2_load_seq[1:])),\n    l1d_load_monotonic_non_decreasing: all(b >= a for a, b in zip(l1d_load_seq, l1d_load_seq[1:])),\n    instruction_restore_activates_l1i: l1i_load_seq[0] == 0 and l1i_load_seq[-1] == manifest_counts[l1i],\n    final_l2_checkpoint_load_hits_exceed_llc_only: ladder[-1][l2_load_hits] > ladder[0][l2_load_hits],\n    final_simticks_below_llc_only: ladder[-1][simTicks] < ladder[0][simTicks],\n}\nphase4 = {\n    ladder: ladder,\n    checks: phase4_checks,\n    pass: all(phase4_checks.values()),\n}\n\ncomparison_100k = {\n    cold: {\n        simInsts: cold[simInsts],\n        simTicks: cold[simTicks],\n        l2_demand_hits: cold[system.ruby.l2_cntrl0.L2cache.m_demand_hits],\n        l2_demand_misses: cold[system.ruby.l2_cntrl0.L2cache.m_demand_misses],\n        l1d_demand_hits: sum_suffix(cold, L1Dcache.m_demand_hits),\n        l1d_demand_misses: sum_suffix(cold, L1Dcache.m_demand_misses),\n        l1i_demand_hits: sum_suffix(cold, L1Icache.m_demand_hits),\n        l1i_demand_misses: sum_suffix(cold, L1Icache.m_demand_misses),\n    },\n    restored: phase3[restored_100k],\n}\ncomparison_100k[delta] = {\n    simTicks: comparison_100k[restored][simTicks] - comparison_100k[cold][simTicks],\n    l2_demand_hits: comparison_100k[restored][l2_demand_hits] - comparison_100k[cold][l2_demand_hits],\n    l2_demand_misses: comparison_100k[restored][l2_demand_misses] - comparison_100k[cold][l2_demand_misses],\n    l1d_demand_hits: comparison_100k[restored][l1d_demand_hits] - comparison_100k[cold][l1d_demand_hits],\n    l1d_demand_misses: comparison_100k[restored][l1d_demand_misses] - comparison_100k[cold][l1d_demand_misses],\n    l1i_demand_hits: comparison_100k[restored][l1i_demand_hits] - comparison_100k[cold][l1i_demand_hits],\n    l1i_demand_misses: comparison_100k[restored][l1i_demand_misses] - comparison_100k[cold][l1i_demand_misses],\n}\ncomparison_100k[directionally_better] = (\n    comparison_100k[delta][simTicks] < 0\n    and comparison_100k[delta][l2_demand_misses] <= 0\n    and comparison_100k[restored][l2_checkpoint_load_hits] > 0\n)\n\nphase5 = {\n    invoked: False,\n    reason: (\n        Residual-miss",
+      "deep",
+      "dive",
+      "was",
+      "not",
+      "required",
+      "because",
+      "phases",
+      "1-4",
+      "were",
+      "\n        clean",
+      "and",
+      "the",
+      "100k",
+      "cold-vs-restored",
+      "comparison",
+      "remained",
+      "\n        directionally",
+      "sensible",
+      "without",
+      "unexplained",
+      "protocol",
+      "symptoms.\n    ),\n}\n\nvalidated = phase1[pass] and phase2[pass] and phase3[pass] and phase4[pass] and comparison_100k[directionally_better]\nreport = {\n    schema_version: 1,\n    validated: validated,\n    phase1: phase1,\n    phase2: phase2,\n    phase3: phase3,\n    phase4: phase4,\n    phase5: phase5,\n    comparison_100k: comparison_100k,\n}\n(OUT / analyses / moesi_restore_validation_report.json).write_text(json.dumps(report, indent=2) + n)\nmd = []\nmd.append(#",
+      "MOESI",
+      "Restore",
+      "Validation)\nmd.append()\nmd.append(f\"Verdict: {validated if validated else not",
+      "yet",
+      "validated}\")\nmd.append()\nmd.append(##",
+      "Snapshot_4",
+      "Family",
+      "Coverage)\nmd.append(f\"- unsupported families observed: {phase1[unsupported_block_count]}\")\nfor name, count in sorted(phase1[implemented_family_counts].items()):\n    md.append(f\"- {name}: {count}\")\nmd.append()\nmd.append(##",
+      "Restore",
+      "Count",
+      "Reconciliation)\nfor name in (l1d,l1i,llc):\n    md.append(f\"- {name}: manifest {manifest_counts[name]}, restored {restored_counts[name]}\")\nmd.append()\nmd.append(##",
+      "100k",
+      "Cold",
+      "vs",
+      "Restored)\nmd.append(f\"- cold simTicks: {comparison_100k[cold][simTicks]}\")\nmd.append(f\"- restored simTicks: {comparison_100k[restored][simTicks]}\")\nmd.append(f\"- delta simTicks: {comparison_100k[delta][simTicks]}\")\nmd.append(f\"- cold L2 demand misses: {comparison_100k[cold][l2_demand_misses]}\")\nmd.append(f\"- restored L2 demand misses: {comparison_100k[restored][l2_demand_misses]}\")\nmd.append(f\"- restored L2 checkpoint load hits: {comparison_100k[restored][l2_checkpoint_load_hits]}\")\nmd.append()\nmd.append(##",
+      "1k",
+      "Family",
+      "Ladder",
+      "Checks)\nfor name, passed in phase4_checks.items():\n    md.append(f\"- {name}: {pass if passed else fail}\")\nmd.append()\nmd.append(##",
+      "Residual-Miss",
+      "Deep",
+      "Dive)\nmd.append(f\"- invoked: {phase5[invoked]}\")\nmd.append(f\"- reason: {phase5[reason]}\")\n(OUT / analyses / MOESI_RESTORE_VALIDATION.md).write_text(n.join(md) + n)\nPY\npython3 \"${OUT}/analyses/summarize_moesi_restore_validation.py\"\n"
+    ]
+  },
+  "intent": {
+    "source_path": "INTENT.txt",
+    "staged_path": "INTENT.txt",
+    "text": "Question: Does the current MOESI_CMP_directory multicore restore stack for\nsnapshot_4 provide a trustworthy warm-start restoration for all observed\nsteady-state private/coherent families under the agreed validation process?\n\nSetup:\n- data-caching-8core snapshot_4 checkpoint lineage\n- gem5 timing-ruby MOESI_CMP_directory full-system O3CPU run\n- 8 cores, 8MB shared L2/LLC, 64kB private L1I/L1D caches\n- current canonical QPoints converter with strict MOESI private-family\n  guardrails enabled\n- one 100k restored reference run and one 100k cold comparison run\n- previously staged 1k MOESI smoke ladder used to assess incremental family\n  usefulness across LLC-only, owner, clean, multi-clean, and instruction-only\n  slices\n\nAcceptance:\n- the strict MOESI guardrail report observes zero unsupported private families\n  in snapshot_4\n- emitted checkpoint family counts match the staged restore artifacts\n- restored gem5 load counters reconcile exactly with the emitted manifest counts\n  for L1D, L1I, and LLC\n- the restored 100k run completes naturally and uses restored state in L1D,\n  L1I, and L2\n- the 1k family ladder shows directionally sensible activation/usefulness as\n  additional families are enabled\n- the restored 100k run is directionally better than the cold 100k comparison\n  on warm-start metrics without surfacing protocol/runtime failures\n\nArtifacts:\n- exact sim-config files for the cold and restored 100k runs\n- staged checkpoint manifest and MOESI guardrail report\n- cold and restored 100k stats/config outputs\n- staged 1k smoke-ladder stats used for family-by-family comparison\n- compact validation report and machine-readable summary\n"
+  },
+  "kind": "experiment",
+  "lessons": [],
+  "lifecycle": {
+    "retention_policy": "keep",
+    "state": "reference"
+  },
+  "provenance": {
+    "clean_run_policy": {
+      "allowed_dirty_paths": {
+        "QPoints": [
+          "scripts/uarch_restore/analyze_multicore_coherence.py",
+          "validation_records/reference_moesi_multicore_restore_100k/snapshot_4"
+        ],
+        "gem5": [],
+        "qflex": [
+          "QPoints"
+        ]
+      },
+      "enforced": true
+    },
+    "created_at_utc": "2026-05-29T14:02:05+00:00",
+    "output_dir": ".",
+    "path_aliases": {
+      "QPoints": "<QPoints>",
+      "gem5": "<gem5>",
+      "qflex": "<qflex>"
+    },
+    "repo_states": {
+      "QPoints": {
+        "allowed_dirty_paths": [
+          "scripts/uarch_restore/analyze_multicore_coherence.py",
+          "validation_records/reference_moesi_multicore_restore_100k/snapshot_4"
+        ],
+        "branch": "ali/real-workload-bringup",
+        "dirty": false,
+        "dirty_entries": [],
+        "head": "4c75d55aa8e176a5ef39657204dae924c7f00ff8",
+        "ignored_dirty_entries": [
+          "?? scripts/uarch_restore/analyze_multicore_coherence.py",
+          "?? validation_records/reference_moesi_multicore_restore_100k/snapshot_4/INTENT.txt"
+        ],
+        "path": "<QPoints>",
+        "raw_dirty": true
+      },
+      "gem5": {
+        "allowed_dirty_paths": [],
+        "branch": "ali/real-workload-bringup",
+        "dirty": false,
+        "dirty_entries": [],
+        "head": "53ce97afe949bd1619bd018672f81549038b2854",
+        "ignored_dirty_entries": [],
+        "path": "<gem5>",
+        "raw_dirty": false
+      },
+      "qflex": {
+        "allowed_dirty_paths": [
+          "QPoints"
+        ],
+        "branch": "ali/real-workload-bringup",
+        "dirty": false,
+        "dirty_entries": [],
+        "head": "bd85bc6e31f94a1dc826b9c572642d3b74d2a861",
+        "ignored_dirty_entries": [
+          " M QPoints"
+        ],
+        "path": "<qflex>",
+        "raw_dirty": true
+      }
+    },
+    "script": "<QPoints>/scripts/validation/run_experiment.py",
+    "updated_at_utc": "2026-05-29T14:02:47+00:00"
+  },
+  "question": "Does the current MOESI_CMP_directory snapshot_4 restore path satisfy the agreed family-coverage, restore-count, activation, and warm-usefulness validation gates?",
+  "result": {
+    "outcome": "passed",
+    "summary": "snapshot_4 MOESI restore meets the agreed validation gates: guardrails are clean, restore counts reconcile exactly, warm-state structures are exercised, the 1k family ladder behaves sensibly, and the restored 100k reference run is directionally better than cold.",
+    "metrics": {
+      "cold_simTicks": 116344000,
+      "restored_simTicks": 97780000,
+      "restored_l2_checkpoint_load_total": 68842,
+      "restored_l2_checkpoint_load_hits": 2924,
+      "restored_l2_demand_hits": 2273,
+      "restored_l2_demand_misses": 6096,
+      "restored_l1d_checkpoint_load_total": 7905,
+      "restored_l1i_checkpoint_load_total": 8192,
+      "unsupported_private_family_blocks": 0
+    }
+  },
+  "schema_version": 2,
+  "supersedes": [],
+  "tags": [
+    "moesi",
+    "restore",
+    "snapshot_4",
+    "multicore"
+  ],
+  "title": "MOESI snapshot_4 multicore restore reference"
+}
