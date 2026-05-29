@@ -991,11 +991,12 @@ def prepare_snapshot_gem5_uarch(
                 },
                 "candidate_file": str(l2_shared_restore_candidate_file),
                 "restore_file": str(l2_shared_restore_file),
-                "line_count": len(l2_shared_candidates),
+                "line_count": l2_shared_stats["total_sharer_cores"],
+                "block_count": len(l2_shared_candidates),
                 "selection_policy": (
                     "all clean directory-shared private lines, emitted once "
-                    "per unique L1 controller sharer so the inclusive gem5 "
-                    "L2 can reconstruct SS state and sharer metadata during "
+                    "per unique core sharer so the inclusive gem5 L2 can "
+                    "reconstruct SS state and sharer metadata during "
                     "multicore warm restore"
                 ),
                 "stats": l2_shared_stats,
