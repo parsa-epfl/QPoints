@@ -9,6 +9,8 @@ Detailed project notes are also available in the supplemental
 [Notion README](https://www.notion.so/README-2ea46d7f056e80d1aeb5f644d6bb0204?source=copy_link).
 Keep the local README as the version-controlled quickstart.
 
+Tracked deferred engineering notes live in [DEFERRED_FIXES.md](DEFERRED_FIXES.md).
+
 ## Requirements
 
 - QEMU/QFlex snapshot inputs
