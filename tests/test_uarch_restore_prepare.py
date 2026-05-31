@@ -672,7 +672,7 @@ def test_prepare_snapshot_gem5_uarch_emits_first_moesi_private_owner_slice(
         gem5_uarch_dir / "moesi_l1d_single_private_data_writeable.core1.txt"
     )
 
-    assert restore_file.read_text(encoding="utf-8") == "0x201\n0x281\n"
+    assert restore_file.read_text(encoding="utf-8") == "0x200 1\n0x280 1\n"
     assert l1d_restore_file.read_text(encoding="utf-8") == "0x200 M\n0x280 M\n"
 
     candidates = json.loads(candidate_file.read_text(encoding="utf-8"))
@@ -800,7 +800,7 @@ def test_prepare_snapshot_gem5_uarch_emits_first_moesi_private_clean_slice(
     )
 
     assert llc_restore_file.read_text(encoding="utf-8") == "0x200\n"
-    assert restore_file.read_text(encoding="utf-8") == "0x201\n"
+    assert restore_file.read_text(encoding="utf-8") == "0x200 1\n"
     assert l1d_restore_file.read_text(encoding="utf-8") == "0x200 S\n"
 
     candidates = json.loads(candidate_file.read_text(encoding="utf-8"))
@@ -959,8 +959,8 @@ def test_prepare_snapshot_gem5_uarch_emits_moesi_multi_private_clean_slice(
     )
 
     assert llc_restore_file.read_text(encoding="utf-8") == "0x300\n"
-    assert restore_file.read_text(encoding="utf-8") == "0x300\n0x302\n"
-    assert nonllc_restore_file.read_text(encoding="utf-8") == "0x340\n0x342\n"
+    assert restore_file.read_text(encoding="utf-8") == "0x300 0\n0x300 2\n"
+    assert nonllc_restore_file.read_text(encoding="utf-8") == "0x340 0\n0x340 2\n"
     assert l1d_restore_file0.read_text(encoding="utf-8") == "0x300 S\n0x340 S\n"
     assert l1d_restore_file2.read_text(encoding="utf-8") == "0x300 S\n0x340 S\n"
 
@@ -1141,8 +1141,8 @@ def test_prepare_snapshot_gem5_uarch_emits_moesi_private_instruction_only_slice(
     )
 
     assert llc_restore_file.read_text(encoding="utf-8") == "0x340\n"
-    assert restore_file.read_text(encoding="utf-8") == "0x340\n0x341\n"
-    assert nonllc_restore_file.read_text(encoding="utf-8") == "0x380\n0x381\n"
+    assert restore_file.read_text(encoding="utf-8") == "0x340 0\n0x340 1\n"
+    assert nonllc_restore_file.read_text(encoding="utf-8") == "0x380 0\n0x380 1\n"
     assert l1i_restore_file0.read_text(encoding="utf-8") == "0x340 S\n0x380 S\n"
     assert l1i_restore_file1.read_text(encoding="utf-8") == "0x340 S\n0x380 S\n"
 

@@ -253,17 +253,9 @@ def _write_l2_shared_restore_file(
     )
 
 
-def _encode_moesi_private_owner_restore_addr(line_addr: int, owner_core: int) -> int:
-    # MOESI private-owner restore preserves non-inclusive residency, so the
-    # shared L2/directory import path needs the owner core without adding a
-    # second parser contract. QFlex cache lines are 64B-aligned, which leaves
-    # the low six bits free to carry the owner core in the one-token warm file.
-    return line_addr | owner_core
-
-
-def _write_moesi_private_owner_restore_file(
+def _write_moesi_private_core_restore_file(
     path: Path,
-    entries: list[dict],
+    pairs: list[tuple[int, int]],
     overwrite: bool,
 ) -> None:
     if path.exists() and not overwrite:
@@ -272,11 +264,23 @@ def _write_moesi_private_owner_restore_file(
             "Pass --overwrite to replace it."
         )
     path.write_text(
-        "".join(
-            f"{_encode_moesi_private_owner_restore_addr(int(entry['line_addr'], 16), int(entry['owner_core'])):#x}\n"
-            for entry in entries
-        ),
+        "".join(f"{line_addr:#x} {core}\n" for line_addr, core in pairs),
         encoding="utf-8",
+    )
+
+
+def _write_moesi_private_owner_restore_file(
+    path: Path,
+    entries: list[dict],
+    overwrite: bool,
+) -> None:
+    _write_moesi_private_core_restore_file(
+        path,
+        [
+            (int(entry["line_addr"], 16), int(entry["owner_core"]))
+            for entry in entries
+        ],
+        overwrite,
     )
 
 
@@ -291,18 +295,14 @@ def _write_moesi_private_clean_restore_file(
     entries: list[dict],
     overwrite: bool,
 ) -> None:
-    if path.exists() and not overwrite:
-        raise FileExistsError(
-            f"Refusing to overwrite existing gem5 uarch artifact: {path}. "
-            "Pass --overwrite to replace it."
-        )
-    path.write_text(
-        "".join(
-            f"{_encode_moesi_private_owner_restore_addr(int(entry['line_addr'], 16), int(core)):#x}\n"
+    _write_moesi_private_core_restore_file(
+        path,
+        [
+            (int(entry["line_addr"], 16), int(core))
             for entry in entries
             for core in _moesi_private_clean_sharer_cores(entry)
-        ),
-        encoding="utf-8",
+        ],
+        overwrite,
     )
 
 
@@ -1720,12 +1720,8 @@ def prepare_snapshot_gem5_uarch(
                 "restore_file": str(l2_shared_restore_file),
                 "line_count": l2_shared_stats["total_sharer_cores"],
                 "block_count": len(l2_shared_candidates),
-                "selection_policy": (
-                    "all clean directory-shared private lines, emitted once "
-                    "per unique core sharer with the core encoded in the "
-                    "low address bits so the inclusive gem5 L2 can "
-                    "reconstruct SS state and sharer metadata during "
-                    "multicore warm restore"
+                "selection_policy": _l2_shared_restore_selection_policy(
+                    ruby_protocol
                 ),
                 "stats": l2_shared_stats,
             },
