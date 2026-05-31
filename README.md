@@ -48,7 +48,12 @@ Optional environment variables:
 ## Run a Checkpoint in gem5
 
 The default mode preserves the existing classic gem5 flow. Add `--timing-ruby`
-to use the O3CPU + Ruby MESI_Two_Level configuration.
+to use the O3CPU + Ruby MESI_Two_Level configuration, or
+`--timing-ruby-moesi` to use the MOESI_CMP_directory timing-Ruby path for
+non-inclusive cache restore. This path requests the staged LLC/L1 cache
+restore slices by default, uses the validated 8MB shared-cache geometry for
+that restore path, and falls back to cold state only for slices whose
+artifacts are missing.
 
 ```bash
 ./run_gem5.sh --gem5-ckp-dir gem5_checkpoints --experiment test \
@@ -59,3 +64,31 @@ to use the O3CPU + Ruby MESI_Two_Level configuration.
 ./run_gem5.sh --gem5-ckp-dir gem5_checkpoints --experiment test \
   --snapshot snapshot_0 --inst 100000 --cores 1 --timing-ruby
 ```
+
+
+```bash
+./run_gem5.sh --gem5-ckp-dir gem5_checkpoints --experiment test \
+  --snapshot snapshot_0 --inst 100000 --cores 1 --timing-ruby-moesi
+```
+
+## Current Protocol Direction
+
+The current `--timing-ruby` path still uses the O3CPU + Ruby `MESI_Two_Level`
+configuration as the active bring-up and partial-reference path. That remains
+useful for LLC restore, frontend validation, and the already translated clean
+shared-private restore family.
+
+For faithful multicore private-state restoration, the long-term direction has
+changed. The current WormCache/QFlex checkpoints come from a non-inclusive
+shared-cache model, and the important private-present / shared-missing families
+cannot be represented faithfully in `MESI_Two_Level` without inventing LLC
+residency in gem5. Because that would change LLC occupancy and future
+replacement behavior, the intended end-state migration is toward a
+non-inclusive gem5 Ruby protocol, with `MOESI_CMP_directory` as the leading
+candidate.
+
+Treat the current MESI timing path as the maintained bring-up path, not the
+final faithful target for full multicore private-cache restore. The current
+`--timing-ruby-moesi` path now restores the staged LLC/L1 cache slices for the
+non-inclusive migration; BTB/TAGE restore remains outside that path and stays
+on the MESI/reference side for now.

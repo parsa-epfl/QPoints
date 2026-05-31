@@ -38,6 +38,7 @@ The tests are split into two groups:
     - `--data-trace`
     - `--dump-cache-state`
     - `--timing-ruby`
+    - `--timing-ruby-moesi`
     - `--sim-config`
 
 - [test_integration_run_gem5.py](/home/dev/qflex_git/QPoints/tests/test_integration_run_gem5.py)
@@ -53,6 +54,9 @@ The tests are split into two groups:
     - Ruby restore sentinel with explicit acceptance criteria:
       - `m_checkpoint_load_total > 0`
       - `L2cache.m_demand_hits > 0`
+    - MOESI restore sentinel with explicit acceptance criteria:
+      - `m_checkpoint_load_total > 0`
+      - `L2cache.m_checkpoint_load_hits > 0`
 
 ## How to run
 

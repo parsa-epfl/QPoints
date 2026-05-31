@@ -238,6 +238,9 @@ def test_run_gem5_ruby_data_trace_and_cache_dump(
     assert (outdir / "stats.txt").is_file()
     assert (outdir / "data_trace_core_0.log").is_file()
     assert (outdir / "ruby_l2cache0_dump.txt").is_file()
+    config_text = (outdir / "config.ini").read_text(encoding="utf-8")
+    assert "fdip=true" in config_text
+    assert "ftqSize=8" in config_text
 
 
 def test_run_gem5_ruby_branch_trace(
@@ -344,3 +347,94 @@ def test_run_gem5_ruby_restore_sentinel(
         )
         > 0
     )
+
+
+
+def test_run_gem5_moesi_restore_sentinel(
+    repo_root: Path,
+    integration_env,
+    artifact_paths,
+    converted_snapshot: str,
+):
+    if shutil.which("zstd") is None:
+        pytest.skip("zstd is required for the MOESI restore sentinel")
+
+    prepare_script = repo_root / "scripts" / "uarch_restore" / "prepare_gem5_uarch.py"
+    qflex_ckp_dir = Path(integration_env.get("qflex_ckp_dir"))
+    qflex_run_dir = Path(integration_env.get("qflex_run_dir", qflex_ckp_dir / "run"))
+    gem5_ckp_dir = Path(integration_env.get("gem5_ckp_dir"))
+    qflex_uarch_dir = qflex_run_dir / f"{converted_snapshot}.uarch"
+    gem5_uarch_dir = gem5_ckp_dir / converted_snapshot / "gem5_uarch"
+    gem5_uarch_preexisting = gem5_uarch_dir.exists()
+
+    if not gem5_uarch_preexisting:
+        if not qflex_uarch_dir.is_dir():
+            pytest.skip(f"QFlex uarch inputs not found for MOESI restore sentinel: {qflex_uarch_dir}")
+
+        required_uarch_inputs = (
+            qflex_uarch_dir / "llc-0.json.zstd",
+            qflex_uarch_dir / "directory-0.json.zstd",
+            qflex_uarch_dir / "harvard-0.json.zstd",
+        )
+        missing_inputs = [path for path in required_uarch_inputs if not path.is_file()]
+        if missing_inputs:
+            missing_str = ", ".join(str(path) for path in missing_inputs)
+            pytest.skip(
+                "MOESI restore sentinel requires complete uarch inputs; "
+                f"missing: {missing_str}"
+            )
+
+        subprocess.run(
+            [
+                sys.executable,
+                str(prepare_script),
+                "--qflex-run-dir",
+                str(qflex_run_dir),
+                "--gem5-workload-root",
+                str(gem5_ckp_dir),
+                "--snapshot",
+                converted_snapshot,
+                "--ruby-protocol",
+                "moesi_cmp_directory",
+                "--overwrite",
+            ],
+            check=True,
+            cwd=repo_root,
+        )
+        if gem5_uarch_dir not in artifact_paths:
+            artifact_paths.append(gem5_uarch_dir)
+
+    outdir = _run_gem5(
+        repo_root,
+        integration_env,
+        artifact_paths,
+        converted_snapshot,
+        "pytest_qpoints_moesi_restore_sentinel_1k",
+        "--timing-ruby-moesi",
+        insts=1000,
+    )
+
+    stats_path = outdir / "stats.txt"
+    config_path = outdir / "config.ini"
+    assert stats_path.is_file()
+    assert config_path.is_file()
+    assert (
+        _stat_value(
+            stats_path,
+            "system.ruby.l2_cntrl0.L2cache.m_checkpoint_load_total",
+        )
+        > 0
+    )
+    assert (
+        _stat_value(
+            stats_path,
+            "system.ruby.l2_cntrl0.L2cache.m_checkpoint_load_hits",
+        )
+        > 0
+    )
+
+    config_text = config_path.read_text(encoding="utf-8")
+    assert "fdip=true" in config_text
+    assert "ftqSize=8" in config_text
+    assert "restore_llc_state=true" in config_text
+    assert "restore_private_owner_state=true" in config_text

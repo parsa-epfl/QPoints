@@ -7,7 +7,7 @@ fi
 
 usage() {
   cat <<'EOF'
-Usage: run_gem5.sh --gem5-ckp-dir DIR --experiment NAME --snapshot NAME --inst N --cores N [--branch-trace] [--tage-decision-trace] [--data-trace] [--dump-cache-state] [--timing-ruby] [--sim-config FILE]
+Usage: run_gem5.sh --gem5-ckp-dir DIR --experiment NAME --snapshot NAME --inst N --cores N [--branch-trace] [--tage-decision-trace] [--data-trace] [--dump-cache-state] [--timing-ruby] [--timing-ruby-moesi] [--sim-config FILE]
 
 Arguments (all required):
   --gem5-ckp-dir  Checkpoint root directory
@@ -23,9 +23,15 @@ Options:
   --data-trace    Enable per-core data access trace logging
   --dump-cache-state
                   Enable Ruby cache-state dumping (currently requires
-                  --timing-ruby)
-  --timing-ruby   Use O3CPU with Ruby MESI_Two_Level. Without this flag,
-                  the existing starter_fs.py AtomicSimpleCPU config is used.
+                  the MESI timing-Ruby path)
+  --timing-ruby   Use O3CPU with Ruby MESI_Two_Level. Without a timing-Ruby
+                  flag, the existing starter_fs.py AtomicSimpleCPU config is
+                  used.
+  --timing-ruby-moesi
+                  Use O3CPU with Ruby MOESI_CMP_directory and request the
+                  staged LLC/L1 cache restore slices by default. If the
+                  matching gem5_uarch artifacts are missing, gem5 will warn
+                  and fall back to cold state for the missing slice.
   --sim-config    Optional file containing additional gem5 CLI arguments,
                   one per line. This is appended after the tracked default
                   config for the selected simulation path. This file owns
@@ -121,6 +127,14 @@ validate_sim_config_args() {
   done
 }
 
+select_timing_ruby_protocol() {
+  local protocol="$1"
+  if [[ -n "$TIMING_RUBY_PROTOCOL" && "$TIMING_RUBY_PROTOCOL" != "$protocol" ]]; then
+    die "Choose only one timing Ruby protocol flag."
+  fi
+  TIMING_RUBY_PROTOCOL="$protocol"
+}
+
 if [[ "$1" == "-h" || "$1" == "--help" ]]; then
   usage
   exit 0
@@ -130,11 +144,16 @@ ROOT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 export M5_PATH="${ROOT_DIR}/bin/m5"
 GEM5_HOME="${ROOT_DIR}/gem5"
 GEM5_CFG_CLASSIC="${GEM5_HOME}/configs/example/arm/starter_fs.py"
-GEM5_CFG_TIMING_RUBY="${GEM5_HOME}/configs/example/arm/qpoints_mesi_fs.py"
+# The current timing-Ruby FS launcher is shared by the MESI bring-up path
+# and the early MOESI cold-bring-up path.
+GEM5_CFG_TIMING_RUBY_FS="${GEM5_HOME}/configs/example/arm/qpoints_timing_ruby_fs.py"
 GEM5_BIN_CLASSIC="${GEM5_HOME}/build/ARM/gem5.opt"
-GEM5_BIN_TIMING_RUBY="${GEM5_HOME}/build/ARM_MESI_Two_Level/gem5.opt"
+GEM5_BIN_TIMING_RUBY_MESI="${GEM5_HOME}/build/ARM_MESI_Two_Level/gem5.opt"
+GEM5_BIN_TIMING_RUBY_MOESI="${GEM5_HOME}/build/ARM_MOESI_CMP_directory/gem5.opt"
 DEFAULT_CLASSIC_SIM_CONFIG="${ROOT_DIR}/configs/classic_atomic_gem5.args"
-DEFAULT_TIMING_RUBY_SIM_CONFIG="${ROOT_DIR}/configs/timing_ruby_gem5.args"
+DEFAULT_TIMING_RUBY_FRONTEND_SIM_CONFIG="${ROOT_DIR}/configs/timing_ruby_frontend_fdip.args"
+DEFAULT_TIMING_RUBY_MESI_SIM_CONFIG="${ROOT_DIR}/configs/timing_ruby_gem5.args"
+DEFAULT_TIMING_RUBY_MOESI_SIM_CONFIG="${ROOT_DIR}/configs/timing_ruby_moesi_gem5.args"
 
 GEM5_CKP_DIR=""
 EXPERIMENT=""
@@ -146,7 +165,7 @@ BRANCH_TRACE_ARGS=()
 TAGE_DECISION_TRACE_ARGS=()
 DATA_TRACE_ARGS=()
 DUMP_CACHE_STATE_ARGS=()
-TIMING_RUBY=""
+TIMING_RUBY_PROTOCOL=""
 
 while [[ $# -gt 0 ]]; do
   case "$1" in
@@ -197,7 +216,11 @@ while [[ $# -gt 0 ]]; do
       shift 2
       ;;
     --timing-ruby)
-      TIMING_RUBY="1"
+      select_timing_ruby_protocol "MESI_Two_Level"
+      shift 1
+      ;;
+    --timing-ruby-moesi)
+      select_timing_ruby_protocol "MOESI_CMP_directory"
       shift 1
       ;;
     *)
@@ -227,25 +250,56 @@ require_file "$BOOTLOADER" "Bootloader"
 
 mkdir -p "$OUTDIR"
 
-if [[ "${#DUMP_CACHE_STATE_ARGS[@]}" -gt 0 && -z "$TIMING_RUBY" ]]; then
-  die "--dump-cache-state requires --timing-ruby."
+if [[ "${#DUMP_CACHE_STATE_ARGS[@]}" -gt 0 && -z "$TIMING_RUBY_PROTOCOL" ]]; then
+  die "--dump-cache-state requires a timing Ruby mode."
 fi
 
-if [[ -n "$TIMING_RUBY" ]]; then
-  require_executable "$GEM5_BIN_TIMING_RUBY" "Timing Ruby gem5 binary"
-  require_file "$GEM5_CFG_TIMING_RUBY" "Timing Ruby gem5 config"
+if [[ "${#DUMP_CACHE_STATE_ARGS[@]}" -gt 0 && "$TIMING_RUBY_PROTOCOL" != "MESI_Two_Level" ]]; then
+  die "--dump-cache-state is currently supported only on the MESI timing-Ruby path."
+fi
+
+if [[ -n "$TIMING_RUBY_PROTOCOL" ]]; then
+  timing_ruby_bin=""
+  timing_ruby_cfg="$GEM5_CFG_TIMING_RUBY_FS"
+  timing_ruby_default_sim_config=""
+  TIMING_RUBY_RESTORE_ARGS=()
+
+  case "$TIMING_RUBY_PROTOCOL" in
+    MESI_Two_Level)
+      timing_ruby_bin="$GEM5_BIN_TIMING_RUBY_MESI"
+      timing_ruby_default_sim_config="$DEFAULT_TIMING_RUBY_MESI_SIM_CONFIG"
+      ;;
+    MOESI_CMP_directory)
+      timing_ruby_bin="$GEM5_BIN_TIMING_RUBY_MOESI"
+      timing_ruby_default_sim_config="$DEFAULT_TIMING_RUBY_MOESI_SIM_CONFIG"
+      TIMING_RUBY_RESTORE_ARGS=(
+        --restore-llc-state
+        --restore-l1d-state
+        --restore-l1i-state
+      )
+      ;;
+    *)
+      die "Unsupported timing Ruby protocol: $TIMING_RUBY_PROTOCOL"
+      ;;
+  esac
+
+  require_executable "$timing_ruby_bin" "Timing Ruby gem5 binary"
+  require_file "$timing_ruby_cfg" "Timing Ruby gem5 config"
+  require_file "$DEFAULT_TIMING_RUBY_FRONTEND_SIM_CONFIG" "Timing Ruby frontend config"
+  require_file "$timing_ruby_default_sim_config" "Timing Ruby default config"
 
   TIMING_RUBY_CONFIG_ARGS=()
-  load_gem5_args_file "$DEFAULT_TIMING_RUBY_SIM_CONFIG" TIMING_RUBY_CONFIG_ARGS
+  append_gem5_args_file "$DEFAULT_TIMING_RUBY_FRONTEND_SIM_CONFIG" TIMING_RUBY_CONFIG_ARGS
+  append_gem5_args_file "$timing_ruby_default_sim_config" TIMING_RUBY_CONFIG_ARGS
   if [[ -n "$SIM_CONFIG" ]]; then
     append_gem5_args_file "$SIM_CONFIG" TIMING_RUBY_CONFIG_ARGS
   fi
 
   gem5_cmd=(
-    "$GEM5_BIN_TIMING_RUBY"
+    "$timing_ruby_bin"
     "--outdir=${OUTDIR}"
     "--debug-file=debug.insts"
-    "$GEM5_CFG_TIMING_RUBY"
+    "$timing_ruby_cfg"
     -I "$INST"
     "--disk-image=${DISK_IMAGE}"
     "--bootloader=${BOOTLOADER}"
@@ -254,6 +308,7 @@ if [[ -n "$TIMING_RUBY" ]]; then
     --restore "$CKPT_DIR"
     --num-cores "$CORES"
     --mem-size 16384MiB
+    "${TIMING_RUBY_RESTORE_ARGS[@]}"
     "${TIMING_RUBY_CONFIG_ARGS[@]}"
     "${BRANCH_TRACE_ARGS[@]}"
     "${TAGE_DECISION_TRACE_ARGS[@]}"
