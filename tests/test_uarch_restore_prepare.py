@@ -1284,6 +1284,82 @@ def test_prepare_snapshot_gem5_uarch_rejects_moesi_single_clean_nonllc_family(
     )
 
 
+def test_prepare_snapshot_gem5_uarch_reports_modified_instruction_only_family(
+    tmp_path: Path,
+):
+    module = _load_prepare_module()
+
+    qflex_run_dir = tmp_path / "qflex-run"
+    gem5_workload_root = tmp_path / "gem5-workload"
+    source_dir = qflex_run_dir / "snapshot_0.uarch"
+    source_dir.mkdir(parents=True)
+    gem5_workload_root.mkdir()
+    (gem5_workload_root / "snapshot_0").mkdir()
+
+    line_addr = 0x480
+
+    _write_zstd_json(
+        source_dir / "llc-0.json.zstd",
+        {"blocks": [{"blocks": []}]},
+    )
+    _write_zstd_json(
+        source_dir / "directory-0.json.zstd",
+        {
+            "entries": [
+                {
+                    str(line_addr // 64): {
+                        "shared": True,
+                        "in_shared_cache": False,
+                    }
+                }
+            ]
+        },
+    )
+    _write_zstd_json(
+        source_dir / "harvard-0.json.zstd",
+        [
+            {
+                "i_cache": [
+                    {
+                        "lines": [
+                            _make_harvard_line(
+                                line_addr,
+                                writeable=False,
+                                modified=True,
+                                ts=7,
+                                is_instruction=True,
+                            )
+                        ]
+                    }
+                ],
+                "d_cache": [{"lines": []}],
+            }
+        ],
+    )
+
+    with pytest.raises(RuntimeError, match="anything_else"):
+        module.prepare_snapshot_gem5_uarch(
+            qflex_run_dir=qflex_run_dir,
+            gem5_workload_root=gem5_workload_root,
+            snapshot="snapshot_0",
+            overwrite=True,
+            ruby_protocol=module.RUBY_PROTOCOL_MOESI_CMP_DIRECTORY,
+        )
+
+    report_file = (
+        gem5_workload_root
+        / "snapshot_0"
+        / "gem5_uarch"
+        / "moesi_unsupported_private_family_report.json"
+    )
+    report = json.loads(report_file.read_text(encoding="utf-8"))
+    assert report["unsupported_block_count"] == 1
+    assert report["observed_unsupported_families"]["anything_else"][
+        "block_count"
+    ] == 1
+    assert report["implemented_family_counts"]["moesi_private_instruction_only"] == 0
+
+
 def test_prepare_snapshot_gem5_uarch_rejects_moesi_anything_else_family(
     tmp_path: Path,
 ):

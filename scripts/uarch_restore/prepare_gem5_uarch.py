@@ -1270,6 +1270,7 @@ def _select_moesi_private_instruction_only_candidates(
         "directory_backed_block_ids": 0,
         "d_sharer_block_ids_skipped": 0,
         "instruction_only_block_ids": 0,
+        "modified_instruction_block_ids_skipped": 0,
         "llc_backed_block_ids": 0,
         "non_llc_backed_block_ids": 0,
         "directory_nonshared_block_ids_skipped": 0,
@@ -1292,6 +1293,10 @@ def _select_moesi_private_instruction_only_candidates(
         if not priv["i_cores"]:
             continue
         stats["instruction_only_block_ids"] += 1
+
+        if priv["any_i_modified"]:
+            stats["modified_instruction_block_ids_skipped"] += 1
+            continue
 
         if not bool(dir_meta.get("shared", False)):
             stats["directory_nonshared_block_ids_skipped"] += 1
