@@ -86,7 +86,7 @@ if [[ -z "$GEM5_CKP_DIR" || -z "$EXPERIMENT" || -z "$SNAPSHOT" || -z "$INST" || 
   exit 1
 fi
 
-CKPT_DIR="${GEM5_CKP_DIR}/${SNAPSHOT}.gem"
+CKPT_DIR="${GEM5_CKP_DIR}/${SNAPSHOT}"
 
 if [[ -z "$TLB_OUTPUT_DIR" ]]; then
   TLB_OUTPUT_DIR="$CKPT_DIR"
