@@ -54,6 +54,9 @@ The tests are split into two groups:
     - Ruby restore sentinel with explicit acceptance criteria:
       - `m_checkpoint_load_total > 0`
       - `L2cache.m_demand_hits > 0`
+    - MOESI restore sentinel with explicit acceptance criteria:
+      - `m_checkpoint_load_total > 0`
+      - `L2cache.m_checkpoint_load_hits > 0`
 
 ## How to run
 

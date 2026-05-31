@@ -28,8 +28,10 @@ Options:
                   flag, the existing starter_fs.py AtomicSimpleCPU config is
                   used.
   --timing-ruby-moesi
-                  Use O3CPU with Ruby MOESI_CMP_directory. This is the tracked
-                  cold bring-up path for the non-inclusive migration.
+                  Use O3CPU with Ruby MOESI_CMP_directory and request the
+                  staged LLC/L1 cache restore slices by default. If the
+                  matching gem5_uarch artifacts are missing, gem5 will warn
+                  and fall back to cold state for the missing slice.
   --sim-config    Optional file containing additional gem5 CLI arguments,
                   one per line. This is appended after the tracked default
                   config for the selected simulation path. This file owns
@@ -149,7 +151,8 @@ GEM5_BIN_CLASSIC="${GEM5_HOME}/build/ARM/gem5.opt"
 GEM5_BIN_TIMING_RUBY_MESI="${GEM5_HOME}/build/ARM_MESI_Two_Level/gem5.opt"
 GEM5_BIN_TIMING_RUBY_MOESI="${GEM5_HOME}/build/ARM_MOESI_CMP_directory/gem5.opt"
 DEFAULT_CLASSIC_SIM_CONFIG="${ROOT_DIR}/configs/classic_atomic_gem5.args"
-DEFAULT_TIMING_RUBY_SIM_CONFIG="${ROOT_DIR}/configs/timing_ruby_gem5.args"
+DEFAULT_TIMING_RUBY_MESI_SIM_CONFIG="${ROOT_DIR}/configs/timing_ruby_gem5.args"
+DEFAULT_TIMING_RUBY_MOESI_SIM_CONFIG="${ROOT_DIR}/configs/timing_ruby_moesi_gem5.args"
 
 GEM5_CKP_DIR=""
 EXPERIMENT=""
@@ -257,13 +260,22 @@ fi
 if [[ -n "$TIMING_RUBY_PROTOCOL" ]]; then
   timing_ruby_bin=""
   timing_ruby_cfg="$GEM5_CFG_TIMING_RUBY_FS"
+  timing_ruby_default_sim_config=""
+  TIMING_RUBY_RESTORE_ARGS=()
 
   case "$TIMING_RUBY_PROTOCOL" in
     MESI_Two_Level)
       timing_ruby_bin="$GEM5_BIN_TIMING_RUBY_MESI"
+      timing_ruby_default_sim_config="$DEFAULT_TIMING_RUBY_MESI_SIM_CONFIG"
       ;;
     MOESI_CMP_directory)
       timing_ruby_bin="$GEM5_BIN_TIMING_RUBY_MOESI"
+      timing_ruby_default_sim_config="$DEFAULT_TIMING_RUBY_MOESI_SIM_CONFIG"
+      TIMING_RUBY_RESTORE_ARGS=(
+        --restore-llc-state
+        --restore-l1d-state
+        --restore-l1i-state
+      )
       ;;
     *)
       die "Unsupported timing Ruby protocol: $TIMING_RUBY_PROTOCOL"
@@ -272,9 +284,10 @@ if [[ -n "$TIMING_RUBY_PROTOCOL" ]]; then
 
   require_executable "$timing_ruby_bin" "Timing Ruby gem5 binary"
   require_file "$timing_ruby_cfg" "Timing Ruby gem5 config"
+  require_file "$timing_ruby_default_sim_config" "Timing Ruby default config"
 
   TIMING_RUBY_CONFIG_ARGS=()
-  load_gem5_args_file "$DEFAULT_TIMING_RUBY_SIM_CONFIG" TIMING_RUBY_CONFIG_ARGS
+  load_gem5_args_file "$timing_ruby_default_sim_config" TIMING_RUBY_CONFIG_ARGS
   if [[ -n "$SIM_CONFIG" ]]; then
     append_gem5_args_file "$SIM_CONFIG" TIMING_RUBY_CONFIG_ARGS
   fi
@@ -292,6 +305,7 @@ if [[ -n "$TIMING_RUBY_PROTOCOL" ]]; then
     --restore "$CKPT_DIR"
     --num-cores "$CORES"
     --mem-size 16384MiB
+    "${TIMING_RUBY_RESTORE_ARGS[@]}"
     "${TIMING_RUBY_CONFIG_ARGS[@]}"
     "${BRANCH_TRACE_ARGS[@]}"
     "${TAGE_DECISION_TRACE_ARGS[@]}"

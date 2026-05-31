@@ -49,8 +49,11 @@ Optional environment variables:
 
 The default mode preserves the existing classic gem5 flow. Add `--timing-ruby`
 to use the O3CPU + Ruby MESI_Two_Level configuration, or
-`--timing-ruby-moesi` to use the tracked cold MOESI_CMP_directory bring-up
-path for the non-inclusive migration.
+`--timing-ruby-moesi` to use the MOESI_CMP_directory timing-Ruby path for
+non-inclusive cache restore. This path requests the staged LLC/L1 cache
+restore slices by default, uses the validated 8MB shared-cache geometry for
+that restore path, and falls back to cold state only for slices whose
+artifacts are missing.
 
 ```bash
 ./run_gem5.sh --gem5-ckp-dir gem5_checkpoints --experiment test \
@@ -86,6 +89,6 @@ candidate.
 
 Treat the current MESI timing path as the maintained bring-up path, not the
 final faithful target for full multicore private-cache restore. The current
-`--timing-ruby-moesi` path is intentionally narrower: it is the tracked cold
-bring-up harness for the non-inclusive migration, not yet a restored-state
-replacement for the MESI flow.
+`--timing-ruby-moesi` path now restores the staged LLC/L1 cache slices for the
+non-inclusive migration; BTB/TAGE restore remains outside that path and stays
+on the MESI/reference side for now.

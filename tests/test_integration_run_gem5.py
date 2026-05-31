@@ -344,3 +344,44 @@ def test_run_gem5_ruby_restore_sentinel(
         )
         > 0
     )
+
+
+
+def test_run_gem5_moesi_restore_sentinel(
+    repo_root: Path,
+    integration_env,
+    artifact_paths,
+    converted_snapshot: str,
+):
+    outdir = _run_gem5(
+        repo_root,
+        integration_env,
+        artifact_paths,
+        converted_snapshot,
+        "pytest_qpoints_moesi_restore_sentinel_1k",
+        "--timing-ruby-moesi",
+        insts=1000,
+    )
+
+    stats_path = outdir / "stats.txt"
+    config_path = outdir / "config.ini"
+    assert stats_path.is_file()
+    assert config_path.is_file()
+    assert (
+        _stat_value(
+            stats_path,
+            "system.ruby.l2_cntrl0.L2cache.m_checkpoint_load_total",
+        )
+        > 0
+    )
+    assert (
+        _stat_value(
+            stats_path,
+            "system.ruby.l2_cntrl0.L2cache.m_checkpoint_load_hits",
+        )
+        > 0
+    )
+
+    config_text = config_path.read_text(encoding="utf-8")
+    assert "restore_llc_state=true" in config_text
+    assert "restore_private_owner_state=true" in config_text
