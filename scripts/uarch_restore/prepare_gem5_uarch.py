@@ -97,6 +97,57 @@ SUPPORTED_RUBY_PROTOCOLS = (
     RUBY_PROTOCOL_MESI_TWO_LEVEL,
     RUBY_PROTOCOL_MOESI_CMP_DIRECTORY,
 )
+MOESI_UNSUPPORTED_PRIVATE_FAMILY_REPORT_FILE = (
+    "moesi_unsupported_private_family_report.json"
+)
+MOESI_IMPLEMENTED_PRIVATE_FAMILY_DESCRIPTIONS = {
+    "moesi_single_private_data_writeable": (
+        "one writable private D-cache owner, no I-cache sharers, "
+        "shared=false, in_shared_cache=false, LLC absent"
+    ),
+    "moesi_single_private_data_clean": (
+        "one read-only private D-cache sharer, no I-cache sharers, "
+        "shared=true, LLC backed"
+    ),
+    "moesi_multi_private_data_clean": (
+        "multiple read-only private D-cache sharers, no I-cache sharers, "
+        "shared=true, LLC-backed or non-LLC local-sharer form"
+    ),
+    "moesi_private_instruction_only": (
+        "instruction-only private sharers, no D-cache sharers, shared=true, "
+        "LLC-backed or non-LLC local-sharer form"
+    ),
+}
+MOESI_KNOWN_UNIMPLEMENTED_PRIVATE_FAMILY_DESCRIPTIONS = {
+    "single_private_data_clean_nonllc": (
+        "one read-only private D-cache sharer, no I-cache sharers, "
+        "shared=true, LLC absent"
+    ),
+    "single_private_data_clean_mixed_instruction_data": (
+        "one read-only private D-cache sharer plus private I-cache sharers"
+    ),
+    "multi_private_data_clean_mixed_instruction_data": (
+        "multiple read-only private D-cache sharers plus private I-cache "
+        "sharers"
+    ),
+    "single_private_data_writeable_llc_backed": (
+        "one writable private D-cache owner, no I-cache sharers, LLC backed"
+    ),
+    "single_private_data_writeable_directory_shared": (
+        "one writable private D-cache owner, no I-cache sharers, but "
+        "directory metadata still claims shared or in-shared-cache"
+    ),
+    "single_private_data_writeable_mixed_instruction_data": (
+        "one writable private D-cache owner plus private I-cache sharers"
+    ),
+    "private_instruction_only_directory_nonshared": (
+        "instruction-only private sharers with directory shared=false"
+    ),
+    "anything_else": (
+        "any private coherent block family that does not match the current "
+        "implemented or explicitly named unsupported MOESI families"
+    ),
+}
 
 
 
@@ -817,6 +868,160 @@ def _summarize_private_entries(entries: list[dict]) -> dict:
     }
 
 
+def _record_moesi_private_family_observation(
+    observed: dict,
+    family_name: str,
+    block_id: int,
+    priv: dict,
+    dir_meta: dict,
+    llc_backed: bool,
+) -> None:
+    family = observed.setdefault(
+        family_name,
+        {
+            "block_count": 0,
+            "llc_backed_block_count": 0,
+            "non_llc_backed_block_count": 0,
+            "examples": [],
+        },
+    )
+    family["block_count"] += 1
+    if llc_backed:
+        family["llc_backed_block_count"] += 1
+    else:
+        family["non_llc_backed_block_count"] += 1
+    if len(family["examples"]) >= 4:
+        return
+    family["examples"].append(
+        {
+            "block_id": block_id,
+            "line_addr": f"{block_id * CACHE_LINE_SIZE:#x}",
+            "private_i_cores": priv["i_cores"],
+            "private_d_cores": priv["d_cores"],
+            "directory_shared": bool(dir_meta.get("shared", False)),
+            "directory_in_shared_cache": bool(
+                dir_meta.get("in_shared_cache", False)
+            ),
+            "any_d_writeable": priv["any_d_writeable"],
+            "any_d_modified": priv["any_d_modified"],
+            "any_i_modified": priv["any_i_modified"],
+            "llc_backed": llc_backed,
+        }
+    )
+
+
+def _classify_moesi_private_block_family(
+    block_id: int,
+    entries: list[dict],
+    dir_meta: dict,
+    llc_block_ids: set[int],
+) -> str:
+    priv = _summarize_private_entries(entries)
+    d_cores = priv["d_cores"]
+    i_cores = priv["i_cores"]
+    llc_backed = block_id in llc_block_ids
+    directory_shared = bool(dir_meta.get("shared", False))
+    in_shared_cache = bool(dir_meta.get("in_shared_cache", False))
+
+    if d_cores:
+        if len(d_cores) == 1 and priv["any_d_writeable"]:
+            if i_cores:
+                return "single_private_data_writeable_mixed_instruction_data"
+            if llc_backed:
+                return "single_private_data_writeable_llc_backed"
+            if directory_shared or in_shared_cache:
+                return "single_private_data_writeable_directory_shared"
+            return "moesi_single_private_data_writeable"
+
+        if not priv["any_d_writeable"] and not priv["any_d_modified"]:
+            if i_cores:
+                if len(d_cores) == 1:
+                    return "single_private_data_clean_mixed_instruction_data"
+                return "multi_private_data_clean_mixed_instruction_data"
+            if len(d_cores) == 1:
+                if not directory_shared:
+                    return "anything_else"
+                if llc_backed:
+                    return "moesi_single_private_data_clean"
+                return "single_private_data_clean_nonllc"
+            if len(d_cores) > 1:
+                if not directory_shared:
+                    return "anything_else"
+                return "moesi_multi_private_data_clean"
+
+        return "anything_else"
+
+    if i_cores:
+        if priv["any_i_modified"]:
+            return "anything_else"
+        if directory_shared:
+            return "moesi_private_instruction_only"
+        return "private_instruction_only_directory_nonshared"
+
+    return "anything_else"
+
+
+def _collect_moesi_private_family_guardrail_report(
+    llc_lines: list[dict],
+    directory: dict,
+    harvard: dict,
+) -> dict:
+    llc_block_ids = {line["block_id"] for line in llc_lines}
+    report = {
+        "schema_version": 1,
+        "strict_mode": True,
+        "implemented_families": MOESI_IMPLEMENTED_PRIVATE_FAMILY_DESCRIPTIONS,
+        "known_unimplemented_families": (
+            MOESI_KNOWN_UNIMPLEMENTED_PRIVATE_FAMILY_DESCRIPTIONS
+        ),
+        "harvard_private_block_ids": len(harvard),
+        "directory_backed_private_block_ids": 0,
+        "implemented_family_counts": {
+            family: 0
+            for family in MOESI_IMPLEMENTED_PRIVATE_FAMILY_DESCRIPTIONS
+        },
+        "observed_unsupported_families": {},
+        "unsupported_block_count": 0,
+    }
+
+    for block_id, entries in harvard.items():
+        dir_meta = directory.get(block_id)
+        if dir_meta is None:
+            continue
+        report["directory_backed_private_block_ids"] += 1
+
+        family_name = _classify_moesi_private_block_family(
+            block_id, entries, dir_meta, llc_block_ids
+        )
+        if family_name in report["implemented_family_counts"]:
+            report["implemented_family_counts"][family_name] += 1
+            continue
+
+        report["unsupported_block_count"] += 1
+        _record_moesi_private_family_observation(
+            report["observed_unsupported_families"],
+            family_name,
+            block_id,
+            _summarize_private_entries(entries),
+            dir_meta,
+            block_id in llc_block_ids,
+        )
+
+    return report
+
+
+def _format_moesi_private_family_guardrail_error(report: dict) -> str:
+    observed = report["observed_unsupported_families"]
+    summary = ", ".join(
+        f"{name}={details['block_count']}"
+        for name, details in sorted(observed.items())
+    )
+    return (
+        "MOESI restore encountered unsupported private family shapes: "
+        f"{summary}."
+    )
+
+
 def _moesi_private_owner_restore_state(candidate: dict) -> str:
     return "M"
 
@@ -835,6 +1040,7 @@ def _select_moesi_single_private_data_writeable_candidates(
         "harvard_block_ids": len(harvard),
         "directory_backed_block_ids": 0,
         "single_private_dcore_block_ids": 0,
+        "instruction_sharer_block_ids_skipped": 0,
         "writeable_block_ids": 0,
         "modified_block_ids_skipped": 0,
         "llc_present_block_ids_skipped": 0,
@@ -858,6 +1064,10 @@ def _select_moesi_single_private_data_writeable_candidates(
         if not priv["any_d_writeable"]:
             continue
         stats["writeable_block_ids"] += 1
+
+        if priv["i_cores"]:
+            stats["instruction_sharer_block_ids_skipped"] += 1
+            continue
 
         if block_id in llc_block_ids:
             stats["llc_present_block_ids_skipped"] += 1
@@ -1060,6 +1270,7 @@ def _select_moesi_private_instruction_only_candidates(
         "directory_backed_block_ids": 0,
         "d_sharer_block_ids_skipped": 0,
         "instruction_only_block_ids": 0,
+        "modified_instruction_block_ids_skipped": 0,
         "llc_backed_block_ids": 0,
         "non_llc_backed_block_ids": 0,
         "directory_nonshared_block_ids_skipped": 0,
@@ -1082,6 +1293,10 @@ def _select_moesi_private_instruction_only_candidates(
         if not priv["i_cores"]:
             continue
         stats["instruction_only_block_ids"] += 1
+
+        if priv["any_i_modified"]:
+            stats["modified_instruction_block_ids_skipped"] += 1
+            continue
 
         if not bool(dir_meta.get("shared", False)):
             stats["directory_nonshared_block_ids_skipped"] += 1
@@ -1348,6 +1563,9 @@ def prepare_snapshot_gem5_uarch(
     moesi_private_instruction_only_nonllc_restore_file = (
         gem5_uarch_dir / MOESI_PRIVATE_INSTRUCTION_ONLY_NONLLC_RESTORE_FILE
     )
+    moesi_private_family_guardrail_report_file = (
+        gem5_uarch_dir / MOESI_UNSUPPORTED_PRIVATE_FAMILY_REPORT_FILE
+    )
     btb_candidate_file = gem5_uarch_dir / BTB_CANDIDATE_FILE
     tage_candidate_file = gem5_uarch_dir / TAGE_CANDIDATE_FILE
     manifest_file = gem5_uarch_dir / MANIFEST_FILE
@@ -1419,6 +1637,48 @@ def prepare_snapshot_gem5_uarch(
     ) = _select_moesi_private_instruction_only_candidates(
         llc_lines, directory, harvard
     )
+    moesi_private_family_guardrail_report = None
+    if ruby_protocol == RUBY_PROTOCOL_MOESI_CMP_DIRECTORY:
+        moesi_private_family_guardrail_report = (
+            _collect_moesi_private_family_guardrail_report(
+                llc_lines, directory, harvard
+            )
+        )
+        expected_moesi_private_family_counts = {
+            "moesi_single_private_data_writeable": len(
+                moesi_private_owner_candidates
+            ),
+            "moesi_single_private_data_clean": len(
+                moesi_private_clean_candidates
+            ),
+            "moesi_multi_private_data_clean": len(
+                moesi_multi_private_clean_candidates
+            ),
+            "moesi_private_instruction_only": len(
+                moesi_private_instruction_only_candidates
+            ),
+        }
+        if (
+            moesi_private_family_guardrail_report["implemented_family_counts"]
+            != expected_moesi_private_family_counts
+        ):
+            raise RuntimeError(
+                "MOESI private-family guardrail counts diverged from the "
+                "selected restore candidates; update the selectors or the "
+                "guardrail classifier together."
+            )
+        _write_json_file(
+            moesi_private_family_guardrail_report_file,
+            moesi_private_family_guardrail_report,
+            overwrite,
+        )
+        if moesi_private_family_guardrail_report["unsupported_block_count"] > 0:
+            raise RuntimeError(
+                _format_moesi_private_family_guardrail_error(
+                    moesi_private_family_guardrail_report
+                )
+                + f" See {moesi_private_family_guardrail_report_file}."
+            )
     btb_candidates, btb_stats = _select_btb_restore_candidates(fetch_units)
     tage_candidates, tage_stats = _select_tage_restore_candidates(fetch_units)
     moesi_private_clean_block_ids = {
@@ -1910,6 +2170,39 @@ def prepare_snapshot_gem5_uarch(
             },
         },
     }
+    if moesi_private_family_guardrail_report is not None:
+        manifest["components"]["moesi_private_family_guardrails"] = {
+            "strict_mode": True,
+            "report_file": str(moesi_private_family_guardrail_report_file),
+            "selection_policy": (
+                "classify every directory-backed private block into an "
+                "implemented MOESI family, a named-but-unimplemented family, "
+                "or anything_else; fail conversion if any unsupported family "
+                "is observed"
+            ),
+            "implemented_families": (
+                MOESI_IMPLEMENTED_PRIVATE_FAMILY_DESCRIPTIONS
+            ),
+            "known_unimplemented_families": (
+                MOESI_KNOWN_UNIMPLEMENTED_PRIVATE_FAMILY_DESCRIPTIONS
+            ),
+            "implemented_family_counts": (
+                moesi_private_family_guardrail_report[
+                    "implemented_family_counts"
+                ]
+            ),
+            "observed_unsupported_families": (
+                moesi_private_family_guardrail_report[
+                    "observed_unsupported_families"
+                ]
+            ),
+            "unsupported_block_count": (
+                moesi_private_family_guardrail_report[
+                    "unsupported_block_count"
+                ]
+            ),
+        }
+
     _write_manifest(manifest_file, manifest, overwrite)
     return manifest
 

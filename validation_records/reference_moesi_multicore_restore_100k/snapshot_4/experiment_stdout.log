@@ -1,0 +1,49 @@
+Prepared gem5 uarch artifacts in: /mnt/sdb/aansari/checkpoints/data-caching-8core/snapshot_4/gem5_uarch
+  protocol: moesi_cmp_directory
+  source: /mnt/sdb/aansari/experiments/single-core/run/snapshot_4.uarch/llc-0.json.zstd
+  output: /mnt/sdb/aansari/checkpoints/data-caching-8core/snapshot_4/gem5_uarch/llc_restore_addrs.txt
+  lines : 68842
+Global frequency set at 1000000000000 ticks per second
+gem5 Simulator System.  http://gem5.org
+gem5 is copyrighted software; use the --copyright option for details.
+
+gem5 version 21.1.0.2
+gem5 compiled May 28 2026 04:13:45
+gem5 started May 29 2026 14:02:11
+gem5 executing on cb82928e55b1, pid 222591
+command line: /home/dev/qflex_git/QPoints/gem5/build/ARM_MOESI_CMP_directory/gem5.opt --outdir=/home/dev/qflex_git/QPoints/sim_outs/moesi_snapshot4_cold_reference_100k/snapshot_4 --debug-file=debug.insts /home/dev/qflex_git/QPoints/gem5/configs/example/arm/qpoints_timing_ruby_fs.py -I 100000 --disk-image=/mnt/sdb/aansari/checkpoints/data-caching-8core/snapshot_4/snapshot_4.img --bootloader=/home/dev/qflex_git/QPoints/bin/m5/binaries/boot_v2_qemu_virt.arm64 --cpu-type O3CPU --bp-type TAGE --restore /mnt/sdb/aansari/checkpoints/data-caching-8core/snapshot_4 --num-cores 8 --mem-size 16384MiB --l1i_size=64kB --l1i_assoc=8 --l1d_size=64kB --l1d_assoc=8 --l2_size=1MB --l2_assoc=16 --mem-channels=1 --mem-ranks=4 --l1i_size=64kB --l1i_assoc=8 --l1d_size=64kB --l1d_assoc=8 --l2_size=8MB --l2_assoc=16 --mem-channels=1 --mem-ranks=4
+
+Namespace(dtb=None, kernel='vmlinux.arm64', disk_image='/mnt/sdb/aansari/checkpoints/data-caching-8core/snapshot_4/snapshot_4.img', bootloader='/home/dev/qflex_git/QPoints/bin/m5/binaries/boot_v2_qemu_virt.arm64', root_device='/dev/vda', script='', cpu='ooo', cpu_freq='2GHz', m1=False, opt=False, numSets=64, num_cores=8, checkpoint=False, restore='/mnt/sdb/aansari/checkpoints/data-caching-8core/snapshot_4', branch_trace=False, data_trace=False, num_cpus=8, sys_voltage='1.0V', sys_clock='1GHz', list_mem_types=None, mem_type='DDR3_1600_8x8', mem_channels=1, mem_ranks=4, mem_size='16384MiB', enable_dram_powerdown=False, mem_channels_intlv=0, memchecker=False, external_memory_system=None, tlm_memory=None, caches=False, l2cache=False, num_dirs=1, num_l2caches=1, num_l3caches=1, l1d_size='64kB', l1i_size='64kB', l2_size='8MB', l3_size='16MB', l1d_assoc=8, l1i_assoc=8, l2_assoc=16, l3_assoc=16, cacheline_size=64, btb_entries=4096, btb_ways=4, starveRandomness=3.125, starveAtleast=0, randomStarve=False, perfectICache=False, fdip=False, pureRandom=False, dump_tms=False, dump_btbconf=False, btbConfThreshold=0.8, btbConfMinInst=100, histRandom=False, emissary_enable_iq_empty=False, oracleEMISSARY=False, oracleStarvationsFileName='', oracleStarvationCountThreshold=100, fetchQSize=32, ftqSize=0, ftqInst=192, l1i_rp='LRU', l2_rp='LRU', lru_ways=2, preserve_ways=6, hist_freq_cycles=0, totalSimInsts=105000000, ruby=True, abs_max_tick=18446744073709551615, rel_max_tick=None, maxtime=None, param=[], list_cpu_types=None, cpu_type='O3CPU', list_bp_types=None, list_indirect_bp_types=None, bp_type='TAGE', indirect_bp_type=None, list_rp_types=None, list_hwp_types=None, l1i_hwp_type=None, l1d_hwp_type=None, l2_hwp_type=None, checker=False, cpu_clock='2GHz', smt=False, elastic_trace_en=False, inst_trace_file='', data_trace_file='', lpae=False, virtualisation=False, dist=False, dist_sync_on_pseudo_op=False, is_switch=False, dist_rank=0, dist_size=0, dist_server_name='127.0.0.1', dist_server_port=2200, dist_sync_repeat='0us', dist_sync_start='5200000000000t', ethernet_linkspeed='10Gbps', ethernet_linkdelay='10us', maxinsts=100000, work_item_id=None, num_work_ids=None, work_begin_cpu_id_exit=None, work_end_exit_count=None, work_begin_exit_count=None, init_param=0, initialize_only=False, simpoint_profile=False, simpoint_interval=10000000, take_simpoint_checkpoints=None, restore_simpoint_checkpoint=False, take_checkpoints=None, max_checkpoints=5, checkpoint_dir=None, checkpoint_restore=None, checkpoint_at_end=False, work_begin_checkpoint_count=None, work_end_checkpoint_count=None, work_cpus_checkpoint_count=None, restore_with_cpu='AtomicSimpleCPU', repeat_switch=None, standard_switch=None, prog_interval=None, warmup_insts=None, bench=None, fast_forward=None, simpoint=False, at_instruction=False, spec_input='ref', arm_iset='arm', stats_root=[], ruby_clock='2GHz', access_backing_store=False, dump_cache_state=False, restore_llc_state=False, restore_btb_state=False, restore_l1d_state=False, restore_l1i_state=False, restore_tage_state=False, tage_decision_trace=False, tage_decision_trace_limit=0, ports=4, numa_high_bit=0, interleaving_bits=0, xor_low_bit=20, recycle_latency=10, topology='Crossbar', mesh_rows=0, network='simple', router_latency=1, link_latency=1, link_width_bits=128, vcs_per_vnet=4, routing_algorithm=0, network_fault_model=False, garnet_deadlock_threshold=50000)
+M1 enabled False
+[<m5.params.AddrRange object at 0x7f66b2c0eb90>]
+O3CPU
+O3CPU
+O3CPU
+O3CPU
+O3CPU
+O3CPU
+O3CPU
+O3CPU
+a thread reached the max instruction count  @  9944029308000
+Global frequency set at 1000000000000 ticks per second
+gem5 Simulator System.  http://gem5.org
+gem5 is copyrighted software; use the --copyright option for details.
+
+gem5 version 21.1.0.2
+gem5 compiled May 28 2026 04:13:45
+gem5 started May 29 2026 14:02:29
+gem5 executing on cb82928e55b1, pid 222776
+command line: /home/dev/qflex_git/QPoints/gem5/build/ARM_MOESI_CMP_directory/gem5.opt --outdir=/home/dev/qflex_git/QPoints/sim_outs/moesi_snapshot4_restore_reference_100k/snapshot_4 --debug-file=debug.insts /home/dev/qflex_git/QPoints/gem5/configs/example/arm/qpoints_timing_ruby_fs.py -I 100000 --disk-image=/mnt/sdb/aansari/checkpoints/data-caching-8core/snapshot_4/snapshot_4.img --bootloader=/home/dev/qflex_git/QPoints/bin/m5/binaries/boot_v2_qemu_virt.arm64 --cpu-type O3CPU --bp-type TAGE --restore /mnt/sdb/aansari/checkpoints/data-caching-8core/snapshot_4 --num-cores 8 --mem-size 16384MiB --l1i_size=64kB --l1i_assoc=8 --l1d_size=64kB --l1d_assoc=8 --l2_size=1MB --l2_assoc=16 --mem-channels=1 --mem-ranks=4 --l1i_size=64kB --l1i_assoc=8 --l1d_size=64kB --l1d_assoc=8 --l2_size=8MB --l2_assoc=16 --mem-channels=1 --mem-ranks=4 --restore-llc-state --restore-l1d-state --restore-l1i-state
+
+Namespace(dtb=None, kernel='vmlinux.arm64', disk_image='/mnt/sdb/aansari/checkpoints/data-caching-8core/snapshot_4/snapshot_4.img', bootloader='/home/dev/qflex_git/QPoints/bin/m5/binaries/boot_v2_qemu_virt.arm64', root_device='/dev/vda', script='', cpu='ooo', cpu_freq='2GHz', m1=False, opt=False, numSets=64, num_cores=8, checkpoint=False, restore='/mnt/sdb/aansari/checkpoints/data-caching-8core/snapshot_4', branch_trace=False, data_trace=False, num_cpus=8, sys_voltage='1.0V', sys_clock='1GHz', list_mem_types=None, mem_type='DDR3_1600_8x8', mem_channels=1, mem_ranks=4, mem_size='16384MiB', enable_dram_powerdown=False, mem_channels_intlv=0, memchecker=False, external_memory_system=None, tlm_memory=None, caches=False, l2cache=False, num_dirs=1, num_l2caches=1, num_l3caches=1, l1d_size='64kB', l1i_size='64kB', l2_size='8MB', l3_size='16MB', l1d_assoc=8, l1i_assoc=8, l2_assoc=16, l3_assoc=16, cacheline_size=64, btb_entries=4096, btb_ways=4, starveRandomness=3.125, starveAtleast=0, randomStarve=False, perfectICache=False, fdip=False, pureRandom=False, dump_tms=False, dump_btbconf=False, btbConfThreshold=0.8, btbConfMinInst=100, histRandom=False, emissary_enable_iq_empty=False, oracleEMISSARY=False, oracleStarvationsFileName='', oracleStarvationCountThreshold=100, fetchQSize=32, ftqSize=0, ftqInst=192, l1i_rp='LRU', l2_rp='LRU', lru_ways=2, preserve_ways=6, hist_freq_cycles=0, totalSimInsts=105000000, ruby=True, abs_max_tick=18446744073709551615, rel_max_tick=None, maxtime=None, param=[], list_cpu_types=None, cpu_type='O3CPU', list_bp_types=None, list_indirect_bp_types=None, bp_type='TAGE', indirect_bp_type=None, list_rp_types=None, list_hwp_types=None, l1i_hwp_type=None, l1d_hwp_type=None, l2_hwp_type=None, checker=False, cpu_clock='2GHz', smt=False, elastic_trace_en=False, inst_trace_file='', data_trace_file='', lpae=False, virtualisation=False, dist=False, dist_sync_on_pseudo_op=False, is_switch=False, dist_rank=0, dist_size=0, dist_server_name='127.0.0.1', dist_server_port=2200, dist_sync_repeat='0us', dist_sync_start='5200000000000t', ethernet_linkspeed='10Gbps', ethernet_linkdelay='10us', maxinsts=100000, work_item_id=None, num_work_ids=None, work_begin_cpu_id_exit=None, work_end_exit_count=None, work_begin_exit_count=None, init_param=0, initialize_only=False, simpoint_profile=False, simpoint_interval=10000000, take_simpoint_checkpoints=None, restore_simpoint_checkpoint=False, take_checkpoints=None, max_checkpoints=5, checkpoint_dir=None, checkpoint_restore=None, checkpoint_at_end=False, work_begin_checkpoint_count=None, work_end_checkpoint_count=None, work_cpus_checkpoint_count=None, restore_with_cpu='AtomicSimpleCPU', repeat_switch=None, standard_switch=None, prog_interval=None, warmup_insts=None, bench=None, fast_forward=None, simpoint=False, at_instruction=False, spec_input='ref', arm_iset='arm', stats_root=[], ruby_clock='2GHz', access_backing_store=False, dump_cache_state=False, restore_llc_state=True, restore_btb_state=False, restore_l1d_state=True, restore_l1i_state=True, restore_tage_state=False, tage_decision_trace=False, tage_decision_trace_limit=0, ports=4, numa_high_bit=0, interleaving_bits=0, xor_low_bit=20, recycle_latency=10, topology='Crossbar', mesh_rows=0, network='simple', router_latency=1, link_latency=1, link_width_bits=128, vcs_per_vnet=4, routing_algorithm=0, network_fault_model=False, garnet_deadlock_threshold=50000)
+M1 enabled False
+[<m5.params.AddrRange object at 0x7f335ab1eb90>]
+O3CPU
+O3CPU
+O3CPU
+O3CPU
+O3CPU
+O3CPU
+O3CPU
+O3CPU
+a thread reached the max instruction count  @  9944010744000

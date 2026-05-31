@@ -1,0 +1,212 @@
+{
+  "schema_version": 1,
+  "validated": true,
+  "phase1": {
+    "unsupported_block_count": 0,
+    "implemented_family_counts": {
+      "moesi_multi_private_data_clean": 561,
+      "moesi_private_instruction_only": 2065,
+      "moesi_single_private_data_clean": 556,
+      "moesi_single_private_data_writeable": 5620
+    },
+    "expected_family_counts": {
+      "moesi_single_private_data_writeable": 5620,
+      "moesi_single_private_data_clean": 556,
+      "moesi_multi_private_data_clean": 561,
+      "moesi_private_instruction_only": 2065
+    },
+    "pass": true
+  },
+  "phase2": {
+    "manifest_counts": {
+      "l1d": 7905,
+      "l1i": 8192,
+      "llc": 68842
+    },
+    "restored_counts": {
+      "l1d": 7905,
+      "l1i": 8192,
+      "llc": 68842
+    },
+    "pass": true
+  },
+  "phase3": {
+    "restored_100k": {
+      "simInsts": 289701,
+      "simTicks": 97780000,
+      "l2_checkpoint_load_hits": 2924,
+      "l2_demand_hits": 2273,
+      "l2_demand_misses": 6096,
+      "l1d_checkpoint_loads": 7905,
+      "l1i_checkpoint_loads": 8192,
+      "l1d_demand_hits": 58873,
+      "l1d_demand_misses": 4237,
+      "l1i_demand_hits": 44689,
+      "l1i_demand_misses": 4132
+    },
+    "pass": true
+  },
+  "phase4": {
+    "ladder": [
+      {
+        "run": "moesi_snapshot4_llc_restore_smoke_1k_v2",
+        "label": "llc_only",
+        "simInsts": 5729,
+        "simTicks": 5535500,
+        "l2_load": 68241,
+        "l2_load_hits": 499,
+        "l2_hits": 875,
+        "l2_misses": 595,
+        "l1d_load": 0,
+        "l1i_load": 0,
+        "l1d_hits": 1746,
+        "l1d_misses": 668,
+        "l1i_hits": 909,
+        "l1i_misses": 803
+      },
+      {
+        "run": "moesi_snapshot4_private_owner_restore_smoke_1k_v2",
+        "label": "owner_only",
+        "simInsts": 5689,
+        "simTicks": 5385000,
+        "l2_load": 68241,
+        "l2_load_hits": 493,
+        "l2_hits": 864,
+        "l2_misses": 579,
+        "l1d_load": 1266,
+        "l1i_load": 0,
+        "l1d_hits": 1717,
+        "l1d_misses": 658,
+        "l1i_hits": 940,
+        "l1i_misses": 785
+      },
+      {
+        "run": "moesi_snapshot4_private_plus_clean_restore_smoke_1k_v3",
+        "label": "owner_plus_single_clean",
+        "simInsts": 5701,
+        "simTicks": 5311000,
+        "l2_load": 68582,
+        "l2_load_hits": 493,
+        "l2_hits": 862,
+        "l2_misses": 579,
+        "l1d_load": 1822,
+        "l1i_load": 0,
+        "l1d_hits": 1733,
+        "l1d_misses": 652,
+        "l1i_hits": 918,
+        "l1i_misses": 789
+      },
+      {
+        "run": "moesi_snapshot4_private_plus_single_plus_multi_clean_restore_smoke_1k_v1",
+        "label": "owner_plus_single_plus_multi_clean",
+        "simInsts": 5968,
+        "simTicks": 5342500,
+        "l2_load": 68842,
+        "l2_load_hits": 492,
+        "l2_hits": 843,
+        "l2_misses": 582,
+        "l1d_load": 3547,
+        "l1i_load": 0,
+        "l1d_hits": 1859,
+        "l1d_misses": 615,
+        "l1i_hits": 927,
+        "l1i_misses": 811
+      },
+      {
+        "run": "moesi_snapshot4_private_plus_clean_plus_i_nonllc_restore_smoke_1k_v1",
+        "label": "clean_plus_instruction_only",
+        "simInsts": 6061,
+        "simTicks": 4776000,
+        "l2_load": 68842,
+        "l2_load_hits": 689,
+        "l2_hits": 579,
+        "l2_misses": 591,
+        "l1d_load": 3547,
+        "l1i_load": 8192,
+        "l1d_hits": 1882,
+        "l1d_misses": 626,
+        "l1i_hits": 1321,
+        "l1i_misses": 546
+      },
+      {
+        "run": "moesi_snapshot4_ownerfull_plus_clean_plus_i_restore_smoke_1k_v1",
+        "label": "ownerfull_plus_clean_plus_instruction",
+        "simInsts": 5471,
+        "simTicks": 3445500,
+        "l2_load": 68842,
+        "l2_load_hits": 692,
+        "l2_hits": 552,
+        "l2_misses": 445,
+        "l1d_load": 7901,
+        "l1i_load": 8192,
+        "l1d_hits": 1896,
+        "l1d_misses": 571,
+        "l1i_hits": 1216,
+        "l1i_misses": 429
+      },
+      {
+        "run": "moesi_snapshot4_all_families_restore_smoke_1k_v1",
+        "label": "all_families",
+        "simInsts": 5500,
+        "simTicks": 3465500,
+        "l2_load": 68842,
+        "l2_load_hits": 697,
+        "l2_hits": 556,
+        "l2_misses": 452,
+        "l1d_load": 7905,
+        "l1i_load": 8192,
+        "l1d_hits": 1910,
+        "l1d_misses": 574,
+        "l1i_hits": 1217,
+        "l1i_misses": 435
+      }
+    ],
+    "checks": {
+      "l2_load_monotonic_non_decreasing": true,
+      "l1d_load_monotonic_non_decreasing": true,
+      "instruction_restore_activates_l1i": true,
+      "final_l2_checkpoint_load_hits_exceed_llc_only": true,
+      "final_simticks_below_llc_only": true
+    },
+    "pass": true
+  },
+  "phase5": {
+    "invoked": false,
+    "reason": "Residual-miss deep dive was not required because phases 1-4 were clean and the 100k cold-vs-restored comparison remained directionally sensible without unexplained protocol symptoms."
+  },
+  "comparison_100k": {
+    "cold": {
+      "simInsts": 305096,
+      "simTicks": 116344000,
+      "l2_demand_hits": 46,
+      "l2_demand_misses": 9460,
+      "l1d_demand_hits": 63583,
+      "l1d_demand_misses": 4311,
+      "l1i_demand_hits": 43483,
+      "l1i_demand_misses": 5195
+    },
+    "restored": {
+      "simInsts": 289701,
+      "simTicks": 97780000,
+      "l2_checkpoint_load_hits": 2924,
+      "l2_demand_hits": 2273,
+      "l2_demand_misses": 6096,
+      "l1d_checkpoint_loads": 7905,
+      "l1i_checkpoint_loads": 8192,
+      "l1d_demand_hits": 58873,
+      "l1d_demand_misses": 4237,
+      "l1i_demand_hits": 44689,
+      "l1i_demand_misses": 4132
+    },
+    "delta": {
+      "simTicks": -18564000,
+      "l2_demand_hits": 2227,
+      "l2_demand_misses": -3364,
+      "l1d_demand_hits": -4710,
+      "l1d_demand_misses": -74,
+      "l1i_demand_hits": 1206,
+      "l1i_demand_misses": -1063
+    },
+    "directionally_better": true
+  }
+}

@@ -1,0 +1,30 @@
+{
+  "directory_backed_private_block_ids": 8802,
+  "harvard_private_block_ids": 8802,
+  "implemented_families": {
+    "moesi_multi_private_data_clean": "multiple read-only private D-cache sharers, no I-cache sharers, shared=true, LLC-backed or non-LLC local-sharer form",
+    "moesi_private_instruction_only": "instruction-only private sharers, no D-cache sharers, shared=true, LLC-backed or non-LLC local-sharer form",
+    "moesi_single_private_data_clean": "one read-only private D-cache sharer, no I-cache sharers, shared=true, LLC backed",
+    "moesi_single_private_data_writeable": "one writable private D-cache owner, no I-cache sharers, shared=false, in_shared_cache=false, LLC absent"
+  },
+  "implemented_family_counts": {
+    "moesi_multi_private_data_clean": 561,
+    "moesi_private_instruction_only": 2065,
+    "moesi_single_private_data_clean": 556,
+    "moesi_single_private_data_writeable": 5620
+  },
+  "known_unimplemented_families": {
+    "anything_else": "any private coherent block family that does not match the current implemented or explicitly named unsupported MOESI families",
+    "multi_private_data_clean_mixed_instruction_data": "multiple read-only private D-cache sharers plus private I-cache sharers",
+    "private_instruction_only_directory_nonshared": "instruction-only private sharers with directory shared=false",
+    "single_private_data_clean_mixed_instruction_data": "one read-only private D-cache sharer plus private I-cache sharers",
+    "single_private_data_clean_nonllc": "one read-only private D-cache sharer, no I-cache sharers, shared=true, LLC absent",
+    "single_private_data_writeable_directory_shared": "one writable private D-cache owner, no I-cache sharers, but directory metadata still claims shared or in-shared-cache",
+    "single_private_data_writeable_llc_backed": "one writable private D-cache owner, no I-cache sharers, LLC backed",
+    "single_private_data_writeable_mixed_instruction_data": "one writable private D-cache owner plus private I-cache sharers"
+  },
+  "observed_unsupported_families": {},
+  "schema_version": 1,
+  "strict_mode": true,
+  "unsupported_block_count": 0
+}

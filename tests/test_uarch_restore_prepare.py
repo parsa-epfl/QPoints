@@ -1191,6 +1191,261 @@ def test_prepare_snapshot_gem5_uarch_emits_moesi_private_instruction_only_slice(
     assert component["stats"]["llc_backed_block_ids"] == 1
     assert component["stats"]["non_llc_backed_block_ids"] == 1
 
+    guardrails = manifest["components"]["moesi_private_family_guardrails"]
+    assert guardrails["strict_mode"] is True
+    assert guardrails["unsupported_block_count"] == 0
+    report = json.loads(
+        Path(guardrails["report_file"]).read_text(encoding="utf-8")
+    )
+    assert report["unsupported_block_count"] == 0
+    assert (
+        "single_private_data_clean_nonllc"
+        in report["known_unimplemented_families"]
+    )
+    assert report["observed_unsupported_families"] == {}
+
+
+def test_prepare_snapshot_gem5_uarch_rejects_moesi_single_clean_nonllc_family(
+    tmp_path: Path,
+):
+    module = _load_prepare_module()
+
+    qflex_run_dir = tmp_path / "qflex-run"
+    gem5_workload_root = tmp_path / "gem5-workload"
+    source_dir = qflex_run_dir / "snapshot_0.uarch"
+    source_dir.mkdir(parents=True)
+    gem5_workload_root.mkdir()
+    (gem5_workload_root / "snapshot_0").mkdir()
+
+    line_addr = 0x440
+
+    _write_zstd_json(
+        source_dir / "llc-0.json.zstd",
+        {"blocks": [{"blocks": []}]},
+    )
+    _write_zstd_json(
+        source_dir / "directory-0.json.zstd",
+        {
+            "entries": [
+                {
+                    str(line_addr // 64): {
+                        "shared": True,
+                        "in_shared_cache": False,
+                        "directory_mask": 0b10,
+                    }
+                }
+            ]
+        },
+    )
+    _write_zstd_json(
+        source_dir / "harvard-0.json.zstd",
+        [
+            {"i_cache": [{"lines": []}], "d_cache": [{"lines": []}]},
+            {
+                "i_cache": [{"lines": []}],
+                "d_cache": [
+                    {
+                        "lines": [
+                            _make_harvard_line(
+                                line_addr,
+                                writeable=False,
+                                modified=False,
+                                ts=7,
+                            )
+                        ]
+                    }
+                ],
+            },
+        ],
+    )
+
+    with pytest.raises(RuntimeError, match="single_private_data_clean_nonllc"):
+        module.prepare_snapshot_gem5_uarch(
+            qflex_run_dir=qflex_run_dir,
+            gem5_workload_root=gem5_workload_root,
+            snapshot="snapshot_0",
+            overwrite=True,
+            ruby_protocol=module.RUBY_PROTOCOL_MOESI_CMP_DIRECTORY,
+        )
+
+    report_file = (
+        gem5_workload_root
+        / "snapshot_0"
+        / "gem5_uarch"
+        / "moesi_unsupported_private_family_report.json"
+    )
+    report = json.loads(report_file.read_text(encoding="utf-8"))
+    assert report["unsupported_block_count"] == 1
+    assert (
+        report["observed_unsupported_families"][
+            "single_private_data_clean_nonllc"
+        ]["block_count"]
+        == 1
+    )
+
+
+def test_prepare_snapshot_gem5_uarch_reports_modified_instruction_only_family(
+    tmp_path: Path,
+):
+    module = _load_prepare_module()
+
+    qflex_run_dir = tmp_path / "qflex-run"
+    gem5_workload_root = tmp_path / "gem5-workload"
+    source_dir = qflex_run_dir / "snapshot_0.uarch"
+    source_dir.mkdir(parents=True)
+    gem5_workload_root.mkdir()
+    (gem5_workload_root / "snapshot_0").mkdir()
+
+    line_addr = 0x480
+
+    _write_zstd_json(
+        source_dir / "llc-0.json.zstd",
+        {"blocks": [{"blocks": []}]},
+    )
+    _write_zstd_json(
+        source_dir / "directory-0.json.zstd",
+        {
+            "entries": [
+                {
+                    str(line_addr // 64): {
+                        "shared": True,
+                        "in_shared_cache": False,
+                    }
+                }
+            ]
+        },
+    )
+    _write_zstd_json(
+        source_dir / "harvard-0.json.zstd",
+        [
+            {
+                "i_cache": [
+                    {
+                        "lines": [
+                            _make_harvard_line(
+                                line_addr,
+                                writeable=False,
+                                modified=True,
+                                ts=7,
+                                is_instruction=True,
+                            )
+                        ]
+                    }
+                ],
+                "d_cache": [{"lines": []}],
+            }
+        ],
+    )
+
+    with pytest.raises(RuntimeError, match="anything_else"):
+        module.prepare_snapshot_gem5_uarch(
+            qflex_run_dir=qflex_run_dir,
+            gem5_workload_root=gem5_workload_root,
+            snapshot="snapshot_0",
+            overwrite=True,
+            ruby_protocol=module.RUBY_PROTOCOL_MOESI_CMP_DIRECTORY,
+        )
+
+    report_file = (
+        gem5_workload_root
+        / "snapshot_0"
+        / "gem5_uarch"
+        / "moesi_unsupported_private_family_report.json"
+    )
+    report = json.loads(report_file.read_text(encoding="utf-8"))
+    assert report["unsupported_block_count"] == 1
+    assert report["observed_unsupported_families"]["anything_else"][
+        "block_count"
+    ] == 1
+    assert report["implemented_family_counts"]["moesi_private_instruction_only"] == 0
+
+
+def test_prepare_snapshot_gem5_uarch_rejects_moesi_anything_else_family(
+    tmp_path: Path,
+):
+    module = _load_prepare_module()
+
+    qflex_run_dir = tmp_path / "qflex-run"
+    gem5_workload_root = tmp_path / "gem5-workload"
+    source_dir = qflex_run_dir / "snapshot_0.uarch"
+    source_dir.mkdir(parents=True)
+    gem5_workload_root.mkdir()
+    (gem5_workload_root / "snapshot_0").mkdir()
+
+    line_addr = 0x4c0
+
+    _write_zstd_json(
+        source_dir / "llc-0.json.zstd",
+        {"blocks": [{"blocks": []}]},
+    )
+    _write_zstd_json(
+        source_dir / "directory-0.json.zstd",
+        {
+            "entries": [
+                {
+                    str(line_addr // 64): {
+                        "shared": False,
+                        "in_shared_cache": False,
+                    }
+                }
+            ]
+        },
+    )
+    _write_zstd_json(
+        source_dir / "harvard-0.json.zstd",
+        [
+            {
+                "i_cache": [{"lines": []}],
+                "d_cache": [
+                    {
+                        "lines": [
+                            _make_harvard_line(
+                                line_addr,
+                                writeable=True,
+                                modified=False,
+                                ts=5,
+                            )
+                        ]
+                    }
+                ],
+            },
+            {
+                "i_cache": [{"lines": []}],
+                "d_cache": [
+                    {
+                        "lines": [
+                            _make_harvard_line(
+                                line_addr,
+                                writeable=True,
+                                modified=False,
+                                ts=6,
+                            )
+                        ]
+                    }
+                ],
+            },
+        ],
+    )
+
+    with pytest.raises(RuntimeError, match="anything_else"):
+        module.prepare_snapshot_gem5_uarch(
+            qflex_run_dir=qflex_run_dir,
+            gem5_workload_root=gem5_workload_root,
+            snapshot="snapshot_0",
+            overwrite=True,
+            ruby_protocol=module.RUBY_PROTOCOL_MOESI_CMP_DIRECTORY,
+        )
+
+    report_file = (
+        gem5_workload_root
+        / "snapshot_0"
+        / "gem5_uarch"
+        / "moesi_unsupported_private_family_report.json"
+    )
+    report = json.loads(report_file.read_text(encoding="utf-8"))
+    assert report["unsupported_block_count"] == 1
+    assert report["observed_unsupported_families"]["anything_else"]["block_count"] == 1
+
 
 def test_prepare_snapshot_gem5_uarch_can_append_controlled_modified_lines(
     tmp_path: Path,
