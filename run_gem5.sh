@@ -11,7 +11,7 @@ Arguments (all required):
 
 Optional:
   --branch-trace  Enable per-core branch trace logging
-  --va-file FILE  WormCacheQFlex MMU snapshot JSON (e.g. mmus-0.json);
+  --va-file FILE  WormCacheQFlex MMU snapshot JSON (e.g. mmus-0.json.zstd or mmus-0.json);
                   runs VA->PA translations at startup then exits
   --tlb-output-dir DIR  Output directory for TLB checkpoint files (default: gem5 checkpoint dir)
   --generate-checkpoint  Generate a checkpoint at the end of simulation
