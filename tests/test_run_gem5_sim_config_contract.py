@@ -35,6 +35,18 @@ def test_run_gem5_rejects_runner_owned_sim_config_option(tmp_path: Path):
     assert "keep --sim-config for machine/model parameters only" in result.stderr
 
 
+def test_timing_ruby_frontend_defaults_capture_validated_fdip_shape():
+    repo_root = Path(__file__).resolve().parents[1]
+    frontend_args = repo_root / "configs" / "timing_ruby_frontend_fdip.args"
+
+    content = frontend_args.read_text(encoding="utf-8")
+
+    assert "--fdip" in content
+    assert "--ftqSize=8" in content
+    assert "--btb-entries=16384" in content
+    assert "--btb-ways=4" in content
+
+
 def test_run_gem5_allows_fdip_in_sim_config_for_machine_path(tmp_path: Path):
     repo_root = Path(__file__).resolve().parents[1]
     script = repo_root / "run_gem5.sh"

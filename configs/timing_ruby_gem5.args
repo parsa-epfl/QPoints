@@ -1,4 +1,4 @@
-# Extra gem5 CLI arguments for the QPoints timing-Ruby run path.
+# Extra gem5 CLI arguments for the QPoints MESI timing-Ruby cache geometry.
 # Keep one argument per line and use native gem5 option syntax.
 
 --l1i_size=64kB

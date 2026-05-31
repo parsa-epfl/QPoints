@@ -238,6 +238,9 @@ def test_run_gem5_ruby_data_trace_and_cache_dump(
     assert (outdir / "stats.txt").is_file()
     assert (outdir / "data_trace_core_0.log").is_file()
     assert (outdir / "ruby_l2cache0_dump.txt").is_file()
+    config_text = (outdir / "config.ini").read_text(encoding="utf-8")
+    assert "fdip=true" in config_text
+    assert "ftqSize=8" in config_text
 
 
 def test_run_gem5_ruby_branch_trace(
@@ -431,5 +434,7 @@ def test_run_gem5_moesi_restore_sentinel(
     )
 
     config_text = config_path.read_text(encoding="utf-8")
+    assert "fdip=true" in config_text
+    assert "ftqSize=8" in config_text
     assert "restore_llc_state=true" in config_text
     assert "restore_private_owner_state=true" in config_text

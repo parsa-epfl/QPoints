@@ -151,6 +151,7 @@ GEM5_BIN_CLASSIC="${GEM5_HOME}/build/ARM/gem5.opt"
 GEM5_BIN_TIMING_RUBY_MESI="${GEM5_HOME}/build/ARM_MESI_Two_Level/gem5.opt"
 GEM5_BIN_TIMING_RUBY_MOESI="${GEM5_HOME}/build/ARM_MOESI_CMP_directory/gem5.opt"
 DEFAULT_CLASSIC_SIM_CONFIG="${ROOT_DIR}/configs/classic_atomic_gem5.args"
+DEFAULT_TIMING_RUBY_FRONTEND_SIM_CONFIG="${ROOT_DIR}/configs/timing_ruby_frontend_fdip.args"
 DEFAULT_TIMING_RUBY_MESI_SIM_CONFIG="${ROOT_DIR}/configs/timing_ruby_gem5.args"
 DEFAULT_TIMING_RUBY_MOESI_SIM_CONFIG="${ROOT_DIR}/configs/timing_ruby_moesi_gem5.args"
 
@@ -284,10 +285,12 @@ if [[ -n "$TIMING_RUBY_PROTOCOL" ]]; then
 
   require_executable "$timing_ruby_bin" "Timing Ruby gem5 binary"
   require_file "$timing_ruby_cfg" "Timing Ruby gem5 config"
+  require_file "$DEFAULT_TIMING_RUBY_FRONTEND_SIM_CONFIG" "Timing Ruby frontend config"
   require_file "$timing_ruby_default_sim_config" "Timing Ruby default config"
 
   TIMING_RUBY_CONFIG_ARGS=()
-  load_gem5_args_file "$timing_ruby_default_sim_config" TIMING_RUBY_CONFIG_ARGS
+  append_gem5_args_file "$DEFAULT_TIMING_RUBY_FRONTEND_SIM_CONFIG" TIMING_RUBY_CONFIG_ARGS
+  append_gem5_args_file "$timing_ruby_default_sim_config" TIMING_RUBY_CONFIG_ARGS
   if [[ -n "$SIM_CONFIG" ]]; then
     append_gem5_args_file "$SIM_CONFIG" TIMING_RUBY_CONFIG_ARGS
   fi

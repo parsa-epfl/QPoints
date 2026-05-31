@@ -1,0 +1,7 @@
+# Shared frontend defaults for QPoints timing-Ruby runs.
+# Keep one argument per line and use native gem5 option syntax.
+
+--fdip
+--ftqSize=8
+--btb-entries=16384
+--btb-ways=4
