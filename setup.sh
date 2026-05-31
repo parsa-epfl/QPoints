@@ -48,7 +48,7 @@ fi
 
 echo build gem5
 cd gem5
-scons -j8 build/ARM/gem5.opt CXX=g++ CXXFLAGS="-std=c++17"
+scons -j32 build/ARM/gem5.opt CXX=g++ CXXFLAGS="-std=c++17"
 cd ..
 
 echo Getting ARM kernel image files for gem5
