@@ -80,6 +80,7 @@ LLC_SOURCE_FILE = "llc-0.json.zstd"
 DIRECTORY_SOURCE_FILE = "directory-0.json.zstd"
 HARVARD_SOURCE_FILE = "harvard-0.json.zstd"
 FETCH_SOURCE_FILE = "fetch.json.zstd"
+MMU_SOURCE_FILE_TEMPLATE = "mmus-{core}.json.zstd"
 MANIFEST_FILE = "manifest.json"
 CACHE_LINE_SIZE = 64
 INSTRUCTION_BYTES = 4
@@ -1528,6 +1529,7 @@ def prepare_snapshot_gem5_uarch(
     directory_source_file = qflex_uarch_dir / DIRECTORY_SOURCE_FILE
     harvard_source_file = qflex_uarch_dir / HARVARD_SOURCE_FILE
     fetch_source_file = qflex_uarch_dir / FETCH_SOURCE_FILE
+    mmu_source_files = {}
     target_file = gem5_uarch_dir / LLC_RESTORE_FILE
     l2_shared_restore_candidate_file = gem5_uarch_dir / L2_SHARED_RESTORE_CANDIDATE_FILE
     l2_shared_restore_file = gem5_uarch_dir / L2_SHARED_RESTORE_FILE
@@ -1605,6 +1607,10 @@ def prepare_snapshot_gem5_uarch(
     directory = _parse_directory(directory_source_file)
     harvard = _parse_harvard(harvard_source_file)
     fetch_units = _parse_fetch(fetch_source_file) if fetch_source_file.is_file() else []
+    for core in range(len(harvard)):
+        mmu_source = qflex_uarch_dir / MMU_SOURCE_FILE_TEMPLATE.format(core=core)
+        if mmu_source.is_file():
+            mmu_source_files[str(core)] = str(mmu_source)
     clean_lines, modified_lines, stats = _select_llc_restore_lines(
         llc_lines, directory, harvard
     )
@@ -2167,6 +2173,16 @@ def prepare_snapshot_gem5_uarch(
                     "history recomputation, and policy-state defaults"
                 ),
                 "stats": tage_stats,
+            },
+            "tlb": {
+                "source_files": mmu_source_files,
+                "line_count": len(mmu_source_files),
+                "selection_policy": (
+                    "pass through per-core WormCache MMU snapshot files for "
+                    "gem5-side VA translation and TLB checkpoint emission; "
+                    "application is owned by the canonical gem5 uarch phase "
+                    "after base checkpoint composition"
+                ),
             },
         },
     }
