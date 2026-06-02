@@ -1,0 +1,34 @@
+tlb_resident_rw is a validation microbenchmark for checkpoint-conversion and
+TLB-restoration work.
+
+Intent:
+- Create a data-side working set that is intentionally page-granular rather
+  than cache-line-granular.
+- Touch exactly one 64 B cache line per 4 KiB page on each inner-loop pass.
+- Perform a read-modify-write so the benchmark creates real load and store
+  traffic instead of a read-only page-touch stream.
+- Keep the hot page footprint comfortably inside the assumed 64-entry WormCache
+  L1 DTLB geometry so restored DTLB state should matter immediately after
+  checkpoint restore.
+
+Why this benchmark exists:
+- `l1d_resident_rw` and `llc_resident_rw` are cache-validation benchmarks.
+- They revisit many cache lines per page and do not make translation behavior
+  the dominant signal.
+- For the first TLB-restoration proof, we want a benchmark whose steady-state
+  hot set is primarily a set of virtual pages, not a cache-capacity stress
+  test.
+- A 48-page footprint fits below the assumed 64-entry WormCache DTLB capacity,
+  so restored translations should be hits instead of immediate replacement
+  pressure.
+
+Compiler and runtime guardrails:
+- The data array is globally allocated and aligned to 4 KiB page boundaries.
+- The loop touches one word at the start of each page, so each iteration
+  revisits the same page-granular translation working set.
+- A volatile sink consumes the checksum from each full pass so the compiler
+  cannot discard the loop body as dead work.
+- The benchmark requests `MADV_NOHUGEPAGE` when available so transparent huge
+  pages do not silently change the page-granular access pattern.
+- The Makefile disables aggressive loop transformations to keep the access
+  pattern close to the intended structure.
