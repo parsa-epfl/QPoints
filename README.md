@@ -30,20 +30,26 @@ bash setup.sh
 
 ## Generate a Checkpoint
 
-Use `run_all.sh` to start QEMU from a QFlex snapshot, wait for SSH, collect the
-gem5 checkpoint, convert the selected qcow2 snapshot to a raw image, and place
-the generated files in the gem5 checkpoint directory.
+The canonical checkpoint conversion path now lives in the top-level `qflex`
+CLI, not in a standalone QPoints bash wrapper. Use `qpoints convert-single` to
+materialize the checkpoint root from the `.gem` producer bundle and prepare the
+gem5 uarch sidecar artifacts.
 
 ```bash
-./run_all.sh --qflex-ckp-dir qflex_checkpoints --gem5-ckp-dir gem5_checkpoints \
-  --core-count 4 --memory-gb 16 --base web_search.qcow2 --snapshot snapshot_0
+../qflex qpoints convert-single \
+  --qflex-ckp-dir qflex_checkpoints \
+  --gem5-ckp-dir gem5_checkpoints \
+  --core-count 4 \
+  --memory-gb 16 \
+  --base web_search.qcow2 \
+  --snapshot snapshot_0
 ```
 
-Optional environment variables:
+The previous bash-based conversion flow has been archived under:
 
-- `QPOINTS_SSH_PASSWORD`: SSH password used while waiting for the guest
-- `QPOINTS_SSH_MAX_ATTEMPTS`: maximum SSH readiness attempts
-- `QEMU_EFI_FD`: explicit UEFI firmware path for QEMU
+```text
+archive/legacy_convert_single/
+```
 
 ## Run a Checkpoint in gem5
 
