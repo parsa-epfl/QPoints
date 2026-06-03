@@ -62,7 +62,7 @@ echo "Warning: run_qemu_emu.sh opens ${BASE} as a writable qcow2 image; guest wr
 exec ./qemu-system-aarch64 \
   -M virt,gic-version=max,virtualization=off,secure=off \
   -smp "$CORES" \
-  -cpu max,pauth=off \
+  -cpu max,pauth=off,sme=off \
   -m "$MEM" \
   -boot order=d,menu=on \
   -bios "$BIOS_PATH" \
