@@ -1,0 +1,12 @@
+Validate the multi-core TLB restore wiring after fixing the MMU source-file
+contract mismatch.
+
+This package is a 4-core smoke on `snapshot_0` that checks:
+
+1. multi-core conversion generates `mmu-cpu0..3.cpt`
+2. gem5 instantiates one `ArmTLBRestorer` per CPU
+3. cold vs restored counters move in the expected direction on the same
+   checkpoint and instruction bound
+
+This is a wiring/functional-effect validation package, not a full multi-core
+effectiveness study.

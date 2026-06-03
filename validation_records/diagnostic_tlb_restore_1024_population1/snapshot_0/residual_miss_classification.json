@@ -1,0 +1,101 @@
+{
+  "kind": "analysis",
+  "schema_version": 1,
+  "title": "Residual TLB miss classification for restored 1024-entry diagnostic",
+  "source_snapshot": "snapshot_0",
+  "restored_run": {
+    "experiment": "tlb1024_restore_snapshot0_100k",
+    "window": {
+      "instructions": 100000
+    }
+  },
+  "source_snapshot_tlb": {
+    "itlb_valid_entries": 300,
+    "dtlb_valid_entries": 263
+  },
+  "generated_sidecar": {
+    "itb_entries": 300,
+    "dtb_entries": 263
+  },
+  "provenance": {
+    "itlb": {
+      "source_valid": 300,
+      "sidecar_valid": 300,
+      "exact_common": 180,
+      "source_only_vpn_count": 120,
+      "sidecar_only_vpn_count": 4
+    },
+    "dtlb": {
+      "source_valid": 263,
+      "sidecar_valid": 263,
+      "exact_common": 226,
+      "source_only_vpn_count": 37,
+      "sidecar_only_vpn_count": 4
+    }
+  },
+  "restored_unique_misses": {
+    "itlb": {
+      "both": 0,
+      "source_only": 0,
+      "sidecar_only": 0,
+      "neither": 22
+    },
+    "dtlb": {
+      "both": 0,
+      "source_only": 0,
+      "sidecar_only": 0,
+      "neither": 41
+    }
+  },
+  "hot_loop_checks": {
+    "dtlb_hot_run": {
+      "vpn_start_hex": "0x495",
+      "vpn_end_hex": "0x4c5",
+      "page_count": 49,
+      "fully_preserved_in_sidecar": true,
+      "present_in_residual_misses": false
+    },
+    "itlb_low_user_page": {
+      "vpn_hex": "0x400",
+      "preserved_in_sidecar": true,
+      "present_in_residual_misses": false
+    }
+  },
+  "sample_residual_symbols": [
+    "tcp_orphan_timer",
+    "do_undefinstr",
+    "fpsimd_save",
+    "oops_enter",
+    "tracing_off",
+    "ring_buffer_record_off",
+    "console_verbose",
+    "console_printk",
+    "_printk",
+    "vprintk",
+    "vsnprintf",
+    "format_decode"
+  ],
+  "restored_terminal": {
+    "kernel_oops": true,
+    "message": "Internal error: Oops - Undefined instruction: 0000000002000000 [#1] SMP"
+  },
+  "focused_fault_trace": {
+    "first_fault": {
+      "kind": "IRQ",
+      "pc": "0x400548"
+    },
+    "undefined_instruction_fault": {
+      "pc": "0xffff800008017b2c",
+      "symbol": "fpsimd_save+0x108",
+      "inst_word": "0xd53b4240",
+      "decoded_instruction": "mrs x0, svcr"
+    }
+  },
+  "interpretation": [
+    "Residual misses are not restored pages failing to hit.",
+    "Residual misses are on a separate execution footprint that was present in neither the source snapshot TLB nor the generated sidecar.",
+    "The current strongest clue is an exceptional kernel-side path involving undefined-instruction handling and printk/tracing work.",
+    "The restored 1024-entry run reports a kernel undefined-instruction oops in system.terminal, while the corresponding cold run does not.",
+    "A focused gem5 fault trace identifies the faulting instruction as 'mrs x0, svcr' in fpsimd_save, which points to missing SME/SVCR support rather than BTI itself."
+  ]
+}

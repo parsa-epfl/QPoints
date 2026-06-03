@@ -1,0 +1,22 @@
+Run a diagnostic single-core TLB-restore experiment with an intentionally oversized
+source-side and target-side L1 TLB (1024 entries) to test whether the remaining
+misses in the restored gem5 run are primarily caused by displacement from the
+resume-side transient.
+
+Purpose:
+- regenerate the single-core `tlb_resident_rw` lineage under a 1024-entry WormCache
+  ITLB/DTLB configuration
+- extend functional warming population from `0.05s` to `1s`
+- convert the fresh `snapshot_0` through the canonical `.gem`-based convert-single
+  path with a 1024-entry TLB helper cap
+- compare cold vs restored gem5 AtomicSimpleCPU runs at `100000` instructions with
+  `ITB=1024` and `DTB=1024`
+- preserve the outcome because the residual misses remain materially non-zero even
+  under this favorable geometry
+
+What this package should let us recover later:
+- the exact source-side MMU occupancy seen in the fresh snapshot
+- the generated `mmu-cpu0.cpt` sidecar produced by convert-single
+- the cold and restored gem5 counters for the 1024-entry diagnostic
+- the reasoning why this result points to a resume/transient and/or translation-
+  semantics issue rather than a simple lack of source-side TLB capacity

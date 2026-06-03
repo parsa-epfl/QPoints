@@ -1,0 +1,4 @@
+# Enable runtime TLB restore from gem5_uarch/mmu-cpu*.cpt sidecars.
+# Keep one argument per line and use native gem5 option syntax.
+
+--restore-tlb-state
