@@ -1,0 +1,150 @@
+{
+  "kind": "experiment",
+  "schema_version": 1,
+  "component": "restore.tlb",
+  "title": "Canonical 64-entry TLB restore validation on single-core tlb_resident_rw",
+  "lifecycle": {
+    "state": "investigation",
+    "retention_policy": "keep"
+  },
+  "intent": {
+    "source_path": "<QPoints>/validation_records/canonical_tlb_restore_64/snapshot_0/INTENT.txt",
+    "staged_path": "INTENT.txt",
+    "text": "Preserve the canonical 64-entry single-core TLB restoration validation on tlb_resident_rw after the .gem convert-single migration, runtime-gated TLB restore wiring, and source CPU SME-off default."
+  },
+  "commands": [
+    {
+      "label": "initialize",
+      "cwd": "<qflex>",
+      "argv": [
+        "./qflex",
+        "initialize",
+        "--fallback-cycles",
+        "100000",
+        "--loadvm-name",
+        "loaded"
+      ]
+    },
+    {
+      "label": "functional-warm-snapshot0",
+      "cwd": "<qflex>",
+      "argv": [
+        "./qflex",
+        "fw",
+        "--sample-size",
+        "1",
+        "--loadvm-name",
+        "init_warmed"
+      ]
+    },
+    {
+      "label": "convert-single",
+      "cwd": "<qflex>",
+      "argv": [
+        "./qflex",
+        "qpoints",
+        "convert-single",
+        "--qflex-ckp-dir",
+        "/mnt/sdb/aansari/experiments/single-core",
+        "--gem5-ckp-dir",
+        "/mnt/sdb/aansari/checkpoints/single-core",
+        "--core-count",
+        "1",
+        "--memory-gb",
+        "16",
+        "--base",
+        "/mnt/sdb/aansari/images/single-core.qcow2",
+        "--snapshot",
+        "snapshot_0",
+        "--overwrite"
+      ]
+    },
+    {
+      "label": "cold-run",
+      "cwd": "<qflex>",
+      "argv": [
+        "./qflex",
+        "qpoints",
+        "run-gem5",
+        "--gem5-ckp-dir",
+        "/mnt/sdb/aansari/checkpoints/single-core",
+        "--experiment",
+        "tlb64_cold_snapshot0_100k",
+        "--snapshot",
+        "snapshot_0",
+        "--inst",
+        "100000",
+        "--core-count",
+        "1"
+      ]
+    },
+    {
+      "label": "restored-run",
+      "cwd": "<qflex>",
+      "argv": [
+        "./qflex",
+        "qpoints",
+        "run-gem5",
+        "--gem5-ckp-dir",
+        "/mnt/sdb/aansari/checkpoints/single-core",
+        "--experiment",
+        "tlb64_restore_snapshot0_100k",
+        "--snapshot",
+        "snapshot_0",
+        "--inst",
+        "100000",
+        "--core-count",
+        "1",
+        "--sim-config",
+        "/home/dev/qflex_git/QPoints/configs/tlb_restore.args"
+      ]
+    }
+  ],
+  "artifacts": [
+    {
+      "label": "intent",
+      "category": "intent",
+      "path": "INTENT.txt",
+      "protected": true,
+      "required": true,
+      "retention": "keep",
+      "description": "Captured validation intent."
+    },
+    {
+      "label": "report",
+      "category": "report",
+      "path": "TLB_RESTORE_64_REPORT.md",
+      "protected": true,
+      "required": true,
+      "retention": "keep",
+      "description": "Summary of the canonical 64-entry validation result."
+    },
+    {
+      "label": "cold-stats",
+      "category": "stats",
+      "path": "cold_stats.txt",
+      "protected": true,
+      "required": true,
+      "retention": "keep",
+      "description": "Cold gem5 stats for the canonical 64-entry run."
+    },
+    {
+      "label": "restored-stats",
+      "category": "stats",
+      "path": "restored_stats.txt",
+      "protected": true,
+      "required": true,
+      "retention": "keep",
+      "description": "Restored gem5 stats for the canonical 64-entry run."
+    },
+    {
+      "label": "mmu-cpu0-cpt",
+      "category": "uarch",
+      "path": "mmu-cpu0.cpt",
+      "protected": true,
+      "required": true,
+      "retention": "keep",
+      "description": "Generated TLB restore sidecar for the converted canonical 64-entry snapshot."
+    }
+  ]
+}
