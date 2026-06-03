@@ -1,0 +1,14 @@
+{
+  "itlb": {
+    "entries": 1024,
+    "valid": 300
+  },
+  "dtlb": {
+    "entries": 1024,
+    "valid": 263
+  },
+  "stlb": {
+    "entries": 4096,
+    "valid": 563
+  }
+}

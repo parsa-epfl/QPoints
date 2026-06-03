@@ -1,0 +1,204 @@
+{
+  "kind": "experiment",
+  "schema_version": 1,
+  "component": "restore.tlb",
+  "title": "Single-core 1024-entry TLB diagnostic with 1s population",
+  "lifecycle": {
+    "state": "investigation",
+    "retention_policy": "keep"
+  },
+  "intent": {
+    "source_path": "<QPoints>/validation_records/diagnostic_tlb_restore_1024_population1/snapshot_0/INTENT.txt",
+    "staged_path": "INTENT.txt",
+    "text": "Preserve the 1024-entry source-side and target-side TLB diagnostic on the single-core tlb_resident_rw lineage, including the cold/restored gem5 counters and a report explaining why substantial residual misses remain despite 1s population and a heavily populated source-side TLB snapshot."
+  },
+  "commands": [
+    {
+      "label": "regenerate-init-warmed",
+      "cwd": "<qflex>",
+      "argv": [
+        "xargs",
+        "-a",
+        "/tmp/qflex_init_1024.args",
+        "--",
+        "./qflex",
+        "initialize",
+        "--skip-generate-cfg",
+        "--fallback-cycles",
+        "100000",
+        "--loadvm-name",
+        "tlb_loaded"
+      ]
+    },
+    {
+      "label": "functional-warm-snapshot0",
+      "cwd": "<qflex>",
+      "argv": [
+        "xargs",
+        "-a",
+        "/tmp/qflex_pop1.args",
+        "--",
+        "./qflex",
+        "fw",
+        "--sample-size",
+        "1",
+        "--loadvm-name",
+        "init_warmed"
+      ]
+    },
+    {
+      "label": "convert-single",
+      "cwd": "<qflex>",
+      "argv": [
+        "./qflex",
+        "qpoints",
+        "convert-single",
+        "--qflex-ckp-dir",
+        "/mnt/sdb/aansari/experiments/single-core",
+        "--gem5-ckp-dir",
+        "/mnt/sdb/aansari/checkpoints/single-core",
+        "--core-count",
+        "1",
+        "--memory-gb",
+        "16",
+        "--base",
+        "/mnt/sdb/aansari/images/single-core.qcow2",
+        "--snapshot",
+        "snapshot_0",
+        "--overwrite"
+      ]
+    },
+    {
+      "label": "cold-run",
+      "cwd": "<QPoints>",
+      "argv": [
+        "bash",
+        "run_gem5.sh",
+        "--gem5-ckp-dir",
+        "/mnt/sdb/aansari/checkpoints/single-core",
+        "--experiment",
+        "tlb1024_cold_snapshot0_100k",
+        "--snapshot",
+        "snapshot_0",
+        "--inst",
+        "100000",
+        "--cores",
+        "1",
+        "--sim-config",
+        "/tmp/classic_atomic_tlb1024.args"
+      ]
+    },
+    {
+      "label": "restored-run",
+      "cwd": "<QPoints>",
+      "argv": [
+        "bash",
+        "run_gem5.sh",
+        "--gem5-ckp-dir",
+        "/mnt/sdb/aansari/checkpoints/single-core",
+        "--experiment",
+        "tlb1024_restore_snapshot0_100k",
+        "--snapshot",
+        "snapshot_0",
+        "--inst",
+        "100000",
+        "--cores",
+        "1",
+        "--sim-config",
+        "/tmp/classic_atomic_tlb1024_restore.args"
+      ]
+    }
+  ],
+  "artifacts": [
+    {
+      "label": "intent",
+      "category": "intent",
+      "path": "INTENT.txt",
+      "protected": true,
+      "required": true,
+      "retention": "keep",
+      "description": "Captured diagnostic intent."
+    },
+    {
+      "label": "report",
+      "category": "analysis",
+      "path": "TLB_RESTORE_1024_REPORT.md",
+      "protected": true,
+      "required": true,
+      "retention": "keep",
+      "description": "Human-readable explanation of the 1024-entry TLB diagnostic and its residual misses."
+    },
+    {
+      "label": "manifest",
+      "category": "metadata",
+      "path": "experiment_manifest.json",
+      "protected": true,
+      "required": true,
+      "retention": "keep",
+      "description": "Structured manifest for the diagnostic package."
+    },
+    {
+      "label": "cold_stats",
+      "category": "file",
+      "path": "cold_stats.txt",
+      "protected": true,
+      "required": true,
+      "retention": "keep",
+      "description": "Cold gem5 stats for the 1024-entry diagnostic."
+    },
+    {
+      "label": "cold_config",
+      "category": "file",
+      "path": "cold_config.ini",
+      "protected": true,
+      "required": true,
+      "retention": "keep",
+      "description": "Cold gem5 config for the 1024-entry diagnostic."
+    },
+    {
+      "label": "restored_stats",
+      "category": "file",
+      "path": "restored_stats.txt",
+      "protected": true,
+      "required": true,
+      "retention": "keep",
+      "description": "Restored gem5 stats for the 1024-entry diagnostic."
+    },
+    {
+      "label": "restored_config",
+      "category": "file",
+      "path": "restored_config.ini",
+      "protected": true,
+      "required": true,
+      "retention": "keep",
+      "description": "Restored gem5 config for the 1024-entry diagnostic."
+    },
+    {
+      "label": "source_mmu_summary",
+      "category": "analysis",
+      "path": "source_mmu_summary.json",
+      "protected": true,
+      "required": true,
+      "retention": "keep",
+      "description": "Summary of valid ITLB/DTLB/STLB entries in the fresh source snapshot."
+    },
+    {
+      "label": "mmu_cpu0_cpt",
+      "category": "analysis",
+      "path": "mmu-cpu0.cpt",
+      "protected": true,
+      "required": true,
+      "retention": "keep",
+      "description": "Generated TLB sidecar used by the restored run."
+    },
+    {
+      "label": "mmu_cpu0_head",
+      "category": "analysis",
+      "path": "mmu_cpu0_head.txt",
+      "protected": true,
+      "required": true,
+      "retention": "keep",
+      "description": "Header excerpt of the generated TLB sidecar for quick inspection."
+    }
+  ]
+}
