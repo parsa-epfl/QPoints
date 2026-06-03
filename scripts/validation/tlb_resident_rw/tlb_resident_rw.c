@@ -30,8 +30,8 @@ static void __attribute__((noinline)) request_base_pages(void)
 
 int main(void)
 {
-    init_array();
     request_base_pages();
+    init_array();
 
     while (1) {
         uint64_t checksum = 0;
