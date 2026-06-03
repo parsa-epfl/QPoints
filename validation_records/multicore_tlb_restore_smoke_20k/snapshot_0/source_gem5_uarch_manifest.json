@@ -1,0 +1,245 @@
+{
+  "components": {
+    "btb": {
+      "candidate_file": "/mnt/sdb/aansari/checkpoints/multi-core/snapshot_0/gem5_uarch/btb_restore_candidates.json",
+      "line_count": 0,
+      "restore_files": {},
+      "selection_policy": "all restorable BTB entries from the QFlex fetch-side state for branch types Conditional, Unconditional, DirectCall, Return, IndirectCall, and IndirectBranch, ordered oldest-to-newest per source set by timestamp; each staged entry carries both the source branch PC and the derived basic-block start address (branch_pc - bbl_bytes) so local gem5 can reconstruct its BBL-indexed BTB entries while preserving the original branch identity",
+      "source_file": "/mnt/sdb/aansari/experiments/multi-core/run/snapshot_0.uarch/fetch.json.zstd",
+      "stats": {
+        "branch_type_counts": {},
+        "nonbranch_entries": 0,
+        "restorable_branch_candidates": 0,
+        "total_entries": 0
+      }
+    },
+    "l1d": {
+      "candidate_file": "/mnt/sdb/aansari/checkpoints/multi-core/snapshot_0/gem5_uarch/l1d_restore_candidates.json",
+      "line_count": 1843,
+      "restore_files": {
+        "0": "/mnt/sdb/aansari/checkpoints/multi-core/snapshot_0/gem5_uarch/l1d_restore_addrs.core0.txt",
+        "1": "/mnt/sdb/aansari/checkpoints/multi-core/snapshot_0/gem5_uarch/l1d_restore_addrs.core1.txt",
+        "2": "/mnt/sdb/aansari/checkpoints/multi-core/snapshot_0/gem5_uarch/l1d_restore_addrs.core2.txt",
+        "3": "/mnt/sdb/aansari/checkpoints/multi-core/snapshot_0/gem5_uarch/l1d_restore_addrs.core3.txt"
+      },
+      "selection_policy": "all valid private L1D lines from the QFlex Harvard state, ordered per-set by ascending L1D timestamp so future restore experiments can preserve source-side recency oldest-to-newest; staged restore state is S for writeable=false lines and M for writeable=true lines",
+      "source_file": "/mnt/sdb/aansari/experiments/multi-core/run/snapshot_0.uarch/harvard-0.json.zstd",
+      "stats": {
+        "candidate_l1d_lines": 1843,
+        "modified_lines": 790,
+        "non_l1d_lines_skipped": 2707,
+        "total_private_lines": 4550,
+        "writeable_lines": 1262
+      }
+    },
+    "l1i": {
+      "candidate_file": "/mnt/sdb/aansari/checkpoints/multi-core/snapshot_0/gem5_uarch/l1i_restore_candidates.json",
+      "line_count": 2707,
+      "restore_files": {
+        "0": "/mnt/sdb/aansari/checkpoints/multi-core/snapshot_0/gem5_uarch/l1i_restore_addrs.core0.txt",
+        "1": "/mnt/sdb/aansari/checkpoints/multi-core/snapshot_0/gem5_uarch/l1i_restore_addrs.core1.txt",
+        "2": "/mnt/sdb/aansari/checkpoints/multi-core/snapshot_0/gem5_uarch/l1i_restore_addrs.core2.txt",
+        "3": "/mnt/sdb/aansari/checkpoints/multi-core/snapshot_0/gem5_uarch/l1i_restore_addrs.core3.txt"
+      },
+      "selection_policy": "all valid private L1I lines from the QFlex Harvard state, ordered per-set by ascending L1I timestamp so restore replays source-side recency oldest-to-newest; staged restore state is always S",
+      "source_file": "/mnt/sdb/aansari/experiments/multi-core/run/snapshot_0.uarch/harvard-0.json.zstd",
+      "stats": {
+        "candidate_l1i_lines": 2707,
+        "data_lines_skipped": 1843,
+        "modified_lines": 0,
+        "total_private_lines": 4550,
+        "writeable_lines": 0
+      }
+    },
+    "l2_shared_private": {
+      "block_count": 1888,
+      "candidate_file": "/mnt/sdb/aansari/checkpoints/multi-core/snapshot_0/gem5_uarch/l2_shared_restore_candidates.json",
+      "line_count": 3288,
+      "restore_file": "/mnt/sdb/aansari/checkpoints/multi-core/snapshot_0/gem5_uarch/l2_shared_restore_addrs.txt",
+      "selection_policy": "all clean directory-shared private lines, emitted once per unique L1 controller sharer so the inclusive gem5 L2 can reconstruct SS state and sharer metadata during multicore warm restore",
+      "source_files": {
+        "directory": "/mnt/sdb/aansari/experiments/multi-core/run/snapshot_0.uarch/directory-0.json.zstd",
+        "harvard": "/mnt/sdb/aansari/experiments/multi-core/run/snapshot_0.uarch/harvard-0.json.zstd"
+      },
+      "stats": {
+        "clean_shared_private_entries": 1888,
+        "directory_entries": 3150,
+        "directory_shared_entries": 1888,
+        "private_present_entries": 1888,
+        "total_sharer_cores": 3288
+      }
+    },
+    "llc": {
+      "line_count": 3514,
+      "output_file": "/mnt/sdb/aansari/checkpoints/multi-core/snapshot_0/gem5_uarch/llc_restore_addrs.txt",
+      "protocol_required_modified_lines": 0,
+      "selected_modified_lines": 0,
+      "selection_policy": "clean LLC lines with no private modified/writeable copy, plus the first N restorable LLC-modified lines for controlled debugging, ordered per-set by ascending LLC timestamp so startup insertion reconstructs warm replacement state oldest-to-newest",
+      "source_files": {
+        "directory": "/mnt/sdb/aansari/experiments/multi-core/run/snapshot_0.uarch/directory-0.json.zstd",
+        "harvard": "/mnt/sdb/aansari/experiments/multi-core/run/snapshot_0.uarch/harvard-0.json.zstd",
+        "llc": "/mnt/sdb/aansari/experiments/multi-core/run/snapshot_0.uarch/llc-0.json.zstd"
+      },
+      "stats": {
+        "candidate_restorable_clean_lines": 3514,
+        "candidate_restorable_llc_lines": 3882,
+        "candidate_restorable_modified_lines": 368,
+        "lines_with_directory_entry": 1888,
+        "llc_modified_lines": 368,
+        "private_modified_lines": 0,
+        "private_writeable_lines": 0,
+        "total_llc_lines": 3882
+      }
+    },
+    "moesi_multi_private_data_clean": {
+      "candidate_file": "/mnt/sdb/aansari/checkpoints/multi-core/snapshot_0/gem5_uarch/moesi_multi_private_data_clean_restore_candidates.json",
+      "l1d_restore_files": {
+        "0": "/mnt/sdb/aansari/checkpoints/multi-core/snapshot_0/gem5_uarch/moesi_l1d_multi_private_data_clean.core0.txt",
+        "1": "/mnt/sdb/aansari/checkpoints/multi-core/snapshot_0/gem5_uarch/moesi_l1d_multi_private_data_clean.core1.txt",
+        "2": "/mnt/sdb/aansari/checkpoints/multi-core/snapshot_0/gem5_uarch/moesi_l1d_multi_private_data_clean.core2.txt",
+        "3": "/mnt/sdb/aansari/checkpoints/multi-core/snapshot_0/gem5_uarch/moesi_l1d_multi_private_data_clean.core3.txt"
+      },
+      "line_count": 145,
+      "nonllc_restore_file": "/mnt/sdb/aansari/checkpoints/multi-core/snapshot_0/gem5_uarch/moesi_multi_private_data_clean_nonllc_restore.txt",
+      "restore_file": "/mnt/sdb/aansari/checkpoints/multi-core/snapshot_0/gem5_uarch/moesi_multi_private_data_clean_restore.txt",
+      "selection_policy": "for MOESI_CMP_directory, multi-private clean data lines whose source directory entry is shared and whose private D-cache holders are all read-only; restore LLC-backed lines as L1D S-state lines plus L2 SLS sharer metadata, and restore non-LLC-backed lines as L1D S-state lines plus L2 local-directory ILS sharer metadata without fabricating LLC residency",
+      "source_files": {
+        "directory": "/mnt/sdb/aansari/experiments/multi-core/run/snapshot_0.uarch/directory-0.json.zstd",
+        "harvard": "/mnt/sdb/aansari/experiments/multi-core/run/snapshot_0.uarch/harvard-0.json.zstd",
+        "llc": "/mnt/sdb/aansari/experiments/multi-core/run/snapshot_0.uarch/llc-0.json.zstd"
+      },
+      "stats": {
+        "candidate_lines": 145,
+        "directory_backed_block_ids": 3150,
+        "directory_nonshared_block_ids_skipped": 0,
+        "harvard_block_ids": 3150,
+        "instruction_sharer_block_ids_skipped": 0,
+        "llc_backed_block_ids": 145,
+        "modified_block_ids_skipped": 0,
+        "multi_private_dcore_block_ids": 145,
+        "non_llc_backed_block_ids": 0,
+        "total_sharer_cores": 449,
+        "writeable_block_ids_skipped": 0
+      }
+    },
+    "moesi_private_instruction_only": {
+      "candidate_file": "/mnt/sdb/aansari/checkpoints/multi-core/snapshot_0/gem5_uarch/moesi_private_instruction_only_restore_candidates.json",
+      "l1i_restore_files": {
+        "0": "/mnt/sdb/aansari/checkpoints/multi-core/snapshot_0/gem5_uarch/moesi_l1i_private_instruction_only.core0.txt",
+        "1": "/mnt/sdb/aansari/checkpoints/multi-core/snapshot_0/gem5_uarch/moesi_l1i_private_instruction_only.core1.txt",
+        "2": "/mnt/sdb/aansari/checkpoints/multi-core/snapshot_0/gem5_uarch/moesi_l1i_private_instruction_only.core2.txt",
+        "3": "/mnt/sdb/aansari/checkpoints/multi-core/snapshot_0/gem5_uarch/moesi_l1i_private_instruction_only.core3.txt"
+      },
+      "line_count": 1611,
+      "nonllc_restore_file": "/mnt/sdb/aansari/checkpoints/multi-core/snapshot_0/gem5_uarch/moesi_private_instruction_only_nonllc_restore.txt",
+      "restore_file": "/mnt/sdb/aansari/checkpoints/multi-core/snapshot_0/gem5_uarch/moesi_private_instruction_only_restore.txt",
+      "selection_policy": "for MOESI_CMP_directory, private instruction-only lines whose source directory entry is shared and whose private sharers are all instruction-cache sharers; restore LLC-backed lines as L1I S-state lines plus L2 SLS sharer metadata, and restore non-LLC-backed lines as L1I S-state lines plus L2 local-directory ILS sharer metadata without fabricating LLC residency",
+      "source_files": {
+        "directory": "/mnt/sdb/aansari/experiments/multi-core/run/snapshot_0.uarch/directory-0.json.zstd",
+        "harvard": "/mnt/sdb/aansari/experiments/multi-core/run/snapshot_0.uarch/harvard-0.json.zstd",
+        "llc": "/mnt/sdb/aansari/experiments/multi-core/run/snapshot_0.uarch/llc-0.json.zstd"
+      },
+      "stats": {
+        "candidate_lines": 1611,
+        "d_sharer_block_ids_skipped": 1539,
+        "directory_backed_block_ids": 3150,
+        "directory_nonshared_block_ids_skipped": 0,
+        "harvard_block_ids": 3150,
+        "instruction_only_block_ids": 1611,
+        "llc_backed_block_ids": 1611,
+        "modified_instruction_block_ids_skipped": 0,
+        "non_llc_backed_block_ids": 0,
+        "total_sharer_cores": 2707
+      }
+    },
+    "moesi_single_private_data_clean": {
+      "candidate_file": "/mnt/sdb/aansari/checkpoints/multi-core/snapshot_0/gem5_uarch/moesi_single_private_data_clean_restore_candidates.json",
+      "l1d_restore_files": {
+        "0": "/mnt/sdb/aansari/checkpoints/multi-core/snapshot_0/gem5_uarch/moesi_l1d_single_private_data_clean.core0.txt",
+        "1": "/mnt/sdb/aansari/checkpoints/multi-core/snapshot_0/gem5_uarch/moesi_l1d_single_private_data_clean.core1.txt",
+        "2": "/mnt/sdb/aansari/checkpoints/multi-core/snapshot_0/gem5_uarch/moesi_l1d_single_private_data_clean.core2.txt",
+        "3": "/mnt/sdb/aansari/checkpoints/multi-core/snapshot_0/gem5_uarch/moesi_l1d_single_private_data_clean.core3.txt"
+      },
+      "line_count": 132,
+      "restore_file": "/mnt/sdb/aansari/checkpoints/multi-core/snapshot_0/gem5_uarch/moesi_single_private_data_clean_restore.txt",
+      "selection_policy": "for MOESI_CMP_directory, single-private clean data lines whose source directory entry is shared, whose shared cache line is present in the LLC snapshot, and whose only private D-cache holder is read-only; restore them as LLC-backed L1D S-state lines plus L2 local directory SLS sharer metadata without changing the global directory's existing LLC-sharer S-state story",
+      "source_files": {
+        "directory": "/mnt/sdb/aansari/experiments/multi-core/run/snapshot_0.uarch/directory-0.json.zstd",
+        "harvard": "/mnt/sdb/aansari/experiments/multi-core/run/snapshot_0.uarch/harvard-0.json.zstd",
+        "llc": "/mnt/sdb/aansari/experiments/multi-core/run/snapshot_0.uarch/llc-0.json.zstd"
+      },
+      "stats": {
+        "candidate_lines": 132,
+        "directory_backed_block_ids": 3150,
+        "directory_nonshared_block_ids_skipped": 0,
+        "harvard_block_ids": 3150,
+        "instruction_sharer_block_ids_skipped": 0,
+        "llc_missing_block_ids_skipped": 0,
+        "modified_block_ids_skipped": 0,
+        "single_private_dcore_block_ids": 1394,
+        "writeable_block_ids_skipped": 1262
+      }
+    },
+    "moesi_single_private_data_writeable": {
+      "candidate_file": "/mnt/sdb/aansari/checkpoints/multi-core/snapshot_0/gem5_uarch/moesi_single_private_data_writeable_restore_candidates.json",
+      "l1d_restore_files": {
+        "0": "/mnt/sdb/aansari/checkpoints/multi-core/snapshot_0/gem5_uarch/moesi_l1d_single_private_data_writeable.core0.txt",
+        "1": "/mnt/sdb/aansari/checkpoints/multi-core/snapshot_0/gem5_uarch/moesi_l1d_single_private_data_writeable.core1.txt",
+        "2": "/mnt/sdb/aansari/checkpoints/multi-core/snapshot_0/gem5_uarch/moesi_l1d_single_private_data_writeable.core2.txt",
+        "3": "/mnt/sdb/aansari/checkpoints/multi-core/snapshot_0/gem5_uarch/moesi_l1d_single_private_data_writeable.core3.txt"
+      },
+      "line_count": 1262,
+      "restore_file": "/mnt/sdb/aansari/checkpoints/multi-core/snapshot_0/gem5_uarch/moesi_single_private_data_writeable_restore.txt",
+      "selection_policy": "for MOESI_CMP_directory, single-private writable data lines whose source directory entry is private (shared=false, in_shared_cache=false) and absent from the shared cache; restore them as L1D M-state lines using checkpoint-backed memory data, plus L2 local directory ILX ownership and global directory M-state ownership without fabricating LLC residency",
+      "source_files": {
+        "directory": "/mnt/sdb/aansari/experiments/multi-core/run/snapshot_0.uarch/directory-0.json.zstd",
+        "harvard": "/mnt/sdb/aansari/experiments/multi-core/run/snapshot_0.uarch/harvard-0.json.zstd",
+        "llc": "/mnt/sdb/aansari/experiments/multi-core/run/snapshot_0.uarch/llc-0.json.zstd"
+      },
+      "stats": {
+        "candidate_lines": 1262,
+        "directory_backed_block_ids": 3150,
+        "directory_in_shared_cache_block_ids_skipped": 0,
+        "directory_shared_block_ids_skipped": 0,
+        "harvard_block_ids": 3150,
+        "instruction_sharer_block_ids_skipped": 0,
+        "llc_present_block_ids_skipped": 0,
+        "modified_block_ids_skipped": 0,
+        "single_private_dcore_block_ids": 1394,
+        "writeable_block_ids": 1262
+      }
+    },
+    "tage": {
+      "candidate_file": "/mnt/sdb/aansari/checkpoints/multi-core/snapshot_0/gem5_uarch/tage_restore_candidates.json",
+      "line_count": 4,
+      "restore_files": {
+        "0": "/mnt/sdb/aansari/checkpoints/multi-core/snapshot_0/gem5_uarch/tage_restore_state.core0.json",
+        "1": "/mnt/sdb/aansari/checkpoints/multi-core/snapshot_0/gem5_uarch/tage_restore_state.core1.json",
+        "2": "/mnt/sdb/aansari/checkpoints/multi-core/snapshot_0/gem5_uarch/tage_restore_state.core2.json",
+        "3": "/mnt/sdb/aansari/checkpoints/multi-core/snapshot_0/gem5_uarch/tage_restore_state.core3.json"
+      },
+      "selection_policy": "serialize the per-core WormCache TAGE checkpoint payload into human-readable JSON without cross-implementation translation; gem5-side restore code is responsible for bank remapping, bimodal hysteresis grouping, folded-history recomputation, and policy-state defaults",
+      "source_file": "/mnt/sdb/aansari/experiments/multi-core/run/snapshot_0.uarch/fetch.json.zstd",
+      "stats": {
+        "cores_emitted": 4,
+        "total_fetch_units": 4,
+        "units_with_tage": 4
+      }
+    },
+    "tlb": {
+      "line_count": 4,
+      "selection_policy": "pass through per-core WormCache MMU snapshot files for gem5-side VA translation and TLB checkpoint emission; application is owned by the canonical gem5 uarch phase after base checkpoint composition",
+      "source_files": {
+        "0": "/mnt/sdb/aansari/experiments/multi-core/run/snapshot_0.uarch/mmus-0.json.zstd",
+        "1": "/mnt/sdb/aansari/experiments/multi-core/run/snapshot_0.uarch/mmus-0.json.zstd",
+        "2": "/mnt/sdb/aansari/experiments/multi-core/run/snapshot_0.uarch/mmus-0.json.zstd",
+        "3": "/mnt/sdb/aansari/experiments/multi-core/run/snapshot_0.uarch/mmus-0.json.zstd"
+      }
+    }
+  },
+  "gem5_uarch_dir": "/mnt/sdb/aansari/checkpoints/multi-core/snapshot_0/gem5_uarch",
+  "qflex_source_dir": "/mnt/sdb/aansari/experiments/multi-core/run/snapshot_0.uarch",
+  "schema_version": 1,
+  "snapshot": "snapshot_0",
+  "target_ruby_protocol": "mesi_two_level"
+}

@@ -1,0 +1,48 @@
+{
+  "validation_package": "multicore_tlb_restore_smoke_20k/snapshot_0",
+  "goal": "Validate 4-core TLB restore wiring and confirm cold-vs-restored counter movement after fixing the shared mmus-0.json.zstd contract mismatch.",
+  "snapshot": "snapshot_0",
+  "checkpoint_root": "/mnt/sdb/aansari/checkpoints/multi-core/snapshot_0",
+  "qflex_checkpoint_root": "/mnt/sdb/aansari/experiments/multi-core",
+  "machine": {
+    "cores": 4,
+    "cpu_type": "AtomicSimpleCPU",
+    "itb_size": 64,
+    "dtb_size": 64,
+    "restore_mode": "runtime sidecar gated by --restore-tlb-state"
+  },
+  "source_contract": {
+    "mmu_source_file": "snapshot_0.uarch/mmus-0.json.zstd",
+    "encoding": "one shared file containing a top-level array of per-CPU MMU payloads"
+  },
+  "artifacts": {
+    "cold_stats": "cold_stats.txt",
+    "cold_config": "cold_config.ini",
+    "restored_stats": "restored_stats.txt",
+    "restored_config": "restored_config.ini",
+    "sidecars": [
+      "mmu-cpu0.cpt",
+      "mmu-cpu1.cpt",
+      "mmu-cpu2.cpt",
+      "mmu-cpu3.cpt"
+    ],
+    "source_gem5_uarch_manifest": "source_gem5_uarch_manifest.json"
+  },
+  "results": {
+    "simInsts": 77859,
+    "cold": {
+      "cpu0": { "itlb_misses": 109, "dtlb_misses": 110 },
+      "cpu1": { "itlb_misses": 53, "dtlb_misses": 87 },
+      "cpu2": { "itlb_misses": 53, "dtlb_misses": 89 },
+      "cpu3": { "itlb_misses": 53, "dtlb_misses": 89 },
+      "totals": { "itlb_misses": 268, "dtlb_misses": 375 }
+    },
+    "restored": {
+      "cpu0": { "itlb_misses": 103, "dtlb_misses": 106 },
+      "cpu1": { "itlb_misses": 33, "dtlb_misses": 74 },
+      "cpu2": { "itlb_misses": 34, "dtlb_misses": 72 },
+      "cpu3": { "itlb_misses": 26, "dtlb_misses": 77 },
+      "totals": { "itlb_misses": 196, "dtlb_misses": 329 }
+    }
+  }
+}

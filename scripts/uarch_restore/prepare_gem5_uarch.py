@@ -81,6 +81,7 @@ DIRECTORY_SOURCE_FILE = "directory-0.json.zstd"
 HARVARD_SOURCE_FILE = "harvard-0.json.zstd"
 FETCH_SOURCE_FILE = "fetch.json.zstd"
 MMU_SOURCE_FILE_TEMPLATE = "mmus-{core}.json.zstd"
+MMU_SHARED_SOURCE_FILE = "mmus-0.json.zstd"
 MANIFEST_FILE = "manifest.json"
 CACHE_LINE_SIZE = 64
 INSTRUCTION_BYTES = 4
@@ -596,6 +597,29 @@ def _parse_fetch(path: Path) -> list[dict]:
             f"Unexpected fetch uarch structure in {path}: missing private_units list"
         )
     return units
+
+
+def _discover_mmu_source_files(qflex_uarch_dir: Path, core_count: int) -> dict[str, str]:
+    source_files: dict[str, str] = {}
+
+    # Current WormCache export writes one mmus-0.json.zstd file whose top-level
+    # array contains one MMU payload per CPU. Keep support for the older
+    # one-file-per-core contract as a fallback.
+    shared_source = qflex_uarch_dir / MMU_SHARED_SOURCE_FILE
+    if shared_source.is_file():
+        mmus = _load_qflex_json(shared_source)
+        if isinstance(mmus, list):
+            for core in range(min(core_count, len(mmus))):
+                source_files[str(core)] = str(shared_source)
+            if source_files:
+                return source_files
+
+    for core in range(core_count):
+        mmu_source = qflex_uarch_dir / MMU_SOURCE_FILE_TEMPLATE.format(core=core)
+        if mmu_source.is_file():
+            source_files[str(core)] = str(mmu_source)
+
+    return source_files
 
 
 def _select_llc_restore_lines(
@@ -1607,10 +1631,7 @@ def prepare_snapshot_gem5_uarch(
     directory = _parse_directory(directory_source_file)
     harvard = _parse_harvard(harvard_source_file)
     fetch_units = _parse_fetch(fetch_source_file) if fetch_source_file.is_file() else []
-    for core in range(len(harvard)):
-        mmu_source = qflex_uarch_dir / MMU_SOURCE_FILE_TEMPLATE.format(core=core)
-        if mmu_source.is_file():
-            mmu_source_files[str(core)] = str(mmu_source)
+    mmu_source_files.update(_discover_mmu_source_files(qflex_uarch_dir, len(harvard)))
     clean_lines, modified_lines, stats = _select_llc_restore_lines(
         llc_lines, directory, harvard
     )
