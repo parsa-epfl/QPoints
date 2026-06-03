@@ -2,7 +2,7 @@
   "kind": "experiment",
   "schema_version": 1,
   "component": "restore.tlb",
-  "title": "Single-core 1024-entry TLB diagnostic with 1s population",
+  "title": "Single-core 1024-entry TLB diagnostic with 1s population and post-fix proof run",
   "lifecycle": {
     "state": "investigation",
     "retention_policy": "keep"
@@ -10,9 +10,106 @@
   "intent": {
     "source_path": "<QPoints>/validation_records/diagnostic_tlb_restore_1024_population1/snapshot_0/INTENT.txt",
     "staged_path": "INTENT.txt",
-    "text": "Preserve the 1024-entry source-side and target-side TLB diagnostic on the single-core tlb_resident_rw lineage, including the cold/restored gem5 counters and a report explaining why substantial residual misses remain despite 1s population and a heavily populated source-side TLB snapshot."
+    "text": "Preserve both the failed and corrected 1024-entry source-side and target-side TLB diagnostics on the single-core tlb_resident_rw lineage, including the overwrite-root-cause analysis, the SME-off control, and the final cold/restored gem5 proof that TLB restoration reaches zero misses once the source-side configuration is preserved."
   },
   "commands": [
+    {
+      "label": "regenerate-init-warmed-postfix",
+      "cwd": "<qflex>",
+      "argv": [
+        "xargs",
+        "-a",
+        "/tmp/qflex_init_1024_smeoff.args",
+        "--",
+        "./qflex",
+        "initialize",
+        "--skip-generate-cfg",
+        "--fallback-cycles",
+        "100000",
+        "--loadvm-name",
+        "loaded"
+      ]
+    },
+    {
+      "label": "functional-warm-snapshot0-postfix",
+      "cwd": "<qflex>",
+      "argv": [
+        "xargs",
+        "-a",
+        "/tmp/qflex_pop1_smeoff.args",
+        "--",
+        "./qflex",
+        "fw",
+        "--sample-size",
+        "1",
+        "--loadvm-name",
+        "init_warmed"
+      ]
+    },
+    {
+      "label": "convert-single-postfix",
+      "cwd": "<qflex>",
+      "argv": [
+        "./qflex",
+        "qpoints",
+        "convert-single",
+        "--qflex-ckp-dir",
+        "/mnt/sdb/aansari/experiments/single-core",
+        "--gem5-ckp-dir",
+        "/mnt/sdb/aansari/checkpoints/single-core",
+        "--core-count",
+        "1",
+        "--memory-gb",
+        "16",
+        "--base",
+        "/mnt/sdb/aansari/images/single-core.qcow2",
+        "--snapshot",
+        "snapshot_0",
+        "--overwrite"
+      ]
+    },
+    {
+      "label": "cold-run-postfix",
+      "cwd": "<qflex>",
+      "argv": [
+        "./qflex",
+        "qpoints",
+        "run-gem5",
+        "--gem5-ckp-dir",
+        "/mnt/sdb/aansari/checkpoints/single-core",
+        "--experiment",
+        "tlb1024_cold_smeoff_postfix_snapshot0_100k_1024",
+        "--snapshot",
+        "snapshot_0",
+        "--inst",
+        "100000",
+        "--core-count",
+        "1",
+        "--sim-config",
+        "/tmp/tlb_cold_1024.args"
+      ]
+    },
+    {
+      "label": "restored-run-postfix",
+      "cwd": "<qflex>",
+      "argv": [
+        "./qflex",
+        "qpoints",
+        "run-gem5",
+        "--gem5-ckp-dir",
+        "/mnt/sdb/aansari/checkpoints/single-core",
+        "--experiment",
+        "tlb1024_restore_smeoff_postfix_snapshot0_100k_1024",
+        "--snapshot",
+        "snapshot_0",
+        "--inst",
+        "100000",
+        "--core-count",
+        "1",
+        "--sim-config",
+        "/tmp/tlb_restore_1024.args"
+      ]
+    },
     {
       "label": "regenerate-init-warmed",
       "cwd": "<qflex>",
@@ -126,7 +223,7 @@
       "protected": true,
       "required": true,
       "retention": "keep",
-      "description": "Human-readable explanation of the 1024-entry TLB diagnostic and its residual misses."
+      "description": "Human-readable explanation of both the failed and corrected 1024-entry TLB diagnostics, including the overwrite-root-cause analysis and the final zero-miss proof."
     },
     {
       "label": "manifest",
@@ -199,6 +296,78 @@
       "required": true,
       "retention": "keep",
       "description": "Header excerpt of the generated TLB sidecar for quick inspection."
+    },
+    {
+      "label": "residual_miss_classification",
+      "category": "analysis",
+      "path": "residual_miss_classification.json",
+      "protected": true,
+      "required": true,
+      "retention": "keep",
+      "description": "Structured classification showing that restored residual misses in the failed pre-fix run were outside both the source snapshot TLB state and the generated sidecar."
+    },
+    {
+      "label": "postfix_cold_stats",
+      "category": "file",
+      "path": "postfix_cold_stats.txt",
+      "protected": true,
+      "required": true,
+      "retention": "keep",
+      "description": "Cold gem5 stats for the corrected post-fix 1024-entry diagnostic."
+    },
+    {
+      "label": "postfix_cold_config",
+      "category": "file",
+      "path": "postfix_cold_config.ini",
+      "protected": true,
+      "required": true,
+      "retention": "keep",
+      "description": "Cold gem5 config for the corrected post-fix 1024-entry diagnostic."
+    },
+    {
+      "label": "postfix_restored_stats",
+      "category": "file",
+      "path": "postfix_restored_stats.txt",
+      "protected": true,
+      "required": true,
+      "retention": "keep",
+      "description": "Restored gem5 stats for the corrected post-fix 1024-entry diagnostic."
+    },
+    {
+      "label": "postfix_restored_config",
+      "category": "file",
+      "path": "postfix_restored_config.ini",
+      "protected": true,
+      "required": true,
+      "retention": "keep",
+      "description": "Restored gem5 config for the corrected post-fix 1024-entry diagnostic."
+    },
+    {
+      "label": "postfix_source_mmu_summary",
+      "category": "analysis",
+      "path": "postfix_source_mmu_summary.json",
+      "protected": true,
+      "required": true,
+      "retention": "keep",
+      "description": "Summary of valid ITLB/DTLB/STLB entries in the corrected post-fix source snapshot."
+    },
+    {
+      "label": "postfix_mmu_cpu0_cpt",
+      "category": "analysis",
+      "path": "postfix_mmu-cpu0.cpt",
+      "protected": true,
+      "required": true,
+      "retention": "keep",
+      "description": "Generated TLB sidecar used by the corrected post-fix restored run."
+    },
+    {
+      "label": "postfix_mmu_cpu0_head",
+      "category": "analysis",
+      "path": "postfix_mmu_cpu0_head.txt",
+      "protected": true,
+      "required": true,
+      "retention": "keep",
+      "description": "Header excerpt of the corrected post-fix generated TLB sidecar for quick inspection."
     }
   ]
 }

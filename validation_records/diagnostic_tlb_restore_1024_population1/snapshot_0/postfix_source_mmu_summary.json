@@ -1,0 +1,33 @@
+{
+  "itlb": {
+    "sets": 1,
+    "total_entries": 1024,
+    "valid_entries": 403,
+    "current_pointer_sample": [
+      403
+    ]
+  },
+  "dtlb": {
+    "sets": 1,
+    "total_entries": 1024,
+    "valid_entries": 404,
+    "current_pointer_sample": [
+      408
+    ]
+  },
+  "stlb": {
+    "sets": 1024,
+    "total_entries": 4096,
+    "valid_entries": 805,
+    "current_pointer_sample": [
+      2,
+      2,
+      2,
+      1,
+      0,
+      0,
+      0,
+      0
+    ]
+  }
+}
