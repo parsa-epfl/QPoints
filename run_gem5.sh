@@ -7,14 +7,17 @@ fi
 
 usage() {
   cat <<'EOF'
-Usage: run_gem5.sh --gem5-ckp-dir DIR --experiment NAME --snapshot NAME --inst N --cores N [--branch-trace] [--tage-decision-trace] [--data-trace] [--dump-cache-state] [--timing-ruby] [--timing-ruby-moesi] [--sim-config FILE]
+Usage: run_gem5.sh --gem5-ckp-dir DIR --experiment NAME --snapshot NAME --cores N [--inst N | --measurement-cycles N [--warmup-cycles N]] [--branch-trace] [--tage-decision-trace] [--data-trace] [--dump-cache-state] [--timing-ruby] [--timing-ruby-moesi] [--sim-config FILE]
 
-Arguments (all required):
+Arguments:
   --gem5-ckp-dir  Checkpoint root directory
   --experiment    Experiment name
   --snapshot      Snapshot name
-  --inst          Instruction count
   --cores         Number of cores
+  --inst          Instruction count for legacy instruction-bounded runs
+  --warmup-cycles Detailed warmup window in CPU cycles (timing Ruby only)
+  --measurement-cycles
+                  Measurement window in CPU cycles (timing Ruby only)
 
 Options:
   --branch-trace  Enable per-core branch trace logging in CSV format
@@ -40,6 +43,7 @@ Options:
 
 Example:
   run_gem5.sh --gem5-ckp-dir /checkpoints --experiment OoO --snapshot snapshot_0 --inst 100000 --cores 1 --branch-trace
+  run_gem5.sh --gem5-ckp-dir /checkpoints --experiment OoO --snapshot snapshot_0 --cores 8 --timing-ruby-moesi --warmup-cycles 200000 --measurement-cycles 100000
 EOF
 }
 
@@ -120,7 +124,7 @@ validate_sim_config_args() {
   for arg in "$@"; do
     key="$(normalize_gem5_arg_key "$arg")"
     case "$key" in
-      -I|--outdir|--debug-file|--disk-image|--bootloader|--cpu-type|--bp-type|--restore|--num-cores|--mem-size|--branch-trace|--tage-decision-trace|--data-trace|--dump-cache-state|--caches)
+      -I|--outdir|--debug-file|--disk-image|--bootloader|--cpu-type|--bp-type|--restore|--num-cores|--mem-size|--branch-trace|--tage-decision-trace|--data-trace|--dump-cache-state|--caches|--warmup-cycles|--measurement-cycles)
         die "${args_file} sets runner-owned option ${key}. Put run-shape and artifact toggles on run_gem5.sh itself; keep --sim-config for machine/model parameters only."
         ;;
     esac
@@ -154,11 +158,14 @@ DEFAULT_CLASSIC_SIM_CONFIG="${ROOT_DIR}/configs/classic_atomic_gem5.args"
 DEFAULT_TIMING_RUBY_FRONTEND_SIM_CONFIG="${ROOT_DIR}/configs/timing_ruby_frontend_fdip.args"
 DEFAULT_TIMING_RUBY_MESI_SIM_CONFIG="${ROOT_DIR}/configs/timing_ruby_gem5.args"
 DEFAULT_TIMING_RUBY_MOESI_SIM_CONFIG="${ROOT_DIR}/configs/timing_ruby_moesi_gem5.args"
+TIMING_UIPC_SUMMARY_SCRIPT="${ROOT_DIR}/scripts/timing/summarize_gem5_uipc.py"
 
 GEM5_CKP_DIR=""
 EXPERIMENT=""
 SNAPSHOT=""
 INST=""
+WARMUP_CYCLES=""
+MEASUREMENT_CYCLES=""
 CORES=""
 SIM_CONFIG=""
 BRANCH_TRACE_ARGS=()
@@ -187,6 +194,16 @@ while [[ $# -gt 0 ]]; do
     --inst)
       require_value "$1" "${2:-}"
       INST="$2"
+      shift 2
+      ;;
+    --warmup-cycles)
+      require_value "$1" "${2:-}"
+      WARMUP_CYCLES="$2"
+      shift 2
+      ;;
+    --measurement-cycles)
+      require_value "$1" "${2:-}"
+      MEASUREMENT_CYCLES="$2"
       shift 2
       ;;
     --cores)
@@ -229,8 +246,24 @@ while [[ $# -gt 0 ]]; do
   esac
 done
 
-if [[ -z "$GEM5_CKP_DIR" || -z "$EXPERIMENT" || -z "$SNAPSHOT" || -z "$INST" || -z "$CORES" ]]; then
+if [[ -z "$GEM5_CKP_DIR" || -z "$EXPERIMENT" || -z "$SNAPSHOT" || -z "$CORES" ]]; then
   die "Missing required arguments."
+fi
+
+if [[ -n "$MEASUREMENT_CYCLES" || -n "$WARMUP_CYCLES" ]]; then
+  if [[ -z "$TIMING_RUBY_PROTOCOL" ]]; then
+    die "Cycle-window timing requires a timing Ruby mode."
+  fi
+  if [[ -n "$INST" ]]; then
+    die "Do not mix --inst with --warmup-cycles/--measurement-cycles."
+  fi
+  if [[ -z "$MEASUREMENT_CYCLES" ]]; then
+    die "--warmup-cycles requires --measurement-cycles."
+  fi
+else
+  if [[ -z "$INST" ]]; then
+    die "Missing required arguments."
+  fi
 fi
 
 if [[ -n "$SIM_CONFIG" ]]; then
@@ -295,12 +328,22 @@ if [[ -n "$TIMING_RUBY_PROTOCOL" ]]; then
     append_gem5_args_file "$SIM_CONFIG" TIMING_RUBY_CONFIG_ARGS
   fi
 
+  TIMING_WINDOW_ARGS=()
+  if [[ -n "$MEASUREMENT_CYCLES" ]]; then
+    if [[ -n "$WARMUP_CYCLES" ]]; then
+      TIMING_WINDOW_ARGS+=(--warmup-cycles "$WARMUP_CYCLES")
+    fi
+    TIMING_WINDOW_ARGS+=(--measurement-cycles "$MEASUREMENT_CYCLES")
+  else
+    TIMING_WINDOW_ARGS+=(-I "$INST")
+  fi
+
   gem5_cmd=(
     "$timing_ruby_bin"
     "--outdir=${OUTDIR}"
     "--debug-file=debug.insts"
     "$timing_ruby_cfg"
-    -I "$INST"
+    "${TIMING_WINDOW_ARGS[@]}"
     "--disk-image=${DISK_IMAGE}"
     "--bootloader=${BOOTLOADER}"
     --cpu-type O3CPU
@@ -348,3 +391,12 @@ else
 fi
 
 "${gem5_cmd[@]}"
+
+if [[ -n "$MEASUREMENT_CYCLES" ]]; then
+  require_executable "$TIMING_UIPC_SUMMARY_SCRIPT" "gem5 uIPC summary script"
+  python3 "$TIMING_UIPC_SUMMARY_SCRIPT" \
+    --stats-file "$OUTDIR/stats.txt" \
+    --experiment "$EXPERIMENT" \
+    --snapshot "$SNAPSHOT" \
+    --output-json "$OUTDIR/uipc_summary.json"
+fi
