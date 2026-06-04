@@ -392,14 +392,14 @@ fi
 
 "${gem5_cmd[@]}"
 
+if [[ -f "$OUTDIR/stats_final.txt" ]]; then
+  mv -f "$OUTDIR/stats_final.txt" "$OUTDIR/stats.txt"
+fi
+
 if [[ -n "$MEASUREMENT_CYCLES" ]]; then
   require_executable "$TIMING_UIPC_SUMMARY_SCRIPT" "gem5 uIPC summary script"
-  stats_source="$OUTDIR/stats_final.txt"
-  if [[ ! -f "$stats_source" ]]; then
-    stats_source="$OUTDIR/stats.txt"
-  fi
   python3 "$TIMING_UIPC_SUMMARY_SCRIPT" \
-    --stats-file "$stats_source" \
+    --stats-file "$OUTDIR/stats.txt" \
     --experiment "$EXPERIMENT" \
     --snapshot "$SNAPSHOT" \
     --output-json "$OUTDIR/uipc_summary.json"
