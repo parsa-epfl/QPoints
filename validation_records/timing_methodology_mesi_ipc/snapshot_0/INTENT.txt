@@ -1,0 +1,16 @@
+Validate the current MESI timing-methodology path on the `tlb_resident_rw`
+microbenchmark using the two runs that matter for this phase:
+
+1. single-core restored timing on the regenerated `single-core/snapshot_0`
+2. 4-core restored timing on `multi-core/snapshot_0` with the corrected
+   `4 MB` shared L2/LLC target
+
+This package focuses on:
+
+- IPC and UIPC values reported by the new canonical report path
+- what those values imply about the restored timing methodology
+- what we learned about the remaining 4-core IPC gap
+
+This is not a full multicore characterization package. It records the
+evidence needed to conclude that the timing-methodology path is live and to
+explain the current single-core versus multicore behavior.
