@@ -10,6 +10,11 @@ CPU_CYCLE_PATTERNS = (
     re.compile(r"^system\.cpu_cluster\.cpus(?P<core>\d+)\.numCycles$"),
 )
 CPU_CYCLE_SINGLE = re.compile(r"^system\.cpu(?:_cluster)?(?:\.cpus)?\.numCycles$")
+COMMITTED_PATTERNS = (
+    re.compile(r"^system\.cpu(?P<core>\d+)\.committedInsts(?:::total)?$"),
+    re.compile(r"^system\.cpu_cluster\.cpus(?P<core>\d+)\.committedInsts(?:::total)?$"),
+)
+COMMITTED_SINGLE = re.compile(r"^system\.cpu(?:_cluster)?(?:\.cpus)?\.committedInsts(?:::total)?$")
 NONSPIN_PATTERNS = (
     re.compile(r"^system\.cpu(?P<core>\d+)\.committedNonSpinUserInsts(?:::total)?$"),
     re.compile(r"^system\.cpu_cluster\.cpus(?P<core>\d+)\.committedNonSpinUserInsts(?:::total)?$"),
@@ -63,6 +68,19 @@ def summarize(stats: dict[str, int | float], experiment: str, snapshot: str) -> 
             per_core.setdefault(0, {})["cycles"] = int(value)
             continue
 
+        for pattern in COMMITTED_PATTERNS:
+            m = pattern.match(name)
+            if m:
+                per_core.setdefault(int(m.group("core")), {})["committed_insts"] = int(value)
+                matched = True
+                break
+        if matched:
+            continue
+
+        if COMMITTED_SINGLE.match(name):
+            per_core.setdefault(0, {})["committed_insts"] = int(value)
+            continue
+
         for pattern in NONSPIN_PATTERNS:
             m = pattern.match(name)
             if m:
@@ -84,20 +102,28 @@ def summarize(stats: dict[str, int | float], experiment: str, snapshot: str) -> 
 
     window_cycles = sim_ticks // clock_ticks
     cores = []
+    aggregate_ipc = 0.0
     aggregate_uipc = 0.0
 
     for core in sorted(per_core):
+        committed = int(per_core[core].get("committed_insts", 0))
         nonspin = int(per_core[core].get("nonspin_user_insts", 0))
+        ipc = float(committed) / window_cycles if window_cycles else 0.0
         uipc = float(nonspin) / window_cycles if window_cycles else 0.0
+        aggregate_ipc += ipc
         aggregate_uipc += uipc
-        cores.append({"core": core, "uipc": uipc})
+        cores.append({"core": core, "ipc": ipc, "uipc": uipc})
+
+    average_ipc = aggregate_ipc / len(cores) if cores else 0.0
+    average_uipc = aggregate_uipc / len(cores) if cores else 0.0
 
     return {
         "engine": "gem5",
         "experiment": experiment,
         "snapshot": snapshot,
         "cores": cores,
-        "aggregate": {"uipc": aggregate_uipc},
+        "aggregate": {"ipc": aggregate_ipc, "uipc": aggregate_uipc},
+        "average": {"ipc": average_ipc, "uipc": average_uipc},
     }
 
 
