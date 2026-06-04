@@ -1,0 +1,20 @@
+{
+  "aggregate": {
+    "ipc": 0.853065,
+    "uipc": 0.853065
+  },
+  "average": {
+    "ipc": 0.853065,
+    "uipc": 0.853065
+  },
+  "cores": [
+    {
+      "core": 0,
+      "ipc": 0.853065,
+      "uipc": 0.853065
+    }
+  ],
+  "engine": "gem5",
+  "experiment": "timing_methodology_single_core_mesi_all_restore_1k_tlb",
+  "snapshot_count": 1
+}

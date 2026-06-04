@@ -1,0 +1,20 @@
+{
+  "aggregate": {
+    "ipc": 0.212457,
+    "uipc": 0.212457
+  },
+  "average": {
+    "ipc": 0.212457,
+    "uipc": 0.212457
+  },
+  "cores": [
+    {
+      "core": 0,
+      "ipc": 0.212457,
+      "uipc": 0.212457
+    }
+  ],
+  "engine": "gem5",
+  "experiment": "timing_methodology_single_core_mesi_base",
+  "snapshot_count": 1
+}

@@ -1,0 +1,35 @@
+{
+  "aggregate": {
+    "ipc": 0.839293,
+    "uipc": 0.839293
+  },
+  "average": {
+    "ipc": 0.20982325,
+    "uipc": 0.20982325
+  },
+  "cores": [
+    {
+      "core": 0,
+      "ipc": 0.193931,
+      "uipc": 0.193931
+    },
+    {
+      "core": 1,
+      "ipc": 0.216668,
+      "uipc": 0.216668
+    },
+    {
+      "core": 2,
+      "ipc": 0.205721,
+      "uipc": 0.205721
+    },
+    {
+      "core": 3,
+      "ipc": 0.222973,
+      "uipc": 0.222973
+    }
+  ],
+  "engine": "gem5",
+  "experiment": "timing_methodology_run_sample_mesi_all_restore_btb_4mb",
+  "snapshot_count": 1
+}

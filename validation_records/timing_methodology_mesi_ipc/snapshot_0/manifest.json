@@ -1,0 +1,5 @@
+{
+  "report": "TIMING_METHODOLOGY_MESI_IPC_REPORT.md",
+  "intent": "INTENT.txt",
+  "experiment_manifest": "experiment_manifest.json"
+}

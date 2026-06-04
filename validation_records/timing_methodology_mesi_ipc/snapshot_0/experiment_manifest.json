@@ -1,0 +1,143 @@
+{
+  "validation_package": "timing_methodology_mesi_ipc/snapshot_0",
+  "goal": "Record the current MESI timing-methodology validation state using the restored single-core run and the corrected 4-core restored run with a 4 MB shared L2/LLC.",
+  "snapshot": "snapshot_0",
+  "runs": {
+    "single_core_baseline": {
+      "checkpoint_root": "/mnt/sdb/aansari/checkpoints/single-core/snapshot_0",
+      "experiment": "timing_methodology_single_core_mesi_base",
+      "cores": 1,
+      "timing_engine": "gem5",
+      "protocol": "MESI_Two_Level",
+      "cpu_type": "O3CPU",
+      "fdip": true,
+      "ftq_size": 8,
+      "warmup_cycles": 200000,
+      "measurement_cycles": 1000000,
+      "restores_enabled": []
+    },
+    "single_core_restored_1k_tlb": {
+      "checkpoint_root": "/mnt/sdb/aansari/checkpoints/single-core/snapshot_0",
+      "experiment": "timing_methodology_single_core_mesi_all_restore_1k_tlb",
+      "cores": 1,
+      "timing_engine": "gem5",
+      "protocol": "MESI_Two_Level",
+      "cpu_type": "O3CPU",
+      "fdip": true,
+      "ftq_size": 8,
+      "warmup_cycles": 200000,
+      "measurement_cycles": 1000000,
+      "target_tlb_size": {
+        "itb": 1024,
+        "dtb": 1024
+      },
+      "restores_enabled": [
+        "llc",
+        "l1d",
+        "l1i",
+        "btb",
+        "tage",
+        "tlb"
+      ],
+      "note": "The single-core source checkpoint lineage still carries the old 1024-entry TLB diagnostic geometry, so the restored gem5 target was raised to 1024/1024 to match it."
+    },
+    "multicore_restored_4mb": {
+      "checkpoint_root": "/mnt/sdb/aansari/checkpoints/multi-core/snapshot_0",
+      "experiment": "timing_methodology_run_sample_mesi_all_restore_btb_4mb",
+      "cores": 4,
+      "timing_engine": "gem5",
+      "protocol": "MESI_Two_Level",
+      "cpu_type": "O3CPU",
+      "fdip": true,
+      "ftq_size": 8,
+      "warmup_cycles": 200000,
+      "measurement_cycles": 1000000,
+      "target_tlb_size": {
+        "itb": 64,
+        "dtb": 64
+      },
+      "target_shared_l2_size": "4MB",
+      "restores_enabled": [
+        "llc",
+        "l1d",
+        "l1i",
+        "btb",
+        "tage",
+        "tlb"
+      ]
+    }
+  },
+  "artifacts": {
+    "single_core_baseline": {
+      "report": "single_core_baseline_uipc_report.json",
+      "stats": "single_core_baseline_stats.txt",
+      "config": "single_core_baseline_config.ini"
+    },
+    "single_core_restored_1k_tlb": {
+      "report": "single_core_restored_1k_tlb_uipc_report.json",
+      "stats": "single_core_restored_1k_tlb_stats.txt",
+      "config": "single_core_restored_1k_tlb_config.ini"
+    },
+    "multicore_restored_4mb": {
+      "report": "multicore_restored_4mb_uipc_report.json",
+      "stats": "multicore_restored_4mb_stats.txt",
+      "config": "multicore_restored_4mb_config.ini"
+    }
+  },
+  "results": {
+    "single_core_baseline": {
+      "aggregate": {
+        "ipc": 0.212457,
+        "uipc": 0.212457
+      },
+      "average": {
+        "ipc": 0.212457,
+        "uipc": 0.212457
+      }
+    },
+    "single_core_restored_1k_tlb": {
+      "aggregate": {
+        "ipc": 0.853065,
+        "uipc": 0.853065
+      },
+      "average": {
+        "ipc": 0.853065,
+        "uipc": 0.853065
+      }
+    },
+    "multicore_restored_4mb": {
+      "aggregate": {
+        "ipc": 0.839293,
+        "uipc": 0.839293
+      },
+      "average": {
+        "ipc": 0.20982325,
+        "uipc": 0.20982325
+      },
+      "cores": {
+        "cpu0": {
+          "ipc": 0.193931,
+          "uipc": 0.193931
+        },
+        "cpu1": {
+          "ipc": 0.216668,
+          "uipc": 0.216668
+        },
+        "cpu2": {
+          "ipc": 0.205721,
+          "uipc": 0.205721
+        },
+        "cpu3": {
+          "ipc": 0.222973,
+          "uipc": 0.222973
+        }
+      }
+    }
+  },
+  "lessons": [
+    "The canonical report path is working: restored single-core IPC/UIPC rises from 0.212457 to 0.853065 on the same checkpoint lineage.",
+    "The earlier 4-core MESI timing run used a mismatched 1 MB shared L2 target even though the source-side 4-core experiment was warmed with an effective 4 MB shared cache. Correcting gem5 to 4 MB raises aggregate IPC/UIPC from 0.796744 to 0.839293.",
+    "After the 4 MB correction, branch and TLB counters remain clean, while load-to-use latency and rescheduled-load counts still indicate substantial shared lower-level service delay in the 4-core run.",
+    "The remaining 4-core gap is therefore no longer explained by TLB misses, BTB/TAGE failure, or the old 1 MB LLC mismatch alone."
+  ]
+}
