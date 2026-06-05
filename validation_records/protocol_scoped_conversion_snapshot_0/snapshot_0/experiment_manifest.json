@@ -1,0 +1,138 @@
+{
+  "validation_package": "protocol_scoped_conversion_snapshot_0/snapshot_0",
+  "goal": "Record the protocol-scoped cache-hierarchy conversion fix, the new conversion accounting guarantees on multi-core snapshot_0, and the final canonical MESI vs MOESI gem5 comparison on the updated checkpoint output.",
+  "snapshot": "snapshot_0",
+  "checkpoint_root": "/mnt/sdb/aansari/checkpoints/multi-core/snapshot_0",
+  "protocol_artifacts": {
+    "mesi_two_level": {
+      "manifest": "/mnt/sdb/aansari/checkpoints/multi-core/snapshot_0/gem5_uarch/mesi_two_level/manifest.json",
+      "conversion_accounting": "/mnt/sdb/aansari/checkpoints/multi-core/snapshot_0/gem5_uarch/mesi_two_level/conversion_accounting.json"
+    },
+    "moesi_cmp_directory": {
+      "manifest": "/mnt/sdb/aansari/checkpoints/multi-core/snapshot_0/gem5_uarch/moesi_cmp_directory/manifest.json",
+      "conversion_accounting": "/mnt/sdb/aansari/checkpoints/multi-core/snapshot_0/gem5_uarch/moesi_cmp_directory/conversion_accounting.json"
+    }
+  },
+  "canonical_run_config": {
+    "cores": 4,
+    "timing_engine": "gem5",
+    "cpu_type": "O3CPU",
+    "fdip": true,
+    "ftq_size": 8,
+    "warmup_cycles": 200000,
+    "measurement_cycles": 1000000,
+    "sim_config": "/home/dev/qflex_git/QPoints/configs/timing_ruby_canonical_4c.args",
+    "restores_enabled": [
+      "llc",
+      "l1d",
+      "l1i",
+      "btb",
+      "tage",
+      "tlb"
+    ],
+    "target_geometry": {
+      "l1i_size": "64kB",
+      "l1i_assoc": 8,
+      "l1d_size": "64kB",
+      "l1d_assoc": 8,
+      "l2_size": "4MB",
+      "l2_assoc": 16,
+      "itb_size": 64,
+      "dtb_size": 64
+    }
+  },
+  "runs": {
+    "mesi_two_level": {
+      "experiment": "canonical_compare_mesi_4c_v2",
+      "report": "/home/dev/qflex_git/QPoints/sim_outs/canonical_compare_mesi_4c_v2/uipc_report.json",
+      "stats": "/home/dev/qflex_git/QPoints/sim_outs/canonical_compare_mesi_4c_v2/snapshot_0/stats.txt"
+    },
+    "moesi_cmp_directory": {
+      "experiment": "canonical_compare_moesi_4c_v2",
+      "report": "/home/dev/qflex_git/QPoints/sim_outs/canonical_compare_moesi_4c_v2/uipc_report.json",
+      "stats": "/home/dev/qflex_git/QPoints/sim_outs/canonical_compare_moesi_4c_v2/snapshot_0/stats.txt"
+    }
+  },
+  "results": {
+    "mesi_two_level": {
+      "aggregate": {
+        "ipc": 0.8439350000000001,
+        "uipc": 0.8439350000000001
+      },
+      "average": {
+        "ipc": 0.21098375000000003,
+        "uipc": 0.21098375000000003
+      },
+      "cores": {
+        "cpu0": {
+          "ipc": 0.193293,
+          "uipc": 0.193293
+        },
+        "cpu1": {
+          "ipc": 0.214573,
+          "uipc": 0.214573
+        },
+        "cpu2": {
+          "ipc": 0.205707,
+          "uipc": 0.205707
+        },
+        "cpu3": {
+          "ipc": 0.230362,
+          "uipc": 0.230362
+        }
+      }
+    },
+    "moesi_cmp_directory": {
+      "aggregate": {
+        "ipc": 0.6464920000000001,
+        "uipc": 0.6464920000000001
+      },
+      "average": {
+        "ipc": 0.16162300000000002,
+        "uipc": 0.16162300000000002
+      },
+      "cores": {
+        "cpu0": {
+          "ipc": 0.150311,
+          "uipc": 0.150311
+        },
+        "cpu1": {
+          "ipc": 0.165259,
+          "uipc": 0.165259
+        },
+        "cpu2": {
+          "ipc": 0.157736,
+          "uipc": 0.157736
+        },
+        "cpu3": {
+          "ipc": 0.173186,
+          "uipc": 0.173186
+        }
+      }
+    }
+  },
+  "conversion_accounting_summary": {
+    "mesi_two_level": {
+      "all_valid_blocks_staged": true,
+      "llc_total_valid_lines": 3851,
+      "llc_staged_lines": 3851,
+      "private_total_valid_lines": 4108,
+      "private_staged_lines": 4108
+    },
+    "moesi_cmp_directory": {
+      "all_valid_blocks_staged": true,
+      "llc_total_valid_lines": 3851,
+      "llc_staged_lines": 3851,
+      "private_total_valid_lines": 4108,
+      "private_staged_lines": 4108,
+      "cache_hierarchy_story_consistent": true,
+      "unsupported_private_family_blocks": 0
+    }
+  },
+  "lessons": [
+    "The original MOESI restore assert was caused by a converter-side inconsistency between LLC-backed private-family metadata and the staged LLC restore set.",
+    "Protocol-scoped cache-hierarchy artifacts and staged-set-based LLC-backed classification remove that pre-gem5 inconsistency.",
+    "After promoting all restorable modified LLC lines into the staged target LLC set, snapshot_0 now has full LLC and private-cache coverage for both MESI and MOESI according to conversion_accounting.json.",
+    "The final MESI vs MOESI canonical comparison still shows a runtime performance gap, so the remaining issue is protocol behavior, not snapshot_0 conversion completeness."
+  ]
+}

@@ -1,0 +1,26 @@
+{
+  "llc": {
+    "all_restorable_lines_staged": true,
+    "all_valid_lines_staged": true,
+    "omitted_due_to_private_conflict_lines": 0,
+    "omitted_lines": 0,
+    "restorable_lines": 3851,
+    "staged_clean_lines": 3470,
+    "staged_lines": 3851,
+    "staged_restorable_modified_lines": 381,
+    "total_valid_lines": 3851
+  },
+  "overall": {
+    "all_valid_blocks_staged": true,
+    "all_valid_llc_lines_staged": true,
+    "all_valid_private_lines_staged": true
+  },
+  "private_caches": {
+    "all_valid_lines_staged": true,
+    "staged_lines": 4108,
+    "total_valid_lines": 4108
+  },
+  "schema_version": 1,
+  "snapshot": "snapshot_0",
+  "target_ruby_protocol": "mesi_two_level"
+}

@@ -1,0 +1,35 @@
+{
+  "aggregate": {
+    "ipc": 0.8439350000000001,
+    "uipc": 0.8439350000000001
+  },
+  "average": {
+    "ipc": 0.21098375000000003,
+    "uipc": 0.21098375000000003
+  },
+  "cores": [
+    {
+      "core": 0,
+      "ipc": 0.193293,
+      "uipc": 0.193293
+    },
+    {
+      "core": 1,
+      "ipc": 0.214573,
+      "uipc": 0.214573
+    },
+    {
+      "core": 2,
+      "ipc": 0.205707,
+      "uipc": 0.205707
+    },
+    {
+      "core": 3,
+      "ipc": 0.230362,
+      "uipc": 0.230362
+    }
+  ],
+  "engine": "gem5",
+  "experiment": "canonical_compare_mesi_4c_v2",
+  "snapshot_count": 1
+}

@@ -83,6 +83,7 @@ FETCH_SOURCE_FILE = "fetch.json.zstd"
 MMU_SOURCE_FILE_TEMPLATE = "mmus-{core}.json.zstd"
 MMU_SHARED_SOURCE_FILE = "mmus-0.json.zstd"
 MANIFEST_FILE = "manifest.json"
+CONVERSION_ACCOUNTING_FILE = "conversion_accounting.json"
 CACHE_LINE_SIZE = 64
 INSTRUCTION_BYTES = 4
 BTB_RESTORABLE_BRANCH_TYPES = {
@@ -230,22 +231,13 @@ def _l2_shared_restore_selection_policy(ruby_protocol: str) -> str:
 
 
 def _llc_restore_selection_policy(ruby_protocol: str) -> str:
-    if ruby_protocol == RUBY_PROTOCOL_MESI_TWO_LEVEL:
-        return (
-            "clean LLC lines with no private modified/writeable copy, "
-            "plus the first N restorable LLC-modified lines for "
-            "controlled debugging, ordered per-set by ascending LLC "
-            "timestamp so startup insertion reconstructs warm "
-            "replacement state oldest-to-newest"
-        )
     return (
-        "clean LLC lines with no private modified/writeable copy, "
-        "plus the LLC-modified subset required to preserve source-side "
-        "residency for MOESI clean-private layering, plus "
-        "the first N restorable LLC-modified lines for controlled "
-        "debugging, ordered per-set by ascending LLC timestamp so "
-        "startup insertion reconstructs warm replacement state "
-        "oldest-to-newest without fabricating shared-cache presence"
+        "all restorable LLC lines with no private modified/writeable copy, "
+        "including source LLC-modified lines that are normalized into clean "
+        "target residency using memory-backed data, ordered per-set by "
+        "ascending LLC timestamp so startup insertion reconstructs warm "
+        "replacement state oldest-to-newest without dropping valid source "
+        "shared-cache lines"
     )
 
 
@@ -1414,6 +1406,77 @@ def _validate_moesi_cache_hierarchy_story(
     return report
 
 
+def _build_conversion_accounting(
+    snapshot: str,
+    ruby_protocol: str,
+    stats: dict,
+    clean_lines: list[dict],
+    modified_lines: list[dict],
+    addrs: list[int],
+    l1d_stats: dict,
+    l1i_stats: dict,
+    moesi_private_family_guardrail_report: dict | None,
+    moesi_cache_hierarchy_story_report: dict | None,
+) -> dict:
+    llc_total_valid_lines = stats["total_llc_lines"]
+    llc_restorable_lines = stats["candidate_restorable_llc_lines"]
+    llc_staged_lines = len(addrs)
+    llc_omitted_lines = llc_total_valid_lines - llc_staged_lines
+    llc_omitted_due_to_private_conflict = llc_total_valid_lines - llc_restorable_lines
+
+    private_total_valid_lines = (
+        l1d_stats["candidate_l1d_lines"] + l1i_stats["candidate_l1i_lines"]
+    )
+    private_staged_lines = private_total_valid_lines
+
+    accounting = {
+        "schema_version": 1,
+        "snapshot": snapshot,
+        "target_ruby_protocol": ruby_protocol,
+        "llc": {
+            "total_valid_lines": llc_total_valid_lines,
+            "restorable_lines": llc_restorable_lines,
+            "staged_lines": llc_staged_lines,
+            "staged_clean_lines": len(clean_lines),
+            "staged_restorable_modified_lines": len(modified_lines),
+            "omitted_lines": llc_omitted_lines,
+            "omitted_due_to_private_conflict_lines": (
+                llc_omitted_due_to_private_conflict
+            ),
+            "all_valid_lines_staged": llc_staged_lines == llc_total_valid_lines,
+            "all_restorable_lines_staged": llc_staged_lines == llc_restorable_lines,
+        },
+        "private_caches": {
+            "total_valid_lines": private_total_valid_lines,
+            "staged_lines": private_staged_lines,
+            "all_valid_lines_staged": private_staged_lines == private_total_valid_lines,
+        },
+        "overall": {
+            "all_valid_llc_lines_staged": llc_staged_lines == llc_total_valid_lines,
+            "all_valid_private_lines_staged": (
+                private_staged_lines == private_total_valid_lines
+            ),
+        },
+    }
+    accounting["overall"]["all_valid_blocks_staged"] = (
+        accounting["overall"]["all_valid_llc_lines_staged"]
+        and accounting["overall"]["all_valid_private_lines_staged"]
+    )
+    if moesi_private_family_guardrail_report is not None:
+        accounting["moesi_private_families"] = {
+            "unsupported_block_count": moesi_private_family_guardrail_report[
+                "unsupported_block_count"
+            ],
+            "strict_mode": True,
+        }
+    if moesi_cache_hierarchy_story_report is not None:
+        accounting["moesi_cache_hierarchy_story"] = {
+            "is_consistent": moesi_cache_hierarchy_story_report["is_consistent"],
+            "strict_mode": True,
+        }
+    return accounting
+
+
 def _select_btb_restore_candidates(fetch_units: list[dict]) -> tuple[list[dict], dict]:
     stats = {
         "total_entries": 0,
@@ -1649,6 +1712,7 @@ def prepare_snapshot_gem5_uarch(
     btb_candidate_file = gem5_uarch_root / BTB_CANDIDATE_FILE
     tage_candidate_file = gem5_uarch_root / TAGE_CANDIDATE_FILE
     manifest_file = gem5_uarch_dir / MANIFEST_FILE
+    conversion_accounting_file = gem5_uarch_dir / CONVERSION_ACCOUNTING_FILE
 
     if not qflex_uarch_dir.is_dir():
         raise FileNotFoundError(f"QFlex uarch directory not found: {qflex_uarch_dir}")
@@ -1737,15 +1801,8 @@ def prepare_snapshot_gem5_uarch(
             for line in modified_lines
             if line["block_id"] in moesi_clean_private_block_ids
         ]
-    selected_modified = max(0, llc_debug_modified_count)
-    selected_modified_lines = modified_lines[:selected_modified]
-    effective_selected_modified = len(selected_modified_lines)
     selected_lines = _normalize_restore_lines(
-        _order_restore_lines(
-            clean_lines
-            + moesi_private_clean_llc_support_lines
-            + selected_modified_lines
-        )
+        _order_restore_lines(clean_lines + modified_lines)
     )
     addrs = [line["line_addr"] for line in selected_lines]
     if not addrs:
@@ -2063,6 +2120,23 @@ def prepare_snapshot_gem5_uarch(
         TAGE_RESTORE_FILE_TEMPLATE,
         TAGE_RESTORE_FILE_GLOB,
     )
+    conversion_accounting = _build_conversion_accounting(
+        snapshot,
+        ruby_protocol,
+        stats,
+        clean_lines,
+        modified_lines,
+        addrs,
+        l1d_stats,
+        l1i_stats,
+        moesi_private_family_guardrail_report,
+        moesi_cache_hierarchy_story_report,
+    )
+    _write_json_file(
+        conversion_accounting_file,
+        conversion_accounting,
+        overwrite,
+    )
 
     manifest = {
         "schema_version": 1,
@@ -2070,6 +2144,7 @@ def prepare_snapshot_gem5_uarch(
         "target_ruby_protocol": ruby_protocol,
         "qflex_source_dir": str(qflex_uarch_dir),
         "gem5_uarch_dir": str(gem5_uarch_dir),
+        "conversion_accounting_file": str(conversion_accounting_file),
         "components": {
             "llc": {
                 "source_files": {
@@ -2080,7 +2155,7 @@ def prepare_snapshot_gem5_uarch(
                 "output_file": str(target_file),
                 "line_count": len(addrs),
                 "selection_policy": _llc_restore_selection_policy(ruby_protocol),
-                "selected_modified_lines": effective_selected_modified,
+                "selected_modified_lines": len(modified_lines),
                 "protocol_required_modified_lines": (
                     len(moesi_private_clean_llc_support_lines)
                 ),
