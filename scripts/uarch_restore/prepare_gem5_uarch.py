@@ -83,6 +83,7 @@ FETCH_SOURCE_FILE = "fetch.json.zstd"
 MMU_SOURCE_FILE_TEMPLATE = "mmus-{core}.json.zstd"
 MMU_SHARED_SOURCE_FILE = "mmus-0.json.zstd"
 MANIFEST_FILE = "manifest.json"
+CONVERSION_ACCOUNTING_FILE = "conversion_accounting.json"
 CACHE_LINE_SIZE = 64
 INSTRUCTION_BYTES = 4
 BTB_RESTORABLE_BRANCH_TYPES = {
@@ -230,22 +231,13 @@ def _l2_shared_restore_selection_policy(ruby_protocol: str) -> str:
 
 
 def _llc_restore_selection_policy(ruby_protocol: str) -> str:
-    if ruby_protocol == RUBY_PROTOCOL_MESI_TWO_LEVEL:
-        return (
-            "clean LLC lines with no private modified/writeable copy, "
-            "plus the first N restorable LLC-modified lines for "
-            "controlled debugging, ordered per-set by ascending LLC "
-            "timestamp so startup insertion reconstructs warm "
-            "replacement state oldest-to-newest"
-        )
     return (
-        "clean LLC lines with no private modified/writeable copy, "
-        "plus the LLC-modified subset required to preserve source-side "
-        "residency for MOESI clean-private layering, plus "
-        "the first N restorable LLC-modified lines for controlled "
-        "debugging, ordered per-set by ascending LLC timestamp so "
-        "startup insertion reconstructs warm replacement state "
-        "oldest-to-newest without fabricating shared-cache presence"
+        "all restorable LLC lines with no private modified/writeable copy, "
+        "including source LLC-modified lines that are normalized into clean "
+        "target residency using memory-backed data, ordered per-set by "
+        "ascending LLC timestamp so startup insertion reconstructs warm "
+        "replacement state oldest-to-newest without dropping valid source "
+        "shared-cache lines"
     )
 
 
@@ -508,6 +500,10 @@ def _nested_gem5_uarch_dir(gem5_workload_root: Path, snapshot: str) -> Path:
 
 def _sibling_gem5_uarch_dir(gem5_workload_root: Path, snapshot: str) -> Path:
     return gem5_workload_root / f"{snapshot}.{GEM5_UARCH_SUFFIX}"
+
+
+def _protocol_gem5_uarch_dir(gem5_uarch_root: Path, ruby_protocol: str) -> Path:
+    return gem5_uarch_root / ruby_protocol
 
 
 def _order_restore_lines(lines: list[dict]) -> list[dict]:
@@ -939,12 +935,12 @@ def _classify_moesi_private_block_family(
     block_id: int,
     entries: list[dict],
     dir_meta: dict,
-    llc_block_ids: set[int],
+    llc_backed_block_ids: set[int],
 ) -> str:
     priv = _summarize_private_entries(entries)
     d_cores = priv["d_cores"]
     i_cores = priv["i_cores"]
-    llc_backed = block_id in llc_block_ids
+    llc_backed = block_id in llc_backed_block_ids
     directory_shared = bool(dir_meta.get("shared", False))
     in_shared_cache = bool(dir_meta.get("in_shared_cache", False))
 
@@ -987,11 +983,10 @@ def _classify_moesi_private_block_family(
 
 
 def _collect_moesi_private_family_guardrail_report(
-    llc_lines: list[dict],
+    llc_backed_block_ids: set[int],
     directory: dict,
     harvard: dict,
 ) -> dict:
-    llc_block_ids = {line["block_id"] for line in llc_lines}
     report = {
         "schema_version": 1,
         "strict_mode": True,
@@ -1016,7 +1011,7 @@ def _collect_moesi_private_family_guardrail_report(
         report["directory_backed_private_block_ids"] += 1
 
         family_name = _classify_moesi_private_block_family(
-            block_id, entries, dir_meta, llc_block_ids
+            block_id, entries, dir_meta, llc_backed_block_ids
         )
         if family_name in report["implemented_family_counts"]:
             report["implemented_family_counts"][family_name] += 1
@@ -1029,7 +1024,7 @@ def _collect_moesi_private_family_guardrail_report(
             block_id,
             _summarize_private_entries(entries),
             dir_meta,
-            block_id in llc_block_ids,
+            block_id in llc_backed_block_ids,
         )
 
     return report
@@ -1056,11 +1051,10 @@ def _moesi_private_clean_restore_state(candidate: dict) -> str:
 
 
 def _select_moesi_single_private_data_writeable_candidates(
-    llc_lines: list[dict],
+    llc_backed_block_ids: set[int],
     directory: dict,
     harvard: dict,
 ) -> tuple[list[dict], dict]:
-    llc_block_ids = {line["block_id"] for line in llc_lines}
     stats = {
         "harvard_block_ids": len(harvard),
         "directory_backed_block_ids": 0,
@@ -1094,7 +1088,7 @@ def _select_moesi_single_private_data_writeable_candidates(
             stats["instruction_sharer_block_ids_skipped"] += 1
             continue
 
-        if block_id in llc_block_ids:
+        if block_id in llc_backed_block_ids:
             stats["llc_present_block_ids_skipped"] += 1
             continue
 
@@ -1130,11 +1124,10 @@ def _select_moesi_single_private_data_writeable_candidates(
 
 
 def _select_moesi_single_private_data_clean_candidates(
-    llc_lines: list[dict],
+    llc_backed_block_ids: set[int],
     directory: dict,
     harvard: dict,
 ) -> tuple[list[dict], dict]:
-    llc_block_ids = {line["block_id"] for line in llc_lines}
     stats = {
         "harvard_block_ids": len(harvard),
         "directory_backed_block_ids": 0,
@@ -1171,7 +1164,7 @@ def _select_moesi_single_private_data_clean_candidates(
             stats["modified_block_ids_skipped"] += 1
             continue
 
-        if block_id not in llc_block_ids:
+        if block_id not in llc_backed_block_ids:
             stats["llc_missing_block_ids_skipped"] += 1
             continue
 
@@ -1203,11 +1196,10 @@ def _select_moesi_single_private_data_clean_candidates(
 
 
 def _select_moesi_multi_private_data_clean_candidates(
-    llc_lines: list[dict],
+    llc_backed_block_ids: set[int],
     directory: dict,
     harvard: dict,
 ) -> tuple[list[dict], dict]:
-    llc_block_ids = {line["block_id"] for line in llc_lines}
     stats = {
         "harvard_block_ids": len(harvard),
         "directory_backed_block_ids": 0,
@@ -1250,7 +1242,7 @@ def _select_moesi_multi_private_data_clean_candidates(
             stats["directory_nonshared_block_ids_skipped"] += 1
             continue
 
-        llc_backed = block_id in llc_block_ids
+        llc_backed = block_id in llc_backed_block_ids
         if llc_backed:
             stats["llc_backed_block_ids"] += 1
         else:
@@ -1285,11 +1277,10 @@ def _select_moesi_multi_private_data_clean_candidates(
 
 
 def _select_moesi_private_instruction_only_candidates(
-    llc_lines: list[dict],
+    llc_backed_block_ids: set[int],
     directory: dict,
     harvard: dict,
 ) -> tuple[list[dict], dict]:
-    llc_block_ids = {line["block_id"] for line in llc_lines}
     stats = {
         "harvard_block_ids": len(harvard),
         "directory_backed_block_ids": 0,
@@ -1327,7 +1318,7 @@ def _select_moesi_private_instruction_only_candidates(
             stats["directory_nonshared_block_ids_skipped"] += 1
             continue
 
-        llc_backed = block_id in llc_block_ids
+        llc_backed = block_id in llc_backed_block_ids
         if llc_backed:
             stats["llc_backed_block_ids"] += 1
         else:
@@ -1359,6 +1350,131 @@ def _select_moesi_private_instruction_only_candidates(
         ),
     )
     return ordered_candidates, stats
+
+
+def _validate_moesi_cache_hierarchy_story(
+    staged_llc_block_ids: set[int],
+    moesi_private_owner_candidates: list[dict],
+    moesi_private_clean_candidates: list[dict],
+    moesi_multi_private_clean_candidates: list[dict],
+    moesi_private_instruction_only_candidates: list[dict],
+) -> dict:
+    def _missing_staged_llc(candidates: list[dict]) -> list[str]:
+        return sorted(
+            candidate["line_addr"]
+            for candidate in candidates
+            if candidate.get("llc_backed", False)
+            and candidate["block_id"] not in staged_llc_block_ids
+        )
+
+    owner_overlaps_staged_llc = sorted(
+        candidate["line_addr"]
+        for candidate in moesi_private_owner_candidates
+        if candidate["block_id"] in staged_llc_block_ids
+    )
+    single_private_clean_missing_staged_llc = _missing_staged_llc(
+        moesi_private_clean_candidates
+    )
+    multi_private_clean_missing_staged_llc = _missing_staged_llc(
+        moesi_multi_private_clean_candidates
+    )
+    private_instruction_only_missing_staged_llc = _missing_staged_llc(
+        moesi_private_instruction_only_candidates
+    )
+
+    report = {
+        "staged_llc_block_count": len(staged_llc_block_ids),
+        "owner_overlaps_staged_llc": owner_overlaps_staged_llc,
+        "single_private_clean_missing_staged_llc": (
+            single_private_clean_missing_staged_llc
+        ),
+        "multi_private_clean_missing_staged_llc": (
+            multi_private_clean_missing_staged_llc
+        ),
+        "private_instruction_only_missing_staged_llc": (
+            private_instruction_only_missing_staged_llc
+        ),
+    }
+    report["is_consistent"] = not any(
+        (
+            owner_overlaps_staged_llc,
+            single_private_clean_missing_staged_llc,
+            multi_private_clean_missing_staged_llc,
+            private_instruction_only_missing_staged_llc,
+        )
+    )
+    return report
+
+
+def _build_conversion_accounting(
+    snapshot: str,
+    ruby_protocol: str,
+    stats: dict,
+    clean_lines: list[dict],
+    modified_lines: list[dict],
+    addrs: list[int],
+    l1d_stats: dict,
+    l1i_stats: dict,
+    moesi_private_family_guardrail_report: dict | None,
+    moesi_cache_hierarchy_story_report: dict | None,
+) -> dict:
+    llc_total_valid_lines = stats["total_llc_lines"]
+    llc_restorable_lines = stats["candidate_restorable_llc_lines"]
+    llc_staged_lines = len(addrs)
+    llc_omitted_lines = llc_total_valid_lines - llc_staged_lines
+    llc_omitted_due_to_private_conflict = llc_total_valid_lines - llc_restorable_lines
+
+    private_total_valid_lines = (
+        l1d_stats["candidate_l1d_lines"] + l1i_stats["candidate_l1i_lines"]
+    )
+    private_staged_lines = private_total_valid_lines
+
+    accounting = {
+        "schema_version": 1,
+        "snapshot": snapshot,
+        "target_ruby_protocol": ruby_protocol,
+        "llc": {
+            "total_valid_lines": llc_total_valid_lines,
+            "restorable_lines": llc_restorable_lines,
+            "staged_lines": llc_staged_lines,
+            "staged_clean_lines": len(clean_lines),
+            "staged_restorable_modified_lines": len(modified_lines),
+            "omitted_lines": llc_omitted_lines,
+            "omitted_due_to_private_conflict_lines": (
+                llc_omitted_due_to_private_conflict
+            ),
+            "all_valid_lines_staged": llc_staged_lines == llc_total_valid_lines,
+            "all_restorable_lines_staged": llc_staged_lines == llc_restorable_lines,
+        },
+        "private_caches": {
+            "total_valid_lines": private_total_valid_lines,
+            "staged_lines": private_staged_lines,
+            "all_valid_lines_staged": private_staged_lines == private_total_valid_lines,
+        },
+        "overall": {
+            "all_valid_llc_lines_staged": llc_staged_lines == llc_total_valid_lines,
+            "all_valid_private_lines_staged": (
+                private_staged_lines == private_total_valid_lines
+            ),
+        },
+    }
+    accounting["overall"]["all_valid_blocks_staged"] = (
+        accounting["overall"]["all_valid_llc_lines_staged"]
+        and accounting["overall"]["all_valid_private_lines_staged"]
+    )
+    if moesi_private_family_guardrail_report is not None:
+        accounting["moesi_private_families"] = {
+            "unsupported_block_count": moesi_private_family_guardrail_report[
+                "unsupported_block_count"
+            ],
+            "strict_mode": True,
+        }
+    if moesi_cache_hierarchy_story_report is not None:
+        accounting["moesi_cache_hierarchy_story"] = {
+            "is_consistent": moesi_cache_hierarchy_story_report["is_consistent"],
+            "strict_mode": True,
+        }
+    return accounting
 
 
 def _select_btb_restore_candidates(fetch_units: list[dict]) -> tuple[list[dict], dict]:
@@ -1546,7 +1662,8 @@ def prepare_snapshot_gem5_uarch(
 
     gem5_snapshot_dir = gem5_workload_root / snapshot
     qflex_uarch_dir = qflex_run_dir / f"{snapshot}{QFLEX_UARCH_SUFFIX}"
-    gem5_uarch_dir = _nested_gem5_uarch_dir(gem5_workload_root, snapshot)
+    gem5_uarch_root = _nested_gem5_uarch_dir(gem5_workload_root, snapshot)
+    gem5_uarch_dir = _protocol_gem5_uarch_dir(gem5_uarch_root, ruby_protocol)
     sibling_gem5_uarch_dir = _sibling_gem5_uarch_dir(gem5_workload_root, snapshot)
 
     llc_source_file = qflex_uarch_dir / LLC_SOURCE_FILE
@@ -1592,9 +1709,10 @@ def prepare_snapshot_gem5_uarch(
     moesi_private_family_guardrail_report_file = (
         gem5_uarch_dir / MOESI_UNSUPPORTED_PRIVATE_FAMILY_REPORT_FILE
     )
-    btb_candidate_file = gem5_uarch_dir / BTB_CANDIDATE_FILE
-    tage_candidate_file = gem5_uarch_dir / TAGE_CANDIDATE_FILE
+    btb_candidate_file = gem5_uarch_root / BTB_CANDIDATE_FILE
+    tage_candidate_file = gem5_uarch_root / TAGE_CANDIDATE_FILE
     manifest_file = gem5_uarch_dir / MANIFEST_FILE
+    conversion_accounting_file = gem5_uarch_dir / CONVERSION_ACCOUNTING_FILE
 
     if not qflex_uarch_dir.is_dir():
         raise FileNotFoundError(f"QFlex uarch directory not found: {qflex_uarch_dir}")
@@ -1625,9 +1743,11 @@ def prepare_snapshot_gem5_uarch(
         else:
             sibling_gem5_uarch_dir.unlink()
 
+    gem5_uarch_root.mkdir(parents=True, exist_ok=True)
     gem5_uarch_dir.mkdir(parents=True, exist_ok=True)
 
     llc_lines = _parse_llc_lines(llc_source_file)
+    source_llc_block_ids = {line["block_id"] for line in llc_lines}
     directory = _parse_directory(directory_source_file)
     harvard = _parse_harvard(harvard_source_file)
     fetch_units = _parse_fetch(fetch_source_file) if fetch_source_file.is_file() else []
@@ -1640,35 +1760,100 @@ def prepare_snapshot_gem5_uarch(
     )
     l1d_candidates, l1d_stats = _select_l1d_restore_candidates(harvard)
     l1i_candidates, l1i_stats = _select_l1i_restore_candidates(harvard)
+    btb_candidates, btb_stats = _select_btb_restore_candidates(fetch_units)
+    tage_candidates, tage_stats = _select_tage_restore_candidates(fetch_units)
+    moesi_private_family_guardrail_report = None
+    if ruby_protocol == RUBY_PROTOCOL_MOESI_CMP_DIRECTORY:
+        (
+            initial_moesi_private_clean_candidates,
+            _,
+        ) = _select_moesi_single_private_data_clean_candidates(
+            source_llc_block_ids, directory, harvard
+        )
+        (
+            initial_moesi_multi_private_clean_candidates,
+            _,
+        ) = _select_moesi_multi_private_data_clean_candidates(
+            source_llc_block_ids, directory, harvard
+        )
+        (
+            initial_moesi_private_instruction_only_candidates,
+            _,
+        ) = _select_moesi_private_instruction_only_candidates(
+            source_llc_block_ids, directory, harvard
+        )
+        moesi_clean_private_block_ids = {
+            candidate["block_id"]
+            for candidate in initial_moesi_private_clean_candidates
+        } | {
+            candidate["block_id"]
+            for candidate in initial_moesi_multi_private_clean_candidates
+        } | {
+            candidate["block_id"]
+            for candidate in initial_moesi_private_instruction_only_candidates
+        }
+    else:
+        moesi_clean_private_block_ids = set()
+    moesi_private_clean_llc_support_lines = []
+    if ruby_protocol == RUBY_PROTOCOL_MOESI_CMP_DIRECTORY:
+        moesi_private_clean_llc_support_lines = [
+            line
+            for line in modified_lines
+            if line["block_id"] in moesi_clean_private_block_ids
+        ]
+    selected_lines = _normalize_restore_lines(
+        _order_restore_lines(clean_lines + modified_lines)
+    )
+    addrs = [line["line_addr"] for line in selected_lines]
+    if not addrs:
+        raise RuntimeError(
+            "No LLC restore addresses were derived from the raw "
+            f"QFlex uarch sources in {qflex_uarch_dir}"
+        )
+    staged_llc_block_ids = {line["block_id"] for line in selected_lines}
+
     (
         moesi_private_owner_candidates,
         moesi_private_owner_stats,
     ) = _select_moesi_single_private_data_writeable_candidates(
-        llc_lines, directory, harvard
+        staged_llc_block_ids, directory, harvard
     )
     (
         moesi_private_clean_candidates,
         moesi_private_clean_stats,
     ) = _select_moesi_single_private_data_clean_candidates(
-        llc_lines, directory, harvard
+        staged_llc_block_ids, directory, harvard
     )
     (
         moesi_multi_private_clean_candidates,
         moesi_multi_private_clean_stats,
     ) = _select_moesi_multi_private_data_clean_candidates(
-        llc_lines, directory, harvard
+        staged_llc_block_ids, directory, harvard
     )
     (
         moesi_private_instruction_only_candidates,
         moesi_private_instruction_only_stats,
     ) = _select_moesi_private_instruction_only_candidates(
-        llc_lines, directory, harvard
+        staged_llc_block_ids, directory, harvard
     )
-    moesi_private_family_guardrail_report = None
+    moesi_cache_hierarchy_story_report = None
     if ruby_protocol == RUBY_PROTOCOL_MOESI_CMP_DIRECTORY:
+        moesi_cache_hierarchy_story_report = _validate_moesi_cache_hierarchy_story(
+            staged_llc_block_ids,
+            moesi_private_owner_candidates,
+            moesi_private_clean_candidates,
+            moesi_multi_private_clean_candidates,
+            moesi_private_instruction_only_candidates,
+        )
+        if not moesi_cache_hierarchy_story_report["is_consistent"]:
+            raise RuntimeError(
+                "MOESI cache-hierarchy conversion emitted an inconsistent "
+                "LLC-backed story; some private-family lines do not match the "
+                "staged LLC restore set."
+            )
         moesi_private_family_guardrail_report = (
             _collect_moesi_private_family_guardrail_report(
-                llc_lines, directory, harvard
+                staged_llc_block_ids, directory, harvard
             )
         )
         expected_moesi_private_family_counts = {
@@ -1706,46 +1891,6 @@ def prepare_snapshot_gem5_uarch(
                 )
                 + f" See {moesi_private_family_guardrail_report_file}."
             )
-    btb_candidates, btb_stats = _select_btb_restore_candidates(fetch_units)
-    tage_candidates, tage_stats = _select_tage_restore_candidates(fetch_units)
-    moesi_private_clean_block_ids = {
-        candidate["block_id"] for candidate in moesi_private_clean_candidates
-    }
-    moesi_multi_private_clean_block_ids = {
-        candidate["block_id"] for candidate in moesi_multi_private_clean_candidates
-    }
-    moesi_private_instruction_only_block_ids = {
-        candidate["block_id"]
-        for candidate in moesi_private_instruction_only_candidates
-    }
-    moesi_clean_private_block_ids = (
-        moesi_private_clean_block_ids
-        | moesi_multi_private_clean_block_ids
-        | moesi_private_instruction_only_block_ids
-    )
-    moesi_private_clean_llc_support_lines = []
-    if ruby_protocol == RUBY_PROTOCOL_MOESI_CMP_DIRECTORY:
-        moesi_private_clean_llc_support_lines = [
-            line
-            for line in modified_lines
-            if line["block_id"] in moesi_clean_private_block_ids
-        ]
-    selected_modified = max(0, llc_debug_modified_count)
-    selected_modified_lines = modified_lines[:selected_modified]
-    effective_selected_modified = len(selected_modified_lines)
-    selected_lines = _normalize_restore_lines(
-        _order_restore_lines(
-            clean_lines
-            + moesi_private_clean_llc_support_lines
-            + selected_modified_lines
-        )
-    )
-    addrs = [line["line_addr"] for line in selected_lines]
-    if not addrs:
-        raise RuntimeError(
-            "No LLC restore addresses were derived from the raw "
-            f"QFlex uarch sources in {qflex_uarch_dir}"
-        )
 
     _write_addr_file(target_file, addrs, overwrite)
     _write_json_file(
@@ -1975,6 +2120,23 @@ def prepare_snapshot_gem5_uarch(
         TAGE_RESTORE_FILE_TEMPLATE,
         TAGE_RESTORE_FILE_GLOB,
     )
+    conversion_accounting = _build_conversion_accounting(
+        snapshot,
+        ruby_protocol,
+        stats,
+        clean_lines,
+        modified_lines,
+        addrs,
+        l1d_stats,
+        l1i_stats,
+        moesi_private_family_guardrail_report,
+        moesi_cache_hierarchy_story_report,
+    )
+    _write_json_file(
+        conversion_accounting_file,
+        conversion_accounting,
+        overwrite,
+    )
 
     manifest = {
         "schema_version": 1,
@@ -1982,6 +2144,7 @@ def prepare_snapshot_gem5_uarch(
         "target_ruby_protocol": ruby_protocol,
         "qflex_source_dir": str(qflex_uarch_dir),
         "gem5_uarch_dir": str(gem5_uarch_dir),
+        "conversion_accounting_file": str(conversion_accounting_file),
         "components": {
             "llc": {
                 "source_files": {
@@ -1992,7 +2155,7 @@ def prepare_snapshot_gem5_uarch(
                 "output_file": str(target_file),
                 "line_count": len(addrs),
                 "selection_policy": _llc_restore_selection_policy(ruby_protocol),
-                "selected_modified_lines": effective_selected_modified,
+                "selected_modified_lines": len(modified_lines),
                 "protocol_required_modified_lines": (
                     len(moesi_private_clean_llc_support_lines)
                 ),
@@ -2236,6 +2399,32 @@ def prepare_snapshot_gem5_uarch(
             "unsupported_block_count": (
                 moesi_private_family_guardrail_report[
                     "unsupported_block_count"
+                ]
+            ),
+        }
+    if moesi_cache_hierarchy_story_report is not None:
+        manifest["components"]["moesi_cache_hierarchy_story"] = {
+            "strict_mode": True,
+            "is_consistent": moesi_cache_hierarchy_story_report["is_consistent"],
+            "staged_llc_block_count": moesi_cache_hierarchy_story_report[
+                "staged_llc_block_count"
+            ],
+            "owner_overlap_count": len(
+                moesi_cache_hierarchy_story_report["owner_overlaps_staged_llc"]
+            ),
+            "single_private_clean_missing_staged_llc_count": len(
+                moesi_cache_hierarchy_story_report[
+                    "single_private_clean_missing_staged_llc"
+                ]
+            ),
+            "multi_private_clean_missing_staged_llc_count": len(
+                moesi_cache_hierarchy_story_report[
+                    "multi_private_clean_missing_staged_llc"
+                ]
+            ),
+            "private_instruction_only_missing_staged_llc_count": len(
+                moesi_cache_hierarchy_story_report[
+                    "private_instruction_only_missing_staged_llc"
                 ]
             ),
         }

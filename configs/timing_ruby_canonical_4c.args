@@ -1,0 +1,21 @@
+# Canonical 4-core timing Ruby configuration for protocol comparisons.
+# Keep protocol the only independent variable unless the experiment
+# explicitly targets another parameter.
+
+--l1i_size=64kB
+--l1i_assoc=8
+--l1d_size=64kB
+--l1d_assoc=8
+--l2_size=4MB
+--l2_assoc=16
+--mem-channels=1
+--mem-ranks=4
+--itb-size=64
+--dtb-size=64
+--have-large-asid-64
+--restore-llc-state
+--restore-l1d-state
+--restore-l1i-state
+--restore-btb-state
+--restore-tage-state
+--restore-tlb-state
