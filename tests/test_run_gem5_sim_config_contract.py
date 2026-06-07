@@ -6,7 +6,7 @@ def test_run_gem5_rejects_runner_owned_sim_config_option(tmp_path: Path):
     repo_root = Path(__file__).resolve().parents[1]
     script = repo_root / "run_gem5.sh"
     sim_config = tmp_path / "bad.args"
-    sim_config.write_text("--branch-trace\n", encoding="utf-8")
+    sim_config.write_text("--root-device=/dev/vda\n", encoding="utf-8")
 
     result = subprocess.run(
         [
@@ -31,7 +31,7 @@ def test_run_gem5_rejects_runner_owned_sim_config_option(tmp_path: Path):
     )
 
     assert result.returncode != 0
-    assert "runner-owned option --branch-trace" in result.stderr
+    assert "runner-owned option --root-device" in result.stderr
     assert "keep --sim-config for machine/model parameters only" in result.stderr
 
 
@@ -140,3 +140,44 @@ def test_run_gem5_rejects_multiple_timing_ruby_protocol_flags():
 
     assert result.returncode != 0
     assert "Choose only one timing Ruby protocol flag." in result.stderr
+
+
+def test_run_gem5_accepts_machine_contract_options_from_runner(tmp_path: Path):
+    repo_root = Path(__file__).resolve().parents[1]
+    script = repo_root / "run_gem5.sh"
+    ckpt_root = tmp_path / "gem5_ckp"
+    snapshot_dir = ckpt_root / "snapshot_0"
+    snapshot_dir.mkdir(parents=True)
+    (snapshot_dir / "snapshot_0.img").write_bytes(b"")
+
+    result = subprocess.run(
+        [
+            "bash",
+            str(script),
+            "--gem5-ckp-dir",
+            str(ckpt_root),
+            "--experiment",
+            "pytest_qpoints_machine_contract",
+            "--snapshot",
+            "snapshot_0",
+            "--inst",
+            "1",
+            "--cores",
+            "1",
+            "--bootloader",
+            "/tmp/boot.arm64",
+            "--root-device",
+            "/dev/vda",
+            "--itb-size",
+            "64",
+            "--dtb-size",
+            "64",
+            "--have-large-asid-64",
+            "--timing-ruby",
+        ],
+        capture_output=True,
+        text=True,
+    )
+
+    assert result.returncode != 0
+    assert "Bootloader not found" in result.stderr

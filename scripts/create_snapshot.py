@@ -3,6 +3,7 @@ import sys
 import os
 import re
 import shutil
+import gzip
 from telnetlib import Telnet
 import subprocess
 import time
@@ -130,6 +131,13 @@ def copy_base_files(out_dir):
         shutil.rmtree(dst)
       shutil.copytree(src, dst)
     else:
+      if name == 'system.physmem.store0.pmem':
+        with open(src, 'rb') as fh:
+          magic = fh.read(2)
+        if magic == b'\x1f\x8b':
+          with gzip.open(src, 'rb') as inf, open(dst, 'wb') as outf:
+            shutil.copyfileobj(inf, outf)
+          continue
       shutil.copy2(src, dst)
 
 

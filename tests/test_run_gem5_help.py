@@ -19,4 +19,9 @@ def test_run_gem5_help_exposes_tracing_options():
     assert "--timing-ruby" in result.stdout
     assert "--timing-ruby-moesi" in result.stdout
     assert "--sim-config" in result.stdout
+    assert "--bootloader" in result.stdout
+    assert "--root-device" in result.stdout
+    assert "--itb-size" in result.stdout
+    assert "--dtb-size" in result.stdout
+    assert "--have-large-asid-64" in result.stdout
     assert "machine/model configuration only; runner-owned options are" in result.stdout
