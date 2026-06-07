@@ -113,8 +113,9 @@ MOESI_IMPLEMENTED_PRIVATE_FAMILY_DESCRIPTIONS = {
         "shared=true, LLC backed"
     ),
     "moesi_multi_private_data_clean": (
-        "multiple read-only private D-cache sharers, no I-cache sharers, "
-        "shared=true, LLC-backed or non-LLC local-sharer form"
+        "read-only private D-cache sharers, no I-cache sharers, "
+        "shared=true, LLC-backed multi-sharer form or non-LLC local-sharer "
+        "form with one or more data sharers"
     ),
     "moesi_private_instruction_only": (
         "instruction-only private sharers, no D-cache sharers, shared=true, "
@@ -122,10 +123,6 @@ MOESI_IMPLEMENTED_PRIVATE_FAMILY_DESCRIPTIONS = {
     ),
 }
 MOESI_KNOWN_UNIMPLEMENTED_PRIVATE_FAMILY_DESCRIPTIONS = {
-    "single_private_data_clean_nonllc": (
-        "one read-only private D-cache sharer, no I-cache sharers, "
-        "shared=true, LLC absent"
-    ),
     "single_private_data_clean_mixed_instruction_data": (
         "one read-only private D-cache sharer plus private I-cache sharers"
     ),
@@ -964,7 +961,7 @@ def _classify_moesi_private_block_family(
                     return "anything_else"
                 if llc_backed:
                     return "moesi_single_private_data_clean"
-                return "single_private_data_clean_nonllc"
+                return "moesi_multi_private_data_clean"
             if len(d_cores) > 1:
                 if not directory_shared:
                     return "anything_else"
@@ -1199,11 +1196,13 @@ def _select_moesi_multi_private_data_clean_candidates(
     llc_backed_block_ids: set[int],
     directory: dict,
     harvard: dict,
+    include_single_clean_nonllc: bool = False,
 ) -> tuple[list[dict], dict]:
     stats = {
         "harvard_block_ids": len(harvard),
         "directory_backed_block_ids": 0,
         "multi_private_dcore_block_ids": 0,
+        "single_private_nonllc_block_ids": 0,
         "instruction_sharer_block_ids_skipped": 0,
         "writeable_block_ids_skipped": 0,
         "modified_block_ids_skipped": 0,
@@ -1222,9 +1221,17 @@ def _select_moesi_multi_private_data_clean_candidates(
         stats["directory_backed_block_ids"] += 1
 
         priv = _summarize_private_entries(entries)
-        if len(priv["d_cores"]) <= 1:
+        d_core_count = len(priv["d_cores"])
+        if d_core_count == 0:
             continue
-        stats["multi_private_dcore_block_ids"] += 1
+
+        llc_backed = block_id in llc_backed_block_ids
+        if d_core_count == 1:
+            if llc_backed or not include_single_clean_nonllc:
+                continue
+            stats["single_private_nonllc_block_ids"] += 1
+        else:
+            stats["multi_private_dcore_block_ids"] += 1
 
         if priv["i_cores"]:
             stats["instruction_sharer_block_ids_skipped"] += 1
@@ -1242,7 +1249,6 @@ def _select_moesi_multi_private_data_clean_candidates(
             stats["directory_nonshared_block_ids_skipped"] += 1
             continue
 
-        llc_backed = block_id in llc_backed_block_ids
         if llc_backed:
             stats["llc_backed_block_ids"] += 1
         else:
@@ -1774,7 +1780,10 @@ def prepare_snapshot_gem5_uarch(
             initial_moesi_multi_private_clean_candidates,
             _,
         ) = _select_moesi_multi_private_data_clean_candidates(
-            source_llc_block_ids, directory, harvard
+            source_llc_block_ids,
+            directory,
+            harvard,
+            include_single_clean_nonllc=False,
         )
         (
             initial_moesi_private_instruction_only_candidates,
@@ -1828,7 +1837,10 @@ def prepare_snapshot_gem5_uarch(
         moesi_multi_private_clean_candidates,
         moesi_multi_private_clean_stats,
     ) = _select_moesi_multi_private_data_clean_candidates(
-        staged_llc_block_ids, directory, harvard
+        staged_llc_block_ids,
+        directory,
+        harvard,
+        include_single_clean_nonllc=True,
     )
     (
         moesi_private_instruction_only_candidates,
@@ -2279,13 +2291,16 @@ def prepare_snapshot_gem5_uarch(
                 },
                 "line_count": len(moesi_multi_private_clean_candidates),
                 "selection_policy": (
-                    "for MOESI_CMP_directory, multi-private clean data "
-                    "lines whose source directory entry is shared and whose "
-                    "private D-cache holders are all read-only; restore "
-                    "LLC-backed lines as L1D S-state lines plus L2 SLS sharer "
-                    "metadata, and restore non-LLC-backed lines as L1D S-state "
-                    "lines plus L2 local-directory ILS sharer metadata "
-                    "without fabricating LLC residency"
+                    "for MOESI_CMP_directory, clean shared data lines whose "
+                    "source directory entry is shared and whose private "
+                    "D-cache holders are all read-only, excluding the "
+                    "LLC-backed single-sharer family handled by "
+                    "moesi_single_private_data_clean; restore LLC-backed "
+                    "multi-sharer lines as L1D S-state lines plus L2 SLS "
+                    "sharer metadata, and restore non-LLC-backed lines with "
+                    "one or more D-cache sharers as L1D S-state lines plus "
+                    "L2 local-directory ILS sharer metadata without "
+                    "fabricating LLC residency"
                 ),
                 "stats": moesi_multi_private_clean_stats,
             },

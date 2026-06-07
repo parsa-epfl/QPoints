@@ -7,13 +7,15 @@ fi
 
 usage() {
   cat <<'EOF'
-Usage: run_gem5.sh --gem5-ckp-dir DIR --experiment NAME --snapshot NAME --cores N [--inst N | --measurement-cycles N [--warmup-cycles N]] [--branch-trace] [--tage-decision-trace] [--data-trace] [--dump-cache-state] [--timing-ruby] [--timing-ruby-moesi] [--no-cache-hierarchy-restore] [--sim-config FILE]
+Usage: run_gem5.sh --gem5-ckp-dir DIR --experiment-name NAME --snapshot NAME --core-count N [--memory-gb N] [--inst N | --measurement-cycles N [--warmup-cycles N]] [--branch-trace] [--tage-decision-trace] [--data-trace] [--dump-cache-state] [--timing-ruby] [--timing-ruby-moesi] [--no-cache-hierarchy-restore] [--sim-config FILE]
 
 Arguments:
   --gem5-ckp-dir  Checkpoint root directory
-  --experiment    Experiment name
+  --experiment-name
+                  Experiment name
   --snapshot      Snapshot name
-  --cores         Number of cores
+  --core-count    Number of cores
+  --memory-gb     Memory size in GB (default: 16)
   --inst          Instruction count for legacy instruction-bounded runs
   --warmup-cycles Detailed warmup window in CPU cycles (timing Ruby only)
   --measurement-cycles
@@ -46,8 +48,8 @@ Options:
                   rejected here.
 
 Example:
-  run_gem5.sh --gem5-ckp-dir /checkpoints --experiment OoO --snapshot snapshot_0 --inst 100000 --cores 1 --branch-trace
-  run_gem5.sh --gem5-ckp-dir /checkpoints --experiment OoO --snapshot snapshot_0 --cores 8 --timing-ruby-moesi --warmup-cycles 200000 --measurement-cycles 100000
+  run_gem5.sh --gem5-ckp-dir /checkpoints --experiment-name OoO --snapshot snapshot_0 --inst 100000 --core-count 1 --branch-trace
+  run_gem5.sh --gem5-ckp-dir /checkpoints --experiment-name OoO --snapshot snapshot_0 --core-count 8 --timing-ruby-moesi --warmup-cycles 200000 --measurement-cycles 100000
 EOF
 }
 
@@ -165,12 +167,13 @@ DEFAULT_TIMING_RUBY_MOESI_SIM_CONFIG="${ROOT_DIR}/configs/timing_ruby_moesi_gem5
 TIMING_UIPC_SUMMARY_SCRIPT="${ROOT_DIR}/scripts/timing/summarize_gem5_uipc.py"
 
 GEM5_CKP_DIR=""
-EXPERIMENT=""
+EXPERIMENT_NAME=""
 SNAPSHOT=""
 INST=""
 WARMUP_CYCLES=""
 MEASUREMENT_CYCLES=""
-CORES=""
+CORE_COUNT=""
+MEMORY_GB="16"
 SIM_CONFIG=""
 RESTORE_CACHE_HIERARCHY=1
 BRANCH_TRACE_ARGS=()
@@ -186,9 +189,9 @@ while [[ $# -gt 0 ]]; do
       GEM5_CKP_DIR="$2"
       shift 2
       ;;
-    --experiment)
+    --experiment-name|--experiment)
       require_value "$1" "${2:-}"
-      EXPERIMENT="$2"
+      EXPERIMENT_NAME="$2"
       shift 2
       ;;
     --snapshot)
@@ -211,9 +214,14 @@ while [[ $# -gt 0 ]]; do
       MEASUREMENT_CYCLES="$2"
       shift 2
       ;;
-    --cores)
+    --core-count|--cores)
       require_value "$1" "${2:-}"
-      CORES="$2"
+      CORE_COUNT="$2"
+      shift 2
+      ;;
+    --memory-gb)
+      require_value "$1" "${2:-}"
+      MEMORY_GB="$2"
       shift 2
       ;;
     --branch-trace)
@@ -255,9 +263,14 @@ while [[ $# -gt 0 ]]; do
   esac
 done
 
-if [[ -z "$GEM5_CKP_DIR" || -z "$EXPERIMENT" || -z "$SNAPSHOT" || -z "$CORES" ]]; then
+if [[ -z "$GEM5_CKP_DIR" || -z "$EXPERIMENT_NAME" || -z "$SNAPSHOT" || -z "$CORE_COUNT" ]]; then
   die "Missing required arguments."
 fi
+
+if [[ ! "$MEMORY_GB" =~ ^[1-9][0-9]*$ ]]; then
+  die "--memory-gb must be a positive integer."
+fi
+MEM_SIZE_MIB=$((MEMORY_GB * 1024))
 
 if [[ -n "$MEASUREMENT_CYCLES" || -n "$WARMUP_CYCLES" ]]; then
   if [[ -z "$TIMING_RUBY_PROTOCOL" ]]; then
@@ -285,7 +298,7 @@ CKPT_DIR="${GEM5_CKP_DIR}/${SNAPSHOT}"
 DISK_IMAGE="${CKPT_DIR}/${SNAPSHOT}.img"
 BOOTLOADER="${M5_PATH}/binaries/boot_v2_qemu_virt.arm64"
 
-OUTDIR="${ROOT_DIR}/sim_outs/${EXPERIMENT}/${SNAPSHOT}"
+OUTDIR="${ROOT_DIR}/sim_outs/${EXPERIMENT_NAME}/${SNAPSHOT}"
 require_dir "$CKPT_DIR" "Checkpoint directory"
 require_file "$DISK_IMAGE" "Checkpoint disk image"
 require_file "$BOOTLOADER" "Bootloader"
@@ -360,8 +373,8 @@ if [[ -n "$TIMING_RUBY_PROTOCOL" ]]; then
     --cpu-type O3CPU
     --bp-type TAGE
     --restore "$CKPT_DIR"
-    --num-cores "$CORES"
-    --mem-size 16384MiB
+    --num-cores "$CORE_COUNT"
+    --mem-size "${MEM_SIZE_MIB}MiB"
     "${TIMING_RUBY_RESTORE_ARGS[@]}"
     "${TIMING_RUBY_CONFIG_ARGS[@]}"
     "${BRANCH_TRACE_ARGS[@]}"
@@ -392,8 +405,8 @@ else
     --fdip
     --bp-type TAGE
     --restore "$CKPT_DIR"
-    --num-cores "$CORES"
-    --mem-size 16384MiB
+    --num-cores "$CORE_COUNT"
+    --mem-size "${MEM_SIZE_MIB}MiB"
     "${CLASSIC_CONFIG_ARGS[@]}"
     "${BRANCH_TRACE_ARGS[@]}"
     "${TAGE_DECISION_TRACE_ARGS[@]}"
@@ -411,7 +424,7 @@ if [[ -n "$MEASUREMENT_CYCLES" ]]; then
   require_executable "$TIMING_UIPC_SUMMARY_SCRIPT" "gem5 uIPC summary script"
   python3 "$TIMING_UIPC_SUMMARY_SCRIPT" \
     --stats-file "$OUTDIR/stats.txt" \
-    --experiment "$EXPERIMENT" \
+    --experiment "$EXPERIMENT_NAME" \
     --snapshot "$SNAPSHOT" \
     --output-json "$OUTDIR/uipc_summary.json"
 fi
