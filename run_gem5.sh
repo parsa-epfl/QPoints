@@ -7,7 +7,7 @@ fi
 
 usage() {
   cat <<'EOF'
-Usage: run_gem5.sh --gem5-ckp-dir DIR --experiment-name NAME --snapshot NAME --core-count N [--memory-gb N] [--kernel FILE] [--inst N | --measurement-cycles N [--warmup-cycles N]] [--branch-trace] [--tage-decision-trace] [--data-trace] [--dump-cache-state] [--timing-ruby] [--timing-ruby-moesi] [--no-cache-hierarchy-restore] [--sim-config FILE]
+Usage: run_gem5.sh --gem5-ckp-dir DIR --experiment-name NAME --snapshot NAME --core-count N [--memory-gb N] [--kernel FILE] [--bootloader FILE] [--root-device DEV] [--itb-size N] [--dtb-size N] [--have-large-asid-64 | --no-large-asid-64] [--inst N | --measurement-cycles N [--warmup-cycles N]] [--branch-trace] [--tage-decision-trace] [--data-trace] [--dump-cache-state] [--timing-ruby] [--timing-ruby-moesi] [--no-cache-hierarchy-restore] [--sim-config FILE]
 
 Arguments:
   --gem5-ckp-dir  Checkpoint root directory
@@ -17,6 +17,12 @@ Arguments:
   --core-count    Number of cores
   --memory-gb     Memory size in GB (default: 16)
   --kernel        Kernel image to supply to gem5. Defaults to bin/m5/binaries/vmlinux.arm64
+  --bootloader    Bootloader image to supply to gem5. Defaults to bin/m5/binaries/boot_v2_qemu_virt.arm64
+  --root-device   Root device to pass to gem5 full-system configs (default: /dev/vda)
+  --itb-size      Instruction TLB size to pass to gem5 (default: 64)
+  --dtb-size      Data TLB size to pass to gem5 (default: 64)
+  --have-large-asid-64 / --no-large-asid-64
+                  Control the gem5 large-ASID mode for TLB restore and runtime config
   --inst          Instruction count for legacy instruction-bounded runs
   --warmup-cycles Detailed warmup window in CPU cycles (timing Ruby only)
   --measurement-cycles
@@ -131,7 +137,7 @@ validate_sim_config_args() {
   for arg in "$@"; do
     key="$(normalize_gem5_arg_key "$arg")"
     case "$key" in
-      -I|--outdir|--debug-file|--disk-image|--bootloader|--cpu-type|--bp-type|--restore|--num-cores|--mem-size|--branch-trace|--tage-decision-trace|--data-trace|--dump-cache-state|--caches|--warmup-cycles|--measurement-cycles)
+      -I|--outdir|--debug-file|--disk-image|--bootloader|--root-device|--cpu-type|--bp-type|--restore|--num-cores|--mem-size|--itb-size|--dtb-size|--have-large-asid-64|--no-large-asid-64|--branch-trace|--tage-decision-trace|--data-trace|--dump-cache-state|--caches|--warmup-cycles|--measurement-cycles)
         die "${args_file} sets runner-owned option ${key}. Put run-shape and artifact toggles on run_gem5.sh itself; keep --sim-config for machine/model parameters only."
         ;;
     esac
@@ -176,6 +182,11 @@ MEASUREMENT_CYCLES=""
 CORE_COUNT=""
 MEMORY_GB="16"
 KERNEL=""
+BOOTLOADER=""
+ROOT_DEVICE="/dev/vda"
+ITB_SIZE="64"
+DTB_SIZE="64"
+HAVE_LARGE_ASID_64=1
 SIM_CONFIG=""
 RESTORE_CACHE_HIERARCHY=1
 BRANCH_TRACE_ARGS=()
@@ -230,6 +241,34 @@ while [[ $# -gt 0 ]]; do
       require_value "$1" "${2:-}"
       KERNEL="$2"
       shift 2
+      ;;
+    --bootloader)
+      require_value "$1" "${2:-}"
+      BOOTLOADER="$2"
+      shift 2
+      ;;
+    --root-device)
+      require_value "$1" "${2:-}"
+      ROOT_DEVICE="$2"
+      shift 2
+      ;;
+    --itb-size)
+      require_value "$1" "${2:-}"
+      ITB_SIZE="$2"
+      shift 2
+      ;;
+    --dtb-size)
+      require_value "$1" "${2:-}"
+      DTB_SIZE="$2"
+      shift 2
+      ;;
+    --have-large-asid-64)
+      HAVE_LARGE_ASID_64=1
+      shift 1
+      ;;
+    --no-large-asid-64)
+      HAVE_LARGE_ASID_64=0
+      shift 1
       ;;
     --branch-trace)
       BRANCH_TRACE_ARGS=(--branch-trace)
@@ -303,9 +342,18 @@ fi
 
 CKPT_DIR="${GEM5_CKP_DIR}/${SNAPSHOT}"
 DISK_IMAGE="${CKPT_DIR}/${SNAPSHOT}.img"
-BOOTLOADER="${M5_PATH}/binaries/boot_v2_qemu_virt.arm64"
+if [[ -z "$BOOTLOADER" ]]; then
+  BOOTLOADER="${M5_PATH}/binaries/boot_v2_qemu_virt.arm64"
+fi
 if [[ -z "$KERNEL" ]]; then
   KERNEL="${M5_PATH}/binaries/vmlinux.arm64"
+fi
+
+if [[ ! "$ITB_SIZE" =~ ^[1-9][0-9]*$ ]]; then
+  die "--itb-size must be a positive integer."
+fi
+if [[ ! "$DTB_SIZE" =~ ^[1-9][0-9]*$ ]]; then
+  die "--dtb-size must be a positive integer."
 fi
 
 OUTDIR="${ROOT_DIR}/sim_outs/${EXPERIMENT_NAME}/${SNAPSHOT}"
@@ -382,11 +430,14 @@ if [[ -n "$TIMING_RUBY_PROTOCOL" ]]; then
     "--disk-image=${DISK_IMAGE}"
     "--bootloader=${BOOTLOADER}"
     "--kernel=${KERNEL}"
+    "--root-device=${ROOT_DEVICE}"
     --cpu-type O3CPU
     --bp-type TAGE
     --restore "$CKPT_DIR"
     --num-cores "$CORE_COUNT"
     --mem-size "${MEM_SIZE_MIB}MiB"
+    "--itb-size=${ITB_SIZE}"
+    "--dtb-size=${DTB_SIZE}"
     "${TIMING_RUBY_RESTORE_ARGS[@]}"
     "${TIMING_RUBY_CONFIG_ARGS[@]}"
     "${BRANCH_TRACE_ARGS[@]}"
@@ -394,6 +445,9 @@ if [[ -n "$TIMING_RUBY_PROTOCOL" ]]; then
     "${DATA_TRACE_ARGS[@]}"
     "${DUMP_CACHE_STATE_ARGS[@]}"
   )
+  if [[ "$HAVE_LARGE_ASID_64" -eq 1 ]]; then
+    gem5_cmd+=(--have-large-asid-64)
+  fi
 else
   require_executable "$GEM5_BIN_CLASSIC" "Classic gem5 binary"
   require_file "$GEM5_CFG_CLASSIC" "Classic gem5 config"
@@ -413,6 +467,7 @@ else
     "--disk-image=${DISK_IMAGE}"
     "--bootloader=${BOOTLOADER}"
     "--kernel=${KERNEL}"
+    "--root-device=${ROOT_DEVICE}"
     --caches
     --cpu-type AtomicSimpleCPU
     --fdip
@@ -420,11 +475,16 @@ else
     --restore "$CKPT_DIR"
     --num-cores "$CORE_COUNT"
     --mem-size "${MEM_SIZE_MIB}MiB"
+    "--itb-size=${ITB_SIZE}"
+    "--dtb-size=${DTB_SIZE}"
     "${CLASSIC_CONFIG_ARGS[@]}"
     "${BRANCH_TRACE_ARGS[@]}"
     "${TAGE_DECISION_TRACE_ARGS[@]}"
     "${DATA_TRACE_ARGS[@]}"
   )
+  if [[ "$HAVE_LARGE_ASID_64" -eq 1 ]]; then
+    gem5_cmd+=(--have-large-asid-64)
+  fi
 fi
 
 "${gem5_cmd[@]}"
