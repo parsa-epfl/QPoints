@@ -7,7 +7,7 @@ fi
 
 usage() {
   cat <<'EOF'
-Usage: run_gem5.sh --gem5-ckp-dir DIR --experiment NAME --snapshot NAME --cores N [--inst N | --measurement-cycles N [--warmup-cycles N]] [--branch-trace] [--tage-decision-trace] [--data-trace] [--dump-cache-state] [--timing-ruby] [--timing-ruby-moesi] [--sim-config FILE]
+Usage: run_gem5.sh --gem5-ckp-dir DIR --experiment NAME --snapshot NAME --cores N [--inst N | --measurement-cycles N [--warmup-cycles N]] [--branch-trace] [--tage-decision-trace] [--data-trace] [--dump-cache-state] [--timing-ruby] [--timing-ruby-moesi] [--no-cache-hierarchy-restore] [--sim-config FILE]
 
 Arguments:
   --gem5-ckp-dir  Checkpoint root directory
@@ -35,6 +35,10 @@ Options:
                   staged LLC/L1 cache restore slices by default. If the
                   matching gem5_uarch artifacts are missing, gem5 will warn
                   and fall back to cold state for the missing slice.
+  --no-cache-hierarchy-restore
+                  Disable the MOESI LLC/L1 cache-hierarchy restore flags while
+                  leaving other restore-related options in the selected
+                  sim-config untouched.
   --sim-config    Optional file containing additional gem5 CLI arguments,
                   one per line. This is appended after the tracked default
                   config for the selected simulation path. This file owns
@@ -168,6 +172,7 @@ WARMUP_CYCLES=""
 MEASUREMENT_CYCLES=""
 CORES=""
 SIM_CONFIG=""
+RESTORE_CACHE_HIERARCHY=1
 BRANCH_TRACE_ARGS=()
 TAGE_DECISION_TRACE_ARGS=()
 DATA_TRACE_ARGS=()
@@ -231,6 +236,10 @@ while [[ $# -gt 0 ]]; do
       require_value "$1" "${2:-}"
       SIM_CONFIG="$2"
       shift 2
+      ;;
+    --no-cache-hierarchy-restore)
+      RESTORE_CACHE_HIERARCHY=0
+      shift 1
       ;;
     --timing-ruby)
       select_timing_ruby_protocol "MESI_Two_Level"
@@ -305,11 +314,13 @@ if [[ -n "$TIMING_RUBY_PROTOCOL" ]]; then
     MOESI_CMP_directory)
       timing_ruby_bin="$GEM5_BIN_TIMING_RUBY_MOESI"
       timing_ruby_default_sim_config="$DEFAULT_TIMING_RUBY_MOESI_SIM_CONFIG"
-      TIMING_RUBY_RESTORE_ARGS=(
-        --restore-llc-state
-        --restore-l1d-state
-        --restore-l1i-state
-      )
+      if [[ "$RESTORE_CACHE_HIERARCHY" -eq 1 ]]; then
+        TIMING_RUBY_RESTORE_ARGS=(
+          --restore-llc-state
+          --restore-l1d-state
+          --restore-l1i-state
+        )
+      fi
       ;;
     *)
       die "Unsupported timing Ruby protocol: $TIMING_RUBY_PROTOCOL"

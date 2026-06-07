@@ -1,0 +1,51 @@
+# First Flexus-reference gem5 config for snapshot_0 comparison.
+# Keep MESI protocol, 4 cores, and restored state; move gem5 toward the
+# current Flexus timing configuration where a direct mapping exists.
+
+--l1i_size=64kB
+--l1i_assoc=8
+--l1d_size=64kB
+--l1d_assoc=8
+--l2_size=4MB
+--l2_assoc=16
+--mem-channels=1
+--mem-ranks=4
+--itb-size=64
+--dtb-size=64
+--have-large-asid-64
+--restore-llc-state
+--restore-l1d-state
+--restore-l1i-state
+--restore-btb-state
+--restore-tage-state
+--restore-tlb-state
+--mem-type=SimpleMemory
+--simple-mem-latency=45ns
+--ports=8
+--recycle-latency=1
+--l1-request-latency=2
+--l1-response-latency=2
+--l2-request-latency=1
+--l2-response-latency=1
+--directory-latency=1
+--to-mem-ctrl-latency=1
+
+# Flexus frontend / core geometry references:
+#   fetch addresses per cycle = 8
+#   fetch insts per cycle     = 8
+#   dispatch width            = 8
+#   retire width              = 4
+#   ROB                       = 140
+#   store buffer              = 12
+#   decoder FIQ               = 48
+
+--fetch-width=8
+--decode-width=8
+--rename-width=8
+--dispatch-width=8
+--issue-width=8
+--wb-width=8
+--commit-width=4
+--fetch-queue-size=48
+--rob-entries=140
+--sq-entries=12
