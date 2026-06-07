@@ -1,0 +1,62 @@
+{
+  "validation_package": "flexus_timing_compare_snapshot_0/snapshot_0",
+  "goal": "Record the first Flexus-vs-gem5 timing comparison phase on multi-core snapshot_0, including the canonical run_sample interface bring-up, the gem5 MAIR restore fix, the remaining IPC gap, and the structural mismatches intentionally deferred to later phases.",
+  "snapshot": "snapshot_0",
+  "checkpoint_root": "/mnt/sdb/aansari/checkpoints/multi-core/snapshot_0",
+  "canonical_window": {
+    "cores": 4,
+    "warmup_cycles": 100000,
+    "measurement_cycles": 100000
+  },
+  "flexus_reference": {
+    "experiment": "multi-core",
+    "report": "/home/dev/qflex_git/QPoints/sim_outs/multi-core/uipc_report.json",
+    "config": "/mnt/sdb/aansari/experiments/multi-core/cfg/timing.cfg",
+    "config_json": "/mnt/sdb/aansari/experiments/multi-core/cfg/flexus_configuration.json",
+    "aggregate": {
+      "ipc": 4.41679,
+      "uipc": 4.41679
+    },
+    "average": {
+      "ipc": 1.1041975,
+      "uipc": 1.1041975
+    }
+  },
+  "gem5_reference": {
+    "experiment": "multi-core-gem5-moesi-fix-sq8-100k-v3",
+    "report": "/home/dev/qflex_git/QPoints/sim_outs/multi-core-gem5-moesi-fix-sq8-100k-v3/uipc_report.json",
+    "stats": "/home/dev/qflex_git/QPoints/sim_outs/multi-core-gem5-moesi-fix-sq8-100k-v3/snapshot_0/stats.txt",
+    "aggregate": {
+      "ipc": 1.15956,
+      "uipc": 1.15956
+    }
+  },
+  "gem5_4slice_crossbar_step": {
+    "experiment": "multi-core-gem5-moesi-4slice-crossbar-100k-v3",
+    "report": "/home/dev/qflex_git/QPoints/sim_outs/multi-core-gem5-moesi-4slice-crossbar-100k-v3/uipc_report.json",
+    "stats": "/home/dev/qflex_git/QPoints/sim_outs/multi-core-gem5-moesi-4slice-crossbar-100k-v3/snapshot_0/stats.txt",
+    "sim_config": "/home/dev/qflex_git/QPoints/configs/timing_ruby_moesi_flexus_ref_4c_sq8_4slice_crossbar.args",
+    "cache_hierarchy_restore": false,
+    "aggregate": {
+      "ipc": 1.15937,
+      "uipc": 1.15937
+    }
+  },
+  "confirmed_fix": {
+    "component": "ARM misc-reg restore",
+    "file": "/home/dev/qflex_git/QPoints/gem5/src/arch/arm/isa.cc",
+    "summary": "Resynchronized MAIR_EL1 backing registers during ISA unserialize so page walks and restored misc-reg state agree."
+  },
+  "major_findings": [
+    "Flexus and gem5 now share the same canonical run_sample reporting contract.",
+    "The gem5 MAIR restore bug was real and materially improved correctness and performance once fixed.",
+    "The dominant remaining gem5 delay is in the Ruby request-service path, not post-response retire handling.",
+    "The first 4-slice gem5 step did not improve IPC because gem5 currently homes slices on low bits above the cache-line offset, which collapses this workload onto slice 0.",
+    "Flexus uses 4KB L2 group interleaving, so gem5 and Flexus are still not structurally matched at the LLC homing level."
+  ],
+  "deferred_work": [
+    "Add or approximate Flexus-like LLC slice homing in gem5 Ruby.",
+    "Move gem5 from crossbar to mesh after the slicing/homing semantics are settled.",
+    "Repeat the canonical microbenchmark after those structural changes and reassess the remaining IPC gap."
+  ]
+}
