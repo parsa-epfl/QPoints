@@ -7,7 +7,7 @@ fi
 
 usage() {
   cat <<'EOF'
-Usage: run_gem5.sh --gem5-ckp-dir DIR --experiment-name NAME --snapshot NAME --core-count N [--memory-gb N] [--inst N | --measurement-cycles N [--warmup-cycles N]] [--branch-trace] [--tage-decision-trace] [--data-trace] [--dump-cache-state] [--timing-ruby] [--timing-ruby-moesi] [--no-cache-hierarchy-restore] [--sim-config FILE]
+Usage: run_gem5.sh --gem5-ckp-dir DIR --experiment-name NAME --snapshot NAME --core-count N [--memory-gb N] [--kernel FILE] [--inst N | --measurement-cycles N [--warmup-cycles N]] [--branch-trace] [--tage-decision-trace] [--data-trace] [--dump-cache-state] [--timing-ruby] [--timing-ruby-moesi] [--no-cache-hierarchy-restore] [--sim-config FILE]
 
 Arguments:
   --gem5-ckp-dir  Checkpoint root directory
@@ -16,6 +16,7 @@ Arguments:
   --snapshot      Snapshot name
   --core-count    Number of cores
   --memory-gb     Memory size in GB (default: 16)
+  --kernel        Kernel image to supply to gem5. Defaults to bin/m5/binaries/vmlinux.arm64
   --inst          Instruction count for legacy instruction-bounded runs
   --warmup-cycles Detailed warmup window in CPU cycles (timing Ruby only)
   --measurement-cycles
@@ -174,6 +175,7 @@ WARMUP_CYCLES=""
 MEASUREMENT_CYCLES=""
 CORE_COUNT=""
 MEMORY_GB="16"
+KERNEL=""
 SIM_CONFIG=""
 RESTORE_CACHE_HIERARCHY=1
 BRANCH_TRACE_ARGS=()
@@ -222,6 +224,11 @@ while [[ $# -gt 0 ]]; do
     --memory-gb)
       require_value "$1" "${2:-}"
       MEMORY_GB="$2"
+      shift 2
+      ;;
+    --kernel)
+      require_value "$1" "${2:-}"
+      KERNEL="$2"
       shift 2
       ;;
     --branch-trace)
@@ -297,11 +304,15 @@ fi
 CKPT_DIR="${GEM5_CKP_DIR}/${SNAPSHOT}"
 DISK_IMAGE="${CKPT_DIR}/${SNAPSHOT}.img"
 BOOTLOADER="${M5_PATH}/binaries/boot_v2_qemu_virt.arm64"
+if [[ -z "$KERNEL" ]]; then
+  KERNEL="${M5_PATH}/binaries/vmlinux.arm64"
+fi
 
 OUTDIR="${ROOT_DIR}/sim_outs/${EXPERIMENT_NAME}/${SNAPSHOT}"
 require_dir "$CKPT_DIR" "Checkpoint directory"
 require_file "$DISK_IMAGE" "Checkpoint disk image"
 require_file "$BOOTLOADER" "Bootloader"
+require_file "$KERNEL" "Kernel image"
 
 mkdir -p "$OUTDIR"
 
@@ -370,6 +381,7 @@ if [[ -n "$TIMING_RUBY_PROTOCOL" ]]; then
     "${TIMING_WINDOW_ARGS[@]}"
     "--disk-image=${DISK_IMAGE}"
     "--bootloader=${BOOTLOADER}"
+    "--kernel=${KERNEL}"
     --cpu-type O3CPU
     --bp-type TAGE
     --restore "$CKPT_DIR"
@@ -400,6 +412,7 @@ else
     -I "$INST"
     "--disk-image=${DISK_IMAGE}"
     "--bootloader=${BOOTLOADER}"
+    "--kernel=${KERNEL}"
     --caches
     --cpu-type AtomicSimpleCPU
     --fdip
