@@ -7,7 +7,7 @@ fi
 
 usage() {
   cat <<'EOF'
-Usage: run_gem5.sh --gem5-ckp-dir DIR --experiment-name NAME --snapshot NAME --core-count N [--memory-gb N] [--bootloader FILE] [--root-device DEV] [--itb-size N] [--dtb-size N] [--have-large-asid-64 | --no-large-asid-64] [--inst N | --measurement-cycles N [--warmup-cycles N]] [--branch-trace] [--tage-decision-trace] [--data-trace] [--dump-cache-state] [--timing-ruby] [--timing-ruby-moesi] [--no-cache-hierarchy-restore] [--sim-config FILE]
+Usage: run_gem5.sh --gem5-ckp-dir DIR --experiment-name NAME --snapshot NAME --core-count N [--memory-gb N] [--bootloader FILE] [--root-device DEV] [--inst N | --measurement-cycles N [--warmup-cycles N]] [--branch-trace] [--tage-decision-trace] [--data-trace] [--dump-cache-state] [--timing-ruby] [--timing-ruby-moesi] [--no-cache-hierarchy-restore] [--sim-config FILE]
 
 Arguments:
   --gem5-ckp-dir  Checkpoint root directory
@@ -18,10 +18,6 @@ Arguments:
   --memory-gb     Memory size in GB (default: 16)
   --bootloader    Bootloader image to supply to gem5. Defaults to bin/m5/binaries/boot_v2_qemu_virt.arm64
   --root-device   Root device to pass to gem5 full-system configs (default: /dev/vda)
-  --itb-size      Instruction TLB size to pass to gem5 (default: 64)
-  --dtb-size      Data TLB size to pass to gem5 (default: 64)
-  --have-large-asid-64 / --no-large-asid-64
-                  Control the gem5 large-ASID mode for TLB restore and runtime config
   --inst          Instruction count for legacy instruction-bounded runs
   --warmup-cycles Detailed warmup window in CPU cycles (timing Ruby only)
   --measurement-cycles
@@ -136,7 +132,7 @@ validate_sim_config_args() {
   for arg in "$@"; do
     key="$(normalize_gem5_arg_key "$arg")"
     case "$key" in
-      -I|--outdir|--debug-file|--disk-image|--bootloader|--root-device|--cpu-type|--bp-type|--restore|--num-cores|--mem-size|--branch-trace|--tage-decision-trace|--data-trace|--dump-cache-state|--caches|--warmup-cycles|--measurement-cycles)
+      -I|--outdir|--debug-file|--disk-image|--bootloader|--root-device|--kernel|--cpu-type|--bp-type|--restore|--num-cores|--mem-size|--branch-trace|--tage-decision-trace|--data-trace|--dump-cache-state|--caches|--warmup-cycles|--measurement-cycles)
         die "${args_file} sets runner-owned option ${key}. Put run-shape and artifact toggles on run_gem5.sh itself; keep --sim-config for machine/model parameters only."
         ;;
     esac
@@ -278,23 +274,8 @@ while [[ $# -gt 0 ]]; do
       ROOT_DEVICE="$2"
       shift 2
       ;;
-    --itb-size)
-      require_value "$1" "${2:-}"
-      ITB_SIZE="$2"
-      shift 2
-      ;;
-    --dtb-size)
-      require_value "$1" "${2:-}"
-      DTB_SIZE="$2"
-      shift 2
-      ;;
-    --have-large-asid-64)
-      HAVE_LARGE_ASID_64=1
-      shift 1
-      ;;
-    --no-large-asid-64)
-      HAVE_LARGE_ASID_64=0
-      shift 1
+    --itb-size|--dtb-size|--have-large-asid-64|--no-large-asid-64)
+      die "$1 controls simulated machine geometry. Put it in --sim-config instead of the run_gem5.sh CLI."
       ;;
     --branch-trace)
       BRANCH_TRACE_ARGS=(--branch-trace)
