@@ -1,0 +1,11 @@
+Validate the end-to-end web-search fresh lineage after the kernel-contract and bounded-boot refactor.
+
+This package records the point where:
+
+- boot produces a decisive kernel state and snapshot ownership model
+- kernel readiness is carried from the experiment bundle into the checkpoint contract
+- convert-single consumes that contract and completes TLB/uarch materialization
+- run-gem5 and run-sample restore from the checkpoint directory without runtime kernel overrides
+- the timing-Ruby validation run completes and emits the canonical IPC/uIPC reports
+
+This is a phase-completion record, not just a single timing number.

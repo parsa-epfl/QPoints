@@ -1,0 +1,67 @@
+{
+  "validation_package": "ws_image_fresh_lineage_phase_validation/snapshot_0",
+  "goal": "Record the end-to-end validation point for the web-search fresh lineage after the bounded boot, kernel-contract, sim-config, and runtime restore refactor.",
+  "branch": {
+    "name": "ali/ws-image-fresh-lineage",
+    "merge_base_vs_gem5_integration_main": "0244ebce3da1b2385a99b101c5f00723d939c323"
+  },
+  "revisions": {
+    "qflex": "8b1b532ea0349466ba4e30bfaa410740c87984dd",
+    "QPoints": "48b45e299c5dd394eef9de28a2660d251a96ac7d",
+    "gem5": "2203a48b07a0dbd6b965d8a9b5bd9f1c769ad3ed"
+  },
+  "experiment": {
+    "name": "ws-image-fresh-8c",
+    "snapshot": "snapshot_0",
+    "checkpoint_root": "/mnt/sdb/aansari/checkpoints/ws-image-fresh-8c/snapshot_0",
+    "kernel_status": "ready",
+    "kernel_bundle_dir": "/mnt/sdb/aansari/checkpoints/ws-image-fresh-8c/kernel",
+    "kernel": "/mnt/sdb/aansari/checkpoints/ws-image-fresh-8c/kernel/vmlinux-6.1.34-3-virt.elf"
+  },
+  "runtime": {
+    "engine": "gem5",
+    "mode": "timing-ruby",
+    "warmup_cycles": 200000,
+    "measurement_cycles": 1000000,
+    "command": "/home/dev/qflex_git/qflex run_sample --args-file /home/dev/qflex_git/args/ws_image_fresh_8c.qflex.args --first snapshot_0 --last snapshot_0 --warmup-cycles 200000 --measurement-cycles 1000000 --timing-ruby"
+  },
+  "inputs": {
+    "top_level_args": "ws_image_fresh_8c.qflex.args",
+    "sim_config": "timing_ruby_gem5.args",
+    "checkpoint_machine_config": "checkpoint_machine_config.json"
+  },
+  "artifacts": {
+    "uipc_report": "uipc_report.json",
+    "uipc_summary": "uipc_summary.json",
+    "stats": "stats.txt",
+    "intent": "INTENT.txt",
+    "report": "WS_IMAGE_FRESH_LINEAGE_PHASE_REPORT.md"
+  },
+  "results": {
+    "aggregate": {
+      "ipc": 8.973202999999998,
+      "uipc": 8.844484999999999
+    },
+    "average": {
+      "ipc": 1.1216503749999998,
+      "uipc": 1.1055606249999999
+    },
+    "cores": [
+      { "core": 0, "ipc": 2.604497, "uipc": 2.60288 },
+      { "core": 1, "ipc": 0.033667, "uipc": 0.000354 },
+      { "core": 2, "ipc": 1.497267, "uipc": 1.497267 },
+      { "core": 3, "ipc": 1.167011, "uipc": 1.163762 },
+      { "core": 4, "ipc": 0.004, "uipc": 0.0 },
+      { "core": 5, "ipc": 0.004, "uipc": 0.0 },
+      { "core": 6, "ipc": 0.085582, "uipc": 0.005153 },
+      { "core": 7, "ipc": 3.577179, "uipc": 3.575069 }
+    ]
+  },
+  "accepted_claims": [
+    "bounded boot produces a decisive kernel state for the web-search fresh lineage",
+    "the experiment-owned kernel bundle is propagated into the checkpoint contract",
+    "convert-single completes using the standardized checkpoint/kernel contract",
+    "run-gem5 restores using the checkpoint-local kernel without runtime overrides",
+    "run-sample completes and emits the canonical IPC/uIPC report"
+  ]
+}

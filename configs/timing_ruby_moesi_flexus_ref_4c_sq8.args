@@ -8,9 +8,6 @@
 --l2_assoc=16
 --mem-channels=1
 --mem-ranks=4
---itb-size=64
---dtb-size=64
---have-large-asid-64
 --restore-llc-state
 --restore-l1d-state
 --restore-l1i-state

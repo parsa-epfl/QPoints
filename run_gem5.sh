@@ -7,13 +7,17 @@ fi
 
 usage() {
   cat <<'EOF'
-Usage: run_gem5.sh --gem5-ckp-dir DIR --experiment NAME --snapshot NAME --cores N [--inst N | --measurement-cycles N [--warmup-cycles N]] [--branch-trace] [--tage-decision-trace] [--data-trace] [--dump-cache-state] [--timing-ruby] [--timing-ruby-moesi] [--no-cache-hierarchy-restore] [--sim-config FILE]
+Usage: run_gem5.sh --gem5-ckp-dir DIR --experiment-name NAME --snapshot NAME --core-count N [--memory-gb N] [--bootloader FILE] [--root-device DEV] [--inst N | --measurement-cycles N [--warmup-cycles N]] [--branch-trace] [--tage-decision-trace] [--data-trace] [--dump-cache-state] [--timing-ruby] [--timing-ruby-moesi] [--no-cache-hierarchy-restore] [--sim-config FILE]
 
 Arguments:
   --gem5-ckp-dir  Checkpoint root directory
-  --experiment    Experiment name
+  --experiment-name
+                  Experiment name
   --snapshot      Snapshot name
-  --cores         Number of cores
+  --core-count    Number of cores
+  --memory-gb     Memory size in GB (default: 16)
+  --bootloader    Bootloader image to supply to gem5. Defaults to bin/m5/binaries/boot_v2_qemu_virt.arm64
+  --root-device   Root device to pass to gem5 full-system configs (default: /dev/vda)
   --inst          Instruction count for legacy instruction-bounded runs
   --warmup-cycles Detailed warmup window in CPU cycles (timing Ruby only)
   --measurement-cycles
@@ -46,8 +50,8 @@ Options:
                   rejected here.
 
 Example:
-  run_gem5.sh --gem5-ckp-dir /checkpoints --experiment OoO --snapshot snapshot_0 --inst 100000 --cores 1 --branch-trace
-  run_gem5.sh --gem5-ckp-dir /checkpoints --experiment OoO --snapshot snapshot_0 --cores 8 --timing-ruby-moesi --warmup-cycles 200000 --measurement-cycles 100000
+  run_gem5.sh --gem5-ckp-dir /checkpoints --experiment-name OoO --snapshot snapshot_0 --inst 100000 --core-count 1 --branch-trace
+  run_gem5.sh --gem5-ckp-dir /checkpoints --experiment-name OoO --snapshot snapshot_0 --core-count 8 --timing-ruby-moesi --warmup-cycles 200000 --measurement-cycles 100000
 EOF
 }
 
@@ -128,11 +132,43 @@ validate_sim_config_args() {
   for arg in "$@"; do
     key="$(normalize_gem5_arg_key "$arg")"
     case "$key" in
-      -I|--outdir|--debug-file|--disk-image|--bootloader|--cpu-type|--bp-type|--restore|--num-cores|--mem-size|--branch-trace|--tage-decision-trace|--data-trace|--dump-cache-state|--caches|--warmup-cycles|--measurement-cycles)
+      -I|--outdir|--debug-file|--disk-image|--bootloader|--root-device|--kernel|--cpu-type|--bp-type|--restore|--num-cores|--mem-size|--branch-trace|--tage-decision-trace|--data-trace|--dump-cache-state|--caches|--warmup-cycles|--measurement-cycles)
         die "${args_file} sets runner-owned option ${key}. Put run-shape and artifact toggles on run_gem5.sh itself; keep --sim-config for machine/model parameters only."
         ;;
     esac
   done
+}
+
+extract_machine_geometry_args() {
+  local -n inout_array_ref="$1"
+  local filtered=()
+  local arg value
+
+  for arg in "${inout_array_ref[@]}"; do
+    case "$arg" in
+      --itb-size=*)
+        value="${arg#*=}"
+        [[ "$value" =~ ^[1-9][0-9]*$ ]] || die "Invalid --itb-size value in sim-config: $value"
+        ITB_SIZE="$value"
+        ;;
+      --dtb-size=*)
+        value="${arg#*=}"
+        [[ "$value" =~ ^[1-9][0-9]*$ ]] || die "Invalid --dtb-size value in sim-config: $value"
+        DTB_SIZE="$value"
+        ;;
+      --have-large-asid-64)
+        HAVE_LARGE_ASID_64=1
+        ;;
+      --no-large-asid-64)
+        HAVE_LARGE_ASID_64=0
+        ;;
+      *)
+        filtered+=("$arg")
+        ;;
+    esac
+  done
+
+  inout_array_ref=("${filtered[@]}")
 }
 
 select_timing_ruby_protocol() {
@@ -165,12 +201,19 @@ DEFAULT_TIMING_RUBY_MOESI_SIM_CONFIG="${ROOT_DIR}/configs/timing_ruby_moesi_gem5
 TIMING_UIPC_SUMMARY_SCRIPT="${ROOT_DIR}/scripts/timing/summarize_gem5_uipc.py"
 
 GEM5_CKP_DIR=""
-EXPERIMENT=""
+EXPERIMENT_NAME=""
 SNAPSHOT=""
 INST=""
 WARMUP_CYCLES=""
 MEASUREMENT_CYCLES=""
-CORES=""
+CORE_COUNT=""
+MEMORY_GB="16"
+KERNEL=""
+BOOTLOADER=""
+ROOT_DEVICE="/dev/vda"
+ITB_SIZE="64"
+DTB_SIZE="64"
+HAVE_LARGE_ASID_64=1
 SIM_CONFIG=""
 RESTORE_CACHE_HIERARCHY=1
 BRANCH_TRACE_ARGS=()
@@ -186,9 +229,9 @@ while [[ $# -gt 0 ]]; do
       GEM5_CKP_DIR="$2"
       shift 2
       ;;
-    --experiment)
+    --experiment-name|--experiment)
       require_value "$1" "${2:-}"
-      EXPERIMENT="$2"
+      EXPERIMENT_NAME="$2"
       shift 2
       ;;
     --snapshot)
@@ -211,10 +254,28 @@ while [[ $# -gt 0 ]]; do
       MEASUREMENT_CYCLES="$2"
       shift 2
       ;;
-    --cores)
+    --core-count|--cores)
       require_value "$1" "${2:-}"
-      CORES="$2"
+      CORE_COUNT="$2"
       shift 2
+      ;;
+    --memory-gb)
+      require_value "$1" "${2:-}"
+      MEMORY_GB="$2"
+      shift 2
+      ;;
+    --bootloader)
+      require_value "$1" "${2:-}"
+      BOOTLOADER="$2"
+      shift 2
+      ;;
+    --root-device)
+      require_value "$1" "${2:-}"
+      ROOT_DEVICE="$2"
+      shift 2
+      ;;
+    --itb-size|--dtb-size|--have-large-asid-64|--no-large-asid-64)
+      die "$1 controls simulated machine geometry. Put it in --sim-config instead of the run_gem5.sh CLI."
       ;;
     --branch-trace)
       BRANCH_TRACE_ARGS=(--branch-trace)
@@ -255,9 +316,14 @@ while [[ $# -gt 0 ]]; do
   esac
 done
 
-if [[ -z "$GEM5_CKP_DIR" || -z "$EXPERIMENT" || -z "$SNAPSHOT" || -z "$CORES" ]]; then
+if [[ -z "$GEM5_CKP_DIR" || -z "$EXPERIMENT_NAME" || -z "$SNAPSHOT" || -z "$CORE_COUNT" ]]; then
   die "Missing required arguments."
 fi
+
+if [[ ! "$MEMORY_GB" =~ ^[1-9][0-9]*$ ]]; then
+  die "--memory-gb must be a positive integer."
+fi
+MEM_SIZE_MIB=$((MEMORY_GB * 1024))
 
 if [[ -n "$MEASUREMENT_CYCLES" || -n "$WARMUP_CYCLES" ]]; then
   if [[ -z "$TIMING_RUBY_PROTOCOL" ]]; then
@@ -283,14 +349,21 @@ fi
 
 CKPT_DIR="${GEM5_CKP_DIR}/${SNAPSHOT}"
 DISK_IMAGE="${CKPT_DIR}/${SNAPSHOT}.img"
-BOOTLOADER="${M5_PATH}/binaries/boot_v2_qemu_virt.arm64"
+if [[ -z "$BOOTLOADER" ]]; then
+  BOOTLOADER="${M5_PATH}/binaries/boot_v2_qemu_virt.arm64"
+fi
 
-OUTDIR="${ROOT_DIR}/sim_outs/${EXPERIMENT}/${SNAPSHOT}"
+if [[ ! "$ITB_SIZE" =~ ^[1-9][0-9]*$ ]]; then
+  die "--itb-size must be a positive integer."
+fi
+if [[ ! "$DTB_SIZE" =~ ^[1-9][0-9]*$ ]]; then
+  die "--dtb-size must be a positive integer."
+fi
+
+OUTDIR="${ROOT_DIR}/sim_outs/${EXPERIMENT_NAME}/${SNAPSHOT}"
 require_dir "$CKPT_DIR" "Checkpoint directory"
 require_file "$DISK_IMAGE" "Checkpoint disk image"
 require_file "$BOOTLOADER" "Bootloader"
-
-mkdir -p "$OUTDIR"
 
 if [[ "${#DUMP_CACHE_STATE_ARGS[@]}" -gt 0 && -z "$TIMING_RUBY_PROTOCOL" ]]; then
   die "--dump-cache-state requires a timing Ruby mode."
@@ -299,6 +372,65 @@ fi
 if [[ "${#DUMP_CACHE_STATE_ARGS[@]}" -gt 0 && "$TIMING_RUBY_PROTOCOL" != "MESI_Two_Level" ]]; then
   die "--dump-cache-state is currently supported only on the MESI timing-Ruby path."
 fi
+
+MACHINE_CONFIG="${CKPT_DIR}/machine_config.json"
+require_file "$MACHINE_CONFIG" "Checkpoint machine config"
+
+checkpoint_kernel_contract="$(python3 - "$MACHINE_CONFIG" <<'PY'
+import json
+import os
+import sys
+from pathlib import Path
+
+machine_config_path = Path(sys.argv[1])
+machine_config = json.loads(machine_config_path.read_text(encoding="utf-8"))
+status = machine_config.get("kernel_capture_status", "")
+kernel_value = machine_config.get("kernel", "")
+kernel_bundle_dir = machine_config.get("kernel_bundle_dir", "")
+
+if status != "ready":
+    print(
+        f"Checkpoint kernel contract is not ready (kernel_capture_status={status!r}). "
+        "Complete the lineage kernel bundle before running gem5.",
+        file=sys.stderr,
+    )
+    sys.exit(2)
+
+if not kernel_value:
+    print("Checkpoint machine config is missing kernel.", file=sys.stderr)
+    sys.exit(2)
+
+if not kernel_bundle_dir:
+    print("Checkpoint machine config is missing kernel_bundle_dir.", file=sys.stderr)
+    sys.exit(2)
+
+kernel_path = Path(os.path.abspath(Path(kernel_value).expanduser()))
+kernel_dir = Path(os.path.abspath(Path(kernel_bundle_dir).expanduser()))
+
+if not kernel_dir.is_dir():
+    print(f"Checkpoint kernel bundle directory not found: {kernel_dir}", file=sys.stderr)
+    sys.exit(2)
+
+if not kernel_path.is_file():
+    print(f"Checkpoint kernel not found: {kernel_path}", file=sys.stderr)
+    sys.exit(2)
+
+if kernel_path.parent != kernel_dir:
+    print(
+        f"Checkpoint kernel path is not under checkpoint kernel bundle dir: "
+        f"{kernel_path} not under {kernel_dir}",
+        file=sys.stderr,
+    )
+    sys.exit(2)
+
+print(str(kernel_path))
+PY
+)" || die "Failed to resolve a ready kernel from ${MACHINE_CONFIG}."
+
+KERNEL="${checkpoint_kernel_contract}"
+require_file "$KERNEL" "Kernel image"
+
+mkdir -p "$OUTDIR"
 
 if [[ -n "$TIMING_RUBY_PROTOCOL" ]]; then
   timing_ruby_bin=""
@@ -338,6 +470,7 @@ if [[ -n "$TIMING_RUBY_PROTOCOL" ]]; then
   if [[ -n "$SIM_CONFIG" ]]; then
     append_gem5_args_file "$SIM_CONFIG" TIMING_RUBY_CONFIG_ARGS
   fi
+  extract_machine_geometry_args TIMING_RUBY_CONFIG_ARGS
 
   TIMING_WINDOW_ARGS=()
   if [[ -n "$MEASUREMENT_CYCLES" ]]; then
@@ -357,11 +490,15 @@ if [[ -n "$TIMING_RUBY_PROTOCOL" ]]; then
     "${TIMING_WINDOW_ARGS[@]}"
     "--disk-image=${DISK_IMAGE}"
     "--bootloader=${BOOTLOADER}"
+    "--kernel=${KERNEL}"
+    "--root-device=${ROOT_DEVICE}"
     --cpu-type O3CPU
     --bp-type TAGE
     --restore "$CKPT_DIR"
-    --num-cores "$CORES"
-    --mem-size 16384MiB
+    --num-cores "$CORE_COUNT"
+    --mem-size "${MEM_SIZE_MIB}MiB"
+    "--itb-size=${ITB_SIZE}"
+    "--dtb-size=${DTB_SIZE}"
     "${TIMING_RUBY_RESTORE_ARGS[@]}"
     "${TIMING_RUBY_CONFIG_ARGS[@]}"
     "${BRANCH_TRACE_ARGS[@]}"
@@ -369,6 +506,9 @@ if [[ -n "$TIMING_RUBY_PROTOCOL" ]]; then
     "${DATA_TRACE_ARGS[@]}"
     "${DUMP_CACHE_STATE_ARGS[@]}"
   )
+  if [[ "$HAVE_LARGE_ASID_64" -eq 1 ]]; then
+    gem5_cmd+=(--have-large-asid-64)
+  fi
 else
   require_executable "$GEM5_BIN_CLASSIC" "Classic gem5 binary"
   require_file "$GEM5_CFG_CLASSIC" "Classic gem5 config"
@@ -378,6 +518,7 @@ else
   if [[ -n "$SIM_CONFIG" ]]; then
     append_gem5_args_file "$SIM_CONFIG" CLASSIC_CONFIG_ARGS
   fi
+  extract_machine_geometry_args CLASSIC_CONFIG_ARGS
 
   gem5_cmd=(
     "$GEM5_BIN_CLASSIC"
@@ -387,18 +528,25 @@ else
     -I "$INST"
     "--disk-image=${DISK_IMAGE}"
     "--bootloader=${BOOTLOADER}"
+    "--kernel=${KERNEL}"
+    "--root-device=${ROOT_DEVICE}"
     --caches
     --cpu-type AtomicSimpleCPU
     --fdip
     --bp-type TAGE
     --restore "$CKPT_DIR"
-    --num-cores "$CORES"
-    --mem-size 16384MiB
+    --num-cores "$CORE_COUNT"
+    --mem-size "${MEM_SIZE_MIB}MiB"
+    "--itb-size=${ITB_SIZE}"
+    "--dtb-size=${DTB_SIZE}"
     "${CLASSIC_CONFIG_ARGS[@]}"
     "${BRANCH_TRACE_ARGS[@]}"
     "${TAGE_DECISION_TRACE_ARGS[@]}"
     "${DATA_TRACE_ARGS[@]}"
   )
+  if [[ "$HAVE_LARGE_ASID_64" -eq 1 ]]; then
+    gem5_cmd+=(--have-large-asid-64)
+  fi
 fi
 
 "${gem5_cmd[@]}"
@@ -411,7 +559,7 @@ if [[ -n "$MEASUREMENT_CYCLES" ]]; then
   require_executable "$TIMING_UIPC_SUMMARY_SCRIPT" "gem5 uIPC summary script"
   python3 "$TIMING_UIPC_SUMMARY_SCRIPT" \
     --stats-file "$OUTDIR/stats.txt" \
-    --experiment "$EXPERIMENT" \
+    --experiment "$EXPERIMENT_NAME" \
     --snapshot "$SNAPSHOT" \
     --output-json "$OUTDIR/uipc_summary.json"
 fi
