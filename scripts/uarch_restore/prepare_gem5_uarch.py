@@ -14,6 +14,8 @@ import subprocess
 GEM5_UARCH_SUFFIX = "gem5_uarch"
 QFLEX_UARCH_SUFFIX = ".uarch"
 LLC_RESTORE_FILE = "llc_restore_addrs.txt"
+LLC_RESTORE_SLICE_FILE_TEMPLATE = "llc_restore_addrs.slice{slice}.txt"
+LLC_RESTORE_SLICE_FILE_GLOB = "llc_restore_addrs.slice*.txt"
 L2_SHARED_RESTORE_CANDIDATE_FILE = "l2_shared_restore_candidates.json"
 L2_SHARED_RESTORE_FILE = "l2_shared_restore_addrs.txt"
 L1D_CANDIDATE_FILE = "l1d_restore_candidates.json"
@@ -26,6 +28,12 @@ MOESI_PRIVATE_OWNER_CANDIDATE_FILE = (
     "moesi_single_private_data_writeable_restore_candidates.json"
 )
 MOESI_PRIVATE_OWNER_RESTORE_FILE = "moesi_single_private_data_writeable_restore.txt"
+MOESI_PRIVATE_OWNER_RESTORE_SLICE_FILE_TEMPLATE = (
+    "moesi_single_private_data_writeable_restore.slice{slice}.txt"
+)
+MOESI_PRIVATE_OWNER_RESTORE_SLICE_FILE_GLOB = (
+    "moesi_single_private_data_writeable_restore.slice*.txt"
+)
 MOESI_PRIVATE_OWNER_L1D_RESTORE_TEMPLATE = (
     "moesi_l1d_single_private_data_writeable.core{core}.txt"
 )
@@ -36,6 +44,12 @@ MOESI_PRIVATE_CLEAN_CANDIDATE_FILE = (
     "moesi_single_private_data_clean_restore_candidates.json"
 )
 MOESI_PRIVATE_CLEAN_RESTORE_FILE = "moesi_single_private_data_clean_restore.txt"
+MOESI_PRIVATE_CLEAN_RESTORE_SLICE_FILE_TEMPLATE = (
+    "moesi_single_private_data_clean_restore.slice{slice}.txt"
+)
+MOESI_PRIVATE_CLEAN_RESTORE_SLICE_FILE_GLOB = (
+    "moesi_single_private_data_clean_restore.slice*.txt"
+)
 MOESI_PRIVATE_CLEAN_L1D_RESTORE_TEMPLATE = (
     "moesi_l1d_single_private_data_clean.core{core}.txt"
 )
@@ -48,6 +62,18 @@ MOESI_MULTI_PRIVATE_CLEAN_CANDIDATE_FILE = (
 MOESI_MULTI_PRIVATE_CLEAN_RESTORE_FILE = "moesi_multi_private_data_clean_restore.txt"
 MOESI_MULTI_PRIVATE_CLEAN_NONLLC_RESTORE_FILE = (
     "moesi_multi_private_data_clean_nonllc_restore.txt"
+)
+MOESI_MULTI_PRIVATE_CLEAN_RESTORE_SLICE_FILE_TEMPLATE = (
+    "moesi_multi_private_data_clean_restore.slice{slice}.txt"
+)
+MOESI_MULTI_PRIVATE_CLEAN_RESTORE_SLICE_FILE_GLOB = (
+    "moesi_multi_private_data_clean_restore.slice*.txt"
+)
+MOESI_MULTI_PRIVATE_CLEAN_NONLLC_RESTORE_SLICE_FILE_TEMPLATE = (
+    "moesi_multi_private_data_clean_nonllc_restore.slice{slice}.txt"
+)
+MOESI_MULTI_PRIVATE_CLEAN_NONLLC_RESTORE_SLICE_FILE_GLOB = (
+    "moesi_multi_private_data_clean_nonllc_restore.slice*.txt"
 )
 MOESI_MULTI_PRIVATE_CLEAN_L1D_RESTORE_TEMPLATE = (
     "moesi_l1d_multi_private_data_clean.core{core}.txt"
@@ -63,6 +89,18 @@ MOESI_PRIVATE_INSTRUCTION_ONLY_RESTORE_FILE = (
 )
 MOESI_PRIVATE_INSTRUCTION_ONLY_NONLLC_RESTORE_FILE = (
     "moesi_private_instruction_only_nonllc_restore.txt"
+)
+MOESI_PRIVATE_INSTRUCTION_ONLY_RESTORE_SLICE_FILE_TEMPLATE = (
+    "moesi_private_instruction_only_restore.slice{slice}.txt"
+)
+MOESI_PRIVATE_INSTRUCTION_ONLY_RESTORE_SLICE_FILE_GLOB = (
+    "moesi_private_instruction_only_restore.slice*.txt"
+)
+MOESI_PRIVATE_INSTRUCTION_ONLY_NONLLC_RESTORE_SLICE_FILE_TEMPLATE = (
+    "moesi_private_instruction_only_nonllc_restore.slice{slice}.txt"
+)
+MOESI_PRIVATE_INSTRUCTION_ONLY_NONLLC_RESTORE_SLICE_FILE_GLOB = (
+    "moesi_private_instruction_only_nonllc_restore.slice*.txt"
 )
 MOESI_PRIVATE_INSTRUCTION_ONLY_L1I_RESTORE_TEMPLATE = (
     "moesi_l1i_private_instruction_only.core{core}.txt"
@@ -199,6 +237,16 @@ def parse_args() -> argparse.Namespace:
             "clean-line restore file for controlled debugging experiments."
         ),
     )
+    parser.add_argument(
+        "--llc-slice-count",
+        type=int,
+        default=1,
+        help=(
+            "Number of LLC slices in the target gem5 Ruby topology. Used to "
+            "emit slice-aware MOESI restore sidecars without hardcoding a "
+            "particular core/slice count."
+        ),
+    )
     return parser.parse_args()
 
 
@@ -209,6 +257,30 @@ def _validate_ruby_protocol(ruby_protocol: str) -> str:
             + ", ".join(SUPPORTED_RUBY_PROTOCOLS)
         )
     return ruby_protocol
+
+
+def _validate_llc_slice_count(llc_slice_count: int) -> int:
+    if llc_slice_count <= 0:
+        raise ValueError(
+            f"LLC slice count must be positive, got {llc_slice_count}."
+        )
+    if llc_slice_count & (llc_slice_count - 1):
+        raise ValueError(
+            "LLC slice count must be a power of two to match gem5 Ruby L2 "
+            f"interleaving, got {llc_slice_count}."
+        )
+    return llc_slice_count
+
+
+def _gem5_llc_slice_id(line_addr: int, llc_slice_count: int) -> int:
+    llc_slice_count = _validate_llc_slice_count(llc_slice_count)
+    if line_addr % CACHE_LINE_SIZE != 0:
+        raise ValueError(
+            f"LLC restore line address is not cache-line aligned: {line_addr:#x}"
+        )
+    return (line_addr >> (CACHE_LINE_SIZE.bit_length() - 1)) & (
+        llc_slice_count - 1
+    )
 
 
 def _l2_shared_restore_selection_policy(ruby_protocol: str) -> str:
@@ -263,6 +335,29 @@ def _write_addr_file(path: Path, addrs: list[int], overwrite: bool) -> None:
     )
 
 
+def _write_slice_addr_files(
+    root: Path,
+    addrs: list[int],
+    overwrite: bool,
+    file_template: str,
+    file_glob: str,
+    llc_slice_count: int,
+) -> dict[int, Path]:
+    _clear_matching_outputs(root, file_glob, overwrite)
+    per_slice: dict[int, list[int]] = {slice_id: [] for slice_id in range(llc_slice_count)}
+    for addr in addrs:
+        per_slice[_gem5_llc_slice_id(addr, llc_slice_count)].append(addr)
+
+    outputs: dict[int, Path] = {}
+    for slice_id, slice_addrs in per_slice.items():
+        if not slice_addrs:
+            continue
+        target = root / file_template.format(slice=slice_id)
+        _write_addr_file(target, slice_addrs, overwrite)
+        outputs[slice_id] = target
+    return outputs
+
+
 def _encode_l2_shared_restore_addr(line_addr: int, sharer_core: int) -> int:
     if line_addr % CACHE_LINE_SIZE != 0:
         raise ValueError(
@@ -311,6 +406,33 @@ def _write_moesi_private_core_restore_file(
     )
 
 
+def _write_slice_moesi_private_core_restore_files(
+    root: Path,
+    pairs: list[tuple[int, int]],
+    overwrite: bool,
+    file_template: str,
+    file_glob: str,
+    llc_slice_count: int,
+) -> dict[int, Path]:
+    _clear_matching_outputs(root, file_glob, overwrite)
+    per_slice: dict[int, list[tuple[int, int]]] = {
+        slice_id: [] for slice_id in range(llc_slice_count)
+    }
+    for line_addr, core in pairs:
+        per_slice[_gem5_llc_slice_id(line_addr, llc_slice_count)].append(
+            (line_addr, core)
+        )
+
+    outputs: dict[int, Path] = {}
+    for slice_id, slice_pairs in per_slice.items():
+        if not slice_pairs:
+            continue
+        target = root / file_template.format(slice=slice_id)
+        _write_moesi_private_core_restore_file(target, slice_pairs, overwrite)
+        outputs[slice_id] = target
+    return outputs
+
+
 def _write_moesi_private_owner_restore_file(
     path: Path,
     entries: list[dict],
@@ -323,6 +445,27 @@ def _write_moesi_private_owner_restore_file(
             for entry in entries
         ],
         overwrite,
+    )
+
+
+def _write_slice_moesi_private_owner_restore_files(
+    root: Path,
+    entries: list[dict],
+    overwrite: bool,
+    file_template: str,
+    file_glob: str,
+    llc_slice_count: int,
+) -> dict[int, Path]:
+    return _write_slice_moesi_private_core_restore_files(
+        root,
+        [
+            (int(entry["line_addr"], 16), int(entry["owner_core"]))
+            for entry in entries
+        ],
+        overwrite,
+        file_template,
+        file_glob,
+        llc_slice_count,
     )
 
 
@@ -348,6 +491,28 @@ def _write_moesi_private_clean_restore_file(
     )
 
 
+def _write_slice_moesi_private_clean_restore_files(
+    root: Path,
+    entries: list[dict],
+    overwrite: bool,
+    file_template: str,
+    file_glob: str,
+    llc_slice_count: int,
+) -> dict[int, Path]:
+    return _write_slice_moesi_private_core_restore_files(
+        root,
+        [
+            (int(entry["line_addr"], 16), int(core))
+            for entry in entries
+            for core in _moesi_private_clean_sharer_cores(entry)
+        ],
+        overwrite,
+        file_template,
+        file_glob,
+        llc_slice_count,
+    )
+
+
 def _write_manifest(path: Path, payload: dict, overwrite: bool) -> None:
     if path.exists() and not overwrite:
         raise FileExistsError(
@@ -370,6 +535,10 @@ def _write_json_file(path: Path, payload: object, overwrite: bool) -> None:
         json.dumps(payload, indent=2, sort_keys=True) + "\n",
         encoding="utf-8",
     )
+
+
+def _serialize_slice_outputs(outputs: dict[int, Path]) -> dict[str, str]:
+    return {str(slice_id): str(path) for slice_id, path in sorted(outputs.items())}
 
 
 def _clear_matching_outputs(root: Path, file_glob: str, overwrite: bool) -> None:
@@ -1661,10 +1830,12 @@ def prepare_snapshot_gem5_uarch(
     overwrite: bool = False,
     llc_debug_modified_count: int = 0,
     ruby_protocol: str = RUBY_PROTOCOL_MESI_TWO_LEVEL,
+    llc_slice_count: int = 1,
 ) -> dict:
     qflex_run_dir = qflex_run_dir.resolve()
     gem5_workload_root = gem5_workload_root.resolve()
     ruby_protocol = _validate_ruby_protocol(ruby_protocol)
+    llc_slice_count = _validate_llc_slice_count(llc_slice_count)
 
     gem5_snapshot_dir = gem5_workload_root / snapshot
     qflex_uarch_dir = qflex_run_dir / f"{snapshot}{QFLEX_UARCH_SUFFIX}"
@@ -1678,6 +1849,7 @@ def prepare_snapshot_gem5_uarch(
     fetch_source_file = qflex_uarch_dir / FETCH_SOURCE_FILE
     mmu_source_files = {}
     target_file = gem5_uarch_dir / LLC_RESTORE_FILE
+    llc_slice_file_template = LLC_RESTORE_SLICE_FILE_TEMPLATE
     l2_shared_restore_candidate_file = gem5_uarch_dir / L2_SHARED_RESTORE_CANDIDATE_FILE
     l2_shared_restore_file = gem5_uarch_dir / L2_SHARED_RESTORE_FILE
     l1d_candidate_file = gem5_uarch_dir / L1D_CANDIDATE_FILE
@@ -1688,11 +1860,17 @@ def prepare_snapshot_gem5_uarch(
     moesi_private_owner_restore_file = (
         gem5_uarch_dir / MOESI_PRIVATE_OWNER_RESTORE_FILE
     )
+    moesi_private_owner_restore_slice_file_template = (
+        MOESI_PRIVATE_OWNER_RESTORE_SLICE_FILE_TEMPLATE
+    )
     moesi_private_clean_candidate_file = (
         gem5_uarch_dir / MOESI_PRIVATE_CLEAN_CANDIDATE_FILE
     )
     moesi_private_clean_restore_file = (
         gem5_uarch_dir / MOESI_PRIVATE_CLEAN_RESTORE_FILE
+    )
+    moesi_private_clean_restore_slice_file_template = (
+        MOESI_PRIVATE_CLEAN_RESTORE_SLICE_FILE_TEMPLATE
     )
     moesi_multi_private_clean_candidate_file = (
         gem5_uarch_dir / MOESI_MULTI_PRIVATE_CLEAN_CANDIDATE_FILE
@@ -1703,6 +1881,12 @@ def prepare_snapshot_gem5_uarch(
     moesi_multi_private_clean_nonllc_restore_file = (
         gem5_uarch_dir / MOESI_MULTI_PRIVATE_CLEAN_NONLLC_RESTORE_FILE
     )
+    moesi_multi_private_clean_restore_slice_file_template = (
+        MOESI_MULTI_PRIVATE_CLEAN_RESTORE_SLICE_FILE_TEMPLATE
+    )
+    moesi_multi_private_clean_nonllc_restore_slice_file_template = (
+        MOESI_MULTI_PRIVATE_CLEAN_NONLLC_RESTORE_SLICE_FILE_TEMPLATE
+    )
     moesi_private_instruction_only_candidate_file = (
         gem5_uarch_dir / MOESI_PRIVATE_INSTRUCTION_ONLY_CANDIDATE_FILE
     )
@@ -1711,6 +1895,12 @@ def prepare_snapshot_gem5_uarch(
     )
     moesi_private_instruction_only_nonllc_restore_file = (
         gem5_uarch_dir / MOESI_PRIVATE_INSTRUCTION_ONLY_NONLLC_RESTORE_FILE
+    )
+    moesi_private_instruction_only_restore_slice_file_template = (
+        MOESI_PRIVATE_INSTRUCTION_ONLY_RESTORE_SLICE_FILE_TEMPLATE
+    )
+    moesi_private_instruction_only_nonllc_restore_slice_file_template = (
+        MOESI_PRIVATE_INSTRUCTION_ONLY_NONLLC_RESTORE_SLICE_FILE_TEMPLATE
     )
     moesi_private_family_guardrail_report_file = (
         gem5_uarch_dir / MOESI_UNSUPPORTED_PRIVATE_FAMILY_REPORT_FILE
@@ -1905,6 +2095,16 @@ def prepare_snapshot_gem5_uarch(
             )
 
     _write_addr_file(target_file, addrs, overwrite)
+    llc_slice_restore_files: dict[int, Path] = {}
+    if ruby_protocol == RUBY_PROTOCOL_MOESI_CMP_DIRECTORY:
+        llc_slice_restore_files = _write_slice_addr_files(
+            gem5_uarch_dir,
+            addrs,
+            overwrite,
+            llc_slice_file_template,
+            LLC_RESTORE_SLICE_FILE_GLOB,
+            llc_slice_count,
+        )
     _write_json_file(
         l2_shared_restore_candidate_file,
         {
@@ -1955,6 +2155,18 @@ def prepare_snapshot_gem5_uarch(
         moesi_private_owner_candidates,
         overwrite,
     )
+    moesi_private_owner_restore_slice_files: dict[int, Path] = {}
+    if ruby_protocol == RUBY_PROTOCOL_MOESI_CMP_DIRECTORY:
+        moesi_private_owner_restore_slice_files = (
+            _write_slice_moesi_private_owner_restore_files(
+                gem5_uarch_dir,
+                moesi_private_owner_candidates,
+                overwrite,
+                moesi_private_owner_restore_slice_file_template,
+                MOESI_PRIVATE_OWNER_RESTORE_SLICE_FILE_GLOB,
+                llc_slice_count,
+            )
+        )
     _write_json_file(
         moesi_private_clean_candidate_file,
         {
@@ -1970,6 +2182,18 @@ def prepare_snapshot_gem5_uarch(
         moesi_private_clean_candidates,
         overwrite,
     )
+    moesi_private_clean_restore_slice_files: dict[int, Path] = {}
+    if ruby_protocol == RUBY_PROTOCOL_MOESI_CMP_DIRECTORY:
+        moesi_private_clean_restore_slice_files = (
+            _write_slice_moesi_private_clean_restore_files(
+                gem5_uarch_dir,
+                moesi_private_clean_candidates,
+                overwrite,
+                moesi_private_clean_restore_slice_file_template,
+                MOESI_PRIVATE_CLEAN_RESTORE_SLICE_FILE_GLOB,
+                llc_slice_count,
+            )
+        )
     _write_json_file(
         moesi_multi_private_clean_candidate_file,
         {
@@ -1989,6 +2213,22 @@ def prepare_snapshot_gem5_uarch(
         ],
         overwrite,
     )
+    moesi_multi_private_clean_restore_slice_files: dict[int, Path] = {}
+    if ruby_protocol == RUBY_PROTOCOL_MOESI_CMP_DIRECTORY:
+        moesi_multi_private_clean_restore_slice_files = (
+            _write_slice_moesi_private_clean_restore_files(
+                gem5_uarch_dir,
+                [
+                    candidate
+                    for candidate in moesi_multi_private_clean_candidates
+                    if candidate["llc_backed"]
+                ],
+                overwrite,
+                moesi_multi_private_clean_restore_slice_file_template,
+                MOESI_MULTI_PRIVATE_CLEAN_RESTORE_SLICE_FILE_GLOB,
+                llc_slice_count,
+            )
+        )
     _write_moesi_private_clean_restore_file(
         moesi_multi_private_clean_nonllc_restore_file,
         [
@@ -1998,6 +2238,22 @@ def prepare_snapshot_gem5_uarch(
         ],
         overwrite,
     )
+    moesi_multi_private_clean_nonllc_restore_slice_files: dict[int, Path] = {}
+    if ruby_protocol == RUBY_PROTOCOL_MOESI_CMP_DIRECTORY:
+        moesi_multi_private_clean_nonllc_restore_slice_files = (
+            _write_slice_moesi_private_clean_restore_files(
+                gem5_uarch_dir,
+                [
+                    candidate
+                    for candidate in moesi_multi_private_clean_candidates
+                    if not candidate["llc_backed"]
+                ],
+                overwrite,
+                moesi_multi_private_clean_nonllc_restore_slice_file_template,
+                MOESI_MULTI_PRIVATE_CLEAN_NONLLC_RESTORE_SLICE_FILE_GLOB,
+                llc_slice_count,
+            )
+        )
     _write_json_file(
         moesi_private_instruction_only_candidate_file,
         {
@@ -2017,6 +2273,22 @@ def prepare_snapshot_gem5_uarch(
         ],
         overwrite,
     )
+    moesi_private_instruction_only_restore_slice_files: dict[int, Path] = {}
+    if ruby_protocol == RUBY_PROTOCOL_MOESI_CMP_DIRECTORY:
+        moesi_private_instruction_only_restore_slice_files = (
+            _write_slice_moesi_private_clean_restore_files(
+                gem5_uarch_dir,
+                [
+                    candidate
+                    for candidate in moesi_private_instruction_only_candidates
+                    if candidate["llc_backed"]
+                ],
+                overwrite,
+                moesi_private_instruction_only_restore_slice_file_template,
+                MOESI_PRIVATE_INSTRUCTION_ONLY_RESTORE_SLICE_FILE_GLOB,
+                llc_slice_count,
+            )
+        )
     _write_moesi_private_clean_restore_file(
         moesi_private_instruction_only_nonllc_restore_file,
         [
@@ -2026,6 +2298,22 @@ def prepare_snapshot_gem5_uarch(
         ],
         overwrite,
     )
+    moesi_private_instruction_only_nonllc_restore_slice_files: dict[int, Path] = {}
+    if ruby_protocol == RUBY_PROTOCOL_MOESI_CMP_DIRECTORY:
+        moesi_private_instruction_only_nonllc_restore_slice_files = (
+            _write_slice_moesi_private_clean_restore_files(
+                gem5_uarch_dir,
+                [
+                    candidate
+                    for candidate in moesi_private_instruction_only_candidates
+                    if not candidate["llc_backed"]
+                ],
+                overwrite,
+                moesi_private_instruction_only_nonllc_restore_slice_file_template,
+                MOESI_PRIVATE_INSTRUCTION_ONLY_NONLLC_RESTORE_SLICE_FILE_GLOB,
+                llc_slice_count,
+            )
+        )
     _write_json_file(
         btb_candidate_file,
         {
@@ -2154,6 +2442,7 @@ def prepare_snapshot_gem5_uarch(
         "schema_version": 1,
         "snapshot": snapshot,
         "target_ruby_protocol": ruby_protocol,
+        "llc_slice_count": llc_slice_count,
         "qflex_source_dir": str(qflex_uarch_dir),
         "gem5_uarch_dir": str(gem5_uarch_dir),
         "conversion_accounting_file": str(conversion_accounting_file),
@@ -2165,6 +2454,9 @@ def prepare_snapshot_gem5_uarch(
                     "harvard": str(harvard_source_file),
                 },
                 "output_file": str(target_file),
+                "slice_restore_files": _serialize_slice_outputs(
+                    llc_slice_restore_files
+                ),
                 "line_count": len(addrs),
                 "selection_policy": _llc_restore_selection_policy(ruby_protocol),
                 "selected_modified_lines": len(modified_lines),
@@ -2228,6 +2520,9 @@ def prepare_snapshot_gem5_uarch(
                 },
                 "candidate_file": str(moesi_private_owner_candidate_file),
                 "restore_file": str(moesi_private_owner_restore_file),
+                "slice_restore_files": _serialize_slice_outputs(
+                    moesi_private_owner_restore_slice_files
+                ),
                 "l1d_restore_files": {
                     str(core): str(path)
                     for core, path in sorted(
@@ -2254,6 +2549,9 @@ def prepare_snapshot_gem5_uarch(
                 },
                 "candidate_file": str(moesi_private_clean_candidate_file),
                 "restore_file": str(moesi_private_clean_restore_file),
+                "slice_restore_files": _serialize_slice_outputs(
+                    moesi_private_clean_restore_slice_files
+                ),
                 "l1d_restore_files": {
                     str(core): str(path)
                     for core, path in sorted(
@@ -2280,8 +2578,14 @@ def prepare_snapshot_gem5_uarch(
                 },
                 "candidate_file": str(moesi_multi_private_clean_candidate_file),
                 "restore_file": str(moesi_multi_private_clean_restore_file),
+                "slice_restore_files": _serialize_slice_outputs(
+                    moesi_multi_private_clean_restore_slice_files
+                ),
                 "nonllc_restore_file": str(
                     moesi_multi_private_clean_nonllc_restore_file
+                ),
+                "nonllc_slice_restore_files": _serialize_slice_outputs(
+                    moesi_multi_private_clean_nonllc_restore_slice_files
                 ),
                 "l1d_restore_files": {
                     str(core): str(path)
@@ -2314,8 +2618,14 @@ def prepare_snapshot_gem5_uarch(
                     moesi_private_instruction_only_candidate_file
                 ),
                 "restore_file": str(moesi_private_instruction_only_restore_file),
+                "slice_restore_files": _serialize_slice_outputs(
+                    moesi_private_instruction_only_restore_slice_files
+                ),
                 "nonllc_restore_file": str(
                     moesi_private_instruction_only_nonllc_restore_file
+                ),
+                "nonllc_slice_restore_files": _serialize_slice_outputs(
+                    moesi_private_instruction_only_nonllc_restore_slice_files
                 ),
                 "l1i_restore_files": {
                     str(core): str(path)
@@ -2457,6 +2767,7 @@ def main() -> int:
         overwrite=args.overwrite,
         llc_debug_modified_count=args.llc_debug_modified_count,
         ruby_protocol=args.ruby_protocol,
+        llc_slice_count=args.llc_slice_count,
     )
 
     print(f"Prepared gem5 uarch artifacts in: {manifest['gem5_uarch_dir']}")

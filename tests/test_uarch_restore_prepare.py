@@ -2150,3 +2150,74 @@ def test_prepare_snapshot_gem5_uarch_requires_architectural_checkpoint_dir(
             snapshot="snapshot_0",
             overwrite=True,
         )
+
+
+def test_gem5_llc_slice_id_is_generic():
+    module = _load_prepare_module()
+
+    assert module._gem5_llc_slice_id(0x0, 4) == 0
+    assert module._gem5_llc_slice_id(0x40, 4) == 1
+    assert module._gem5_llc_slice_id(0x80, 4) == 2
+    assert module._gem5_llc_slice_id(0xC0, 4) == 3
+    assert module._gem5_llc_slice_id(0x100, 4) == 0
+
+
+def test_prepare_snapshot_gem5_uarch_emits_moesi_slice_restore_sidecars(
+    tmp_path: Path,
+):
+    module = _load_prepare_module()
+
+    qflex_run_dir = tmp_path / "qflex-run"
+    gem5_workload_root = tmp_path / "gem5-workload"
+    source_dir = qflex_run_dir / "snapshot_0.uarch"
+    source_dir.mkdir(parents=True)
+    gem5_workload_root.mkdir()
+    (gem5_workload_root / "snapshot_0").mkdir()
+
+    llc_lines = [0x0, 0x40, 0x80, 0xC0]
+    _write_zstd_json(
+        source_dir / "llc-0.json.zstd",
+        {
+            "blocks": [
+                {
+                    "blocks": [
+                        {
+                            "block_id_with_v": _encode_block_id_with_v(line_addr),
+                            "ts": idx + 1,
+                            "modified": False,
+                        }
+                        for idx, line_addr in enumerate(llc_lines)
+                    ]
+                }
+            ]
+        },
+    )
+    _write_zstd_json(source_dir / "directory-0.json.zstd", {"entries": [{}]})
+    _write_zstd_json(
+        source_dir / "harvard-0.json.zstd",
+        [{"i_cache": [{"lines": []}], "d_cache": [{"lines": []}]}],
+    )
+
+    manifest = module.prepare_snapshot_gem5_uarch(
+        qflex_run_dir=qflex_run_dir,
+        gem5_workload_root=gem5_workload_root,
+        snapshot="snapshot_0",
+        overwrite=False,
+        ruby_protocol=module.RUBY_PROTOCOL_MOESI_CMP_DIRECTORY,
+        llc_slice_count=4,
+    )
+
+    gem5_uarch_dir = _gem5_uarch_protocol_dir(
+        gem5_workload_root,
+        module,
+        ruby_protocol=module.RUBY_PROTOCOL_MOESI_CMP_DIRECTORY,
+    )
+    for slice_id, line_addr in enumerate(llc_lines):
+        restore_file = gem5_uarch_dir / f"llc_restore_addrs.slice{slice_id}.txt"
+        assert restore_file.read_text(encoding="utf-8") == f"{line_addr:#x}\n"
+
+    assert manifest["llc_slice_count"] == 4
+    assert manifest["components"]["llc"]["slice_restore_files"] == {
+        str(slice_id): str(gem5_uarch_dir / f"llc_restore_addrs.slice{slice_id}.txt")
+        for slice_id in range(4)
+    }
