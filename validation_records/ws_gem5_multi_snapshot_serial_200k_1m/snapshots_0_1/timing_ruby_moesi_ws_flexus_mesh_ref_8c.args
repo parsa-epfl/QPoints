@@ -1,0 +1,63 @@
+# Reference gem5 MOESI timing-Ruby config for the web-search Flexus-vs-gem5
+# comparison phase, mesh bring-up variant.
+#
+# Intent:
+# - keep the same checkpoint/snapshot and simulated-machine contract as the
+#   validated Crossbar reference
+# - reduce the topology mismatch against Flexus BuildMesh
+# - change topology knobs only; keep restore and machine geometry stable
+#
+# Current assumption:
+# - Flexus records BuildMesh but does not record mesh dimensions in the checked
+#   config files we use here
+# - this first gem5 mesh variant uses an 8-router 2x4 mesh via mesh_rows=2
+# - if later evidence shows a different intended mesh shape, update this file
+#   and rerun the reference
+#
+# Current known non-equivalence that remains outside this file:
+# - Flexus LLC slice homing uses 4KB group interleaving; current gem5 Ruby
+#   still cannot express that homing rule faithfully.
+
+# Cache geometry aligned to the recorded Flexus machine.
+--l1i_size=64kB
+--l1i_assoc=8
+--l1d_size=64kB
+--l1d_assoc=8
+--l2_size=1MB
+--l2_assoc=16
+--num-l2caches=8
+--num-dirs=8
+--topology=Mesh_XY
+--mesh-rows=2
+
+# Memory geometry aligned to the current web-search experiment.
+--mem-type=DDR4_2400_8x8
+--mem-channels=1
+--mem-ranks=4
+
+# MMU geometry aligned to the recorded Flexus machine contract.
+--itb-size=64
+--dtb-size=64
+--have-large-asid-64
+
+# Warm restored frontend/MMU state.
+--restore-btb-state
+--restore-tage-state
+--restore-tlb-state
+
+# Core/frontend geometry aligned to timing.cfg where the current gem5 path has
+# direct knobs.
+--fdip
+--ftqSize=8
+--btb-entries=16384
+--btb-ways=4
+--fetch-width=8
+--decode-width=8
+--rename-width=8
+--dispatch-width=8
+--issue-width=8
+--wb-width=8
+--commit-width=4
+--fetch-queue-size=48
+--rob-entries=140
+--sq-entries=12

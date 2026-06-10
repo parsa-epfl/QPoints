@@ -1,0 +1,73 @@
+{
+  "validation_package": "ws_gem5_multi_snapshot_serial_200k_1m/snapshots_0_1",
+  "goal": "Record the current serial two-snapshot gem5 run_sample behavior for ws-image-fresh-8c with lazy per-snapshot conversion and cleanup of derived gem5 artifacts after each successful run.",
+  "branch": {
+    "name": "ali/ws-multi-sample-run"
+  },
+  "revisions": {
+    "qflex_base_commit": "1e0aaac312654f4286a6b2f16075d7f6227a02ba",
+    "QPoints": "37c22c90329b1bf2b99a6a4a651657ea9bf828cd",
+    "gem5": "38ea9fb55a6461675fbc1647ec514259bdb24b9c",
+    "WormCacheQFlex": "01b4e8dff2b5e9b9199a87a48b96b712bc3723c5"
+  },
+  "local_state": {
+    "qflex_dirty": true,
+    "qflex_modified_files": [
+      "commands/qpoints.py",
+      "qflex",
+      "tests/test_qpoints_cli.py"
+    ],
+    "QPoints_dirty": false
+  },
+  "experiment": {
+    "name": "ws-image-fresh-8c",
+    "snapshots": [
+      "snapshot_0",
+      "snapshot_1"
+    ],
+    "run_root": "/mnt/sdb/aansari/experiments/ws-image-fresh-8c/run",
+    "checkpoint_root": "/mnt/sdb/aansari/checkpoints/ws-image-fresh-8c"
+  },
+  "runtime": {
+    "warmup_cycles": 200000,
+    "measurement_cycles": 1000000,
+    "fw_command": "/home/dev/qflex_git/qflex fw --args-file /home/dev/qflex_git/args/ws_image_fresh_8c_flexus_compare.qflex.args --loadvm-name init_warmed --refresh-wormcache --sample-size 2 --collect-gem5-bbl-btb",
+    "run_sample_command": "/home/dev/qflex_git/qflex run_sample --args-file /home/dev/qflex_git/args/ws_image_fresh_8c_flexus_compare.qflex.args --first snapshot_0 --last snapshot_1 --warmup-cycles 200000 --measurement-cycles 1000000 --timing-engine gem5 --timing-ruby-moesi --cleanup-conversion-artifacts --sim-config /home/dev/qflex_git/QPoints/configs/timing_ruby_moesi_ws_flexus_mesh_ref_8c.args"
+  },
+  "inputs": {
+    "top_level_args": "ws_image_fresh_8c_flexus_compare.qflex.args",
+    "gem5_sim_config": "timing_ruby_moesi_ws_flexus_mesh_ref_8c.args"
+  },
+  "artifacts": {
+    "intent": "INTENT.txt",
+    "report": "WS_GEM5_MULTI_SNAPSHOT_SERIAL_200K_1M_REPORT.md",
+    "aggregate_report": "multi_snapshot_uipc_report.json",
+    "snapshot_0_summary": "snapshot_0_uipc_summary.json",
+    "snapshot_1_summary": "snapshot_1_uipc_summary.json",
+    "snapshot_0_stats": "snapshot_0_stats.txt",
+    "snapshot_1_stats": "snapshot_1_stats.txt"
+  },
+  "results": {
+    "aggregate": {
+      "ipc": 7.708780000000001,
+      "uipc": 6.726329,
+      "average_ipc": 0.9635975,
+      "average_uipc": 0.840791125,
+      "snapshot_count": 2
+    },
+    "snapshot_0": {
+      "aggregate_ipc": 9.902529000000001,
+      "aggregate_uipc": 8.938326
+    },
+    "snapshot_1": {
+      "aggregate_ipc": 5.515031,
+      "aggregate_uipc": 4.5143320000000005
+    }
+  },
+  "major_findings": [
+    "run_sample now works serially across snapshot_0 and snapshot_1 for gem5 timing.",
+    "Each snapshot triggered lazy conversion before timing, then cleanup removed .gem and converted checkpoint artifacts after success.",
+    "The source snapshot lineage remained intact after cleanup, so later recreation remains possible.",
+    "The dominant runtime cost remains per-snapshot conversion, especially the TLB/MMU apply stage."
+  ]
+}
