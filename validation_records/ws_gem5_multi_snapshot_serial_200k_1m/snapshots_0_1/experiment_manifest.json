@@ -1,0 +1,16 @@
+{
+  "package_root": "/home/dev/qflex_git/QPoints/validation_records/ws_gem5_multi_snapshot_serial_200k_1m/snapshots_0_1",
+  "artifact_sources": {
+    "aggregate_report": "/home/dev/qflex_git/QPoints/sim_outs/ws-image-fresh-8c/uipc_report.json",
+    "snapshot_0_summary": "/home/dev/qflex_git/QPoints/sim_outs/ws-image-fresh-8c/snapshot_0/uipc_summary.json",
+    "snapshot_1_summary": "/home/dev/qflex_git/QPoints/sim_outs/ws-image-fresh-8c/snapshot_1/uipc_summary.json",
+    "snapshot_0_stats": "/home/dev/qflex_git/QPoints/sim_outs/ws-image-fresh-8c/snapshot_0/stats.txt",
+    "snapshot_1_stats": "/home/dev/qflex_git/QPoints/sim_outs/ws-image-fresh-8c/snapshot_1/stats.txt",
+    "top_level_args": "/home/dev/qflex_git/args/ws_image_fresh_8c_flexus_compare.qflex.args",
+    "gem5_sim_config": "/home/dev/qflex_git/QPoints/configs/timing_ruby_moesi_ws_flexus_mesh_ref_8c.args"
+  },
+  "commands": {
+    "fw": "/home/dev/qflex_git/qflex fw --args-file /home/dev/qflex_git/args/ws_image_fresh_8c_flexus_compare.qflex.args --loadvm-name init_warmed --refresh-wormcache --sample-size 2 --collect-gem5-bbl-btb",
+    "run_sample": "/home/dev/qflex_git/qflex run_sample --args-file /home/dev/qflex_git/args/ws_image_fresh_8c_flexus_compare.qflex.args --first snapshot_0 --last snapshot_1 --warmup-cycles 200000 --measurement-cycles 1000000 --timing-engine gem5 --timing-ruby-moesi --cleanup-conversion-artifacts --sim-config /home/dev/qflex_git/QPoints/configs/timing_ruby_moesi_ws_flexus_mesh_ref_8c.args"
+  }
+}

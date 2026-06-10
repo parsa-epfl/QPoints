@@ -1,0 +1,10 @@
+Record the current web-search multi-snapshot gem5 serial run point using:
+- `fw` from `init_warmed` to generate `snapshot_0` and `snapshot_1`
+- no `.gem` emission during warming
+- gem5 `run_sample` over `snapshot_0..snapshot_1`
+- lazy per-snapshot conversion inside `run_sample`
+- cleanup of derived gem5 conversion artifacts after each successful snapshot run
+
+This package is intentionally narrow. It captures the final two-snapshot serial
+workflow and the resulting outputs. It does not restate the earlier restore,
+topology, or single-snapshot debugging history.
