@@ -5,18 +5,14 @@
     "name": "ali/ws-multi-sample-run"
   },
   "revisions": {
-    "qflex_base_commit": "1e0aaac312654f4286a6b2f16075d7f6227a02ba",
+    "qflex_base_commit": "76f7b698935c877e1dfc3e4d9074c365b3055945",
     "QPoints": "37c22c90329b1bf2b99a6a4a651657ea9bf828cd",
     "gem5": "38ea9fb55a6461675fbc1647ec514259bdb24b9c",
     "WormCacheQFlex": "01b4e8dff2b5e9b9199a87a48b96b712bc3723c5"
   },
   "local_state": {
-    "qflex_dirty": true,
-    "qflex_modified_files": [
-      "commands/qpoints.py",
-      "qflex",
-      "tests/test_qpoints_cli.py"
-    ],
+    "qflex_dirty": false,
+    "qflex_modified_files": [],
     "QPoints_dirty": false
   },
   "experiment": {

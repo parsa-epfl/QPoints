@@ -13,6 +13,9 @@ This package captures the final runtime behavior of the serial gem5
 multi-snapshot path. It focuses on how the orchestration worked and what
 outputs it produced.
 
+The recorded run in this package was rerun from a clean committed qflex tree
+after the orchestration changes for this phase were committed.
+
 ## Snapshot generation setup
 
 The snapshots used in this record were regenerated from `init_warmed`, not from
