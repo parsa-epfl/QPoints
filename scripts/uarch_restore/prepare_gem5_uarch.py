@@ -2119,14 +2119,14 @@ def prepare_snapshot_gem5_uarch(
         _l1i_restore_state,
     )
     btb_restore_files = _write_btb_restore_files(
-        gem5_uarch_dir,
+        gem5_uarch_root,
         btb_candidates,
         overwrite,
         BTB_RESTORE_FILE_TEMPLATE,
         BTB_RESTORE_FILE_GLOB,
     )
     tage_restore_files = _write_per_core_json_files(
-        gem5_uarch_dir,
+        gem5_uarch_root,
         tage_candidates,
         overwrite,
         TAGE_RESTORE_FILE_TEMPLATE,

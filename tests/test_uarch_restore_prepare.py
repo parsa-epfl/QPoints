@@ -99,6 +99,20 @@ def _make_tage_payload() -> dict:
     }
 
 
+def _gem5_uarch_root(gem5_workload_root: Path, snapshot: str = "snapshot_0") -> Path:
+    return gem5_workload_root / snapshot / "gem5_uarch"
+
+
+def _gem5_uarch_protocol_dir(
+    gem5_workload_root: Path,
+    module,
+    snapshot: str = "snapshot_0",
+    ruby_protocol: str | None = None,
+) -> Path:
+    protocol = ruby_protocol or module.RUBY_PROTOCOL_MESI_TWO_LEVEL
+    return _gem5_uarch_root(gem5_workload_root, snapshot) / protocol
+
+
 def test_prepare_snapshot_gem5_uarch_writes_outputs_and_manifest(tmp_path: Path):
     module = _load_prepare_module()
 
@@ -277,19 +291,20 @@ def test_prepare_snapshot_gem5_uarch_writes_outputs_and_manifest(tmp_path: Path)
         overwrite=True,
     )
 
-    gem5_uarch_dir = gem5_workload_root / "snapshot_0" / "gem5_uarch"
+    gem5_uarch_root = _gem5_uarch_root(gem5_workload_root)
+    gem5_uarch_dir = _gem5_uarch_protocol_dir(gem5_workload_root, module)
     output_file = gem5_uarch_dir / "llc_restore_addrs.txt"
     l1d_file = gem5_uarch_dir / "l1d_restore_candidates.json"
     l1d_restore_file = gem5_uarch_dir / "l1d_restore_addrs.core0.txt"
     l1i_file = gem5_uarch_dir / "l1i_restore_candidates.json"
     l1i_restore_file = gem5_uarch_dir / "l1i_restore_addrs.core0.txt"
-    btb_file = gem5_uarch_dir / "btb_restore_candidates.json"
-    btb_restore_file = gem5_uarch_dir / "btb_restore_addrs.core0.txt"
-    tage_file = gem5_uarch_dir / "tage_restore_candidates.json"
-    tage_restore_file = gem5_uarch_dir / "tage_restore_state.core0.json"
+    btb_file = gem5_uarch_root / "btb_restore_candidates.json"
+    btb_restore_file = gem5_uarch_root / "btb_restore_addrs.core0.txt"
+    tage_file = gem5_uarch_root / "tage_restore_candidates.json"
+    tage_restore_file = gem5_uarch_root / "tage_restore_state.core0.json"
     manifest_file = gem5_uarch_dir / "manifest.json"
 
-    assert output_file.read_text(encoding="utf-8") == "0x100\n0x140\n"
+    assert output_file.read_text(encoding="utf-8") == "0x100\n0x140\n0x180\n"
     assert (
         l1d_restore_file.read_text(encoding="utf-8")
         == "0x1c0 S\n0x200 M\n0x240 S\n0x280 M\n"
@@ -467,12 +482,12 @@ def test_prepare_snapshot_gem5_uarch_writes_outputs_and_manifest(tmp_path: Path)
         manifest["target_ruby_protocol"]
         == module.RUBY_PROTOCOL_MESI_TWO_LEVEL
     )
-    assert manifest["components"]["llc"]["line_count"] == 2
+    assert manifest["components"]["llc"]["line_count"] == 3
     assert manifest["components"]["llc"]["stats"]["total_llc_lines"] == 5
     assert manifest["components"]["llc"]["stats"]["llc_modified_lines"] == 1
     assert manifest["components"]["llc"]["stats"]["private_modified_lines"] == 1
     assert manifest["components"]["llc"]["stats"]["private_writeable_lines"] == 1
-    assert manifest["components"]["llc"]["selected_modified_lines"] == 0
+    assert manifest["components"]["llc"]["selected_modified_lines"] == 1
     assert manifest["components"]["llc"]["stats"]["candidate_restorable_llc_lines"] == 3
     assert manifest["components"]["llc"]["stats"]["candidate_restorable_clean_lines"] == 2
     assert manifest["components"]["llc"]["stats"]["candidate_restorable_modified_lines"] == 1
@@ -571,7 +586,12 @@ def test_prepare_snapshot_gem5_uarch_records_moesi_target_protocol(
         "l2_shared_private"
     ]["selection_policy"]
     assert (
-        gem5_workload_root / "snapshot_0" / "gem5_uarch" / "llc_restore_addrs.txt"
+        _gem5_uarch_protocol_dir(
+            gem5_workload_root,
+            module,
+            ruby_protocol=module.RUBY_PROTOCOL_MOESI_CMP_DIRECTORY,
+        )
+        / "llc_restore_addrs.txt"
     ).is_file()
 
 
@@ -660,7 +680,11 @@ def test_prepare_snapshot_gem5_uarch_emits_first_moesi_private_owner_slice(
         ruby_protocol=module.RUBY_PROTOCOL_MOESI_CMP_DIRECTORY,
     )
 
-    gem5_uarch_dir = gem5_workload_root / "snapshot_0" / "gem5_uarch"
+    gem5_uarch_dir = _gem5_uarch_protocol_dir(
+        gem5_workload_root,
+        module,
+        ruby_protocol=module.RUBY_PROTOCOL_MOESI_CMP_DIRECTORY,
+    )
     candidate_file = (
         gem5_uarch_dir
         / "moesi_single_private_data_writeable_restore_candidates.json"
@@ -789,7 +813,11 @@ def test_prepare_snapshot_gem5_uarch_emits_first_moesi_private_clean_slice(
         ruby_protocol=module.RUBY_PROTOCOL_MOESI_CMP_DIRECTORY,
     )
 
-    gem5_uarch_dir = gem5_workload_root / "snapshot_0" / "gem5_uarch"
+    gem5_uarch_dir = _gem5_uarch_protocol_dir(
+        gem5_workload_root,
+        module,
+        ruby_protocol=module.RUBY_PROTOCOL_MOESI_CMP_DIRECTORY,
+    )
     llc_restore_file = gem5_uarch_dir / "llc_restore_addrs.txt"
     candidate_file = (
         gem5_uarch_dir / "moesi_single_private_data_clean_restore_candidates.json"
@@ -829,7 +857,7 @@ def test_prepare_snapshot_gem5_uarch_emits_first_moesi_private_clean_slice(
     assert component["line_count"] == 1
     assert component["stats"]["candidate_lines"] == 1
     assert manifest["components"]["llc"]["line_count"] == 1
-    assert manifest["components"]["llc"]["selected_modified_lines"] == 0
+    assert manifest["components"]["llc"]["selected_modified_lines"] == 1
     assert manifest["components"]["llc"]["protocol_required_modified_lines"] == 1
 
 
@@ -942,7 +970,11 @@ def test_prepare_snapshot_gem5_uarch_emits_moesi_multi_private_clean_slice(
         ruby_protocol=module.RUBY_PROTOCOL_MOESI_CMP_DIRECTORY,
     )
 
-    gem5_uarch_dir = gem5_workload_root / "snapshot_0" / "gem5_uarch"
+    gem5_uarch_dir = _gem5_uarch_protocol_dir(
+        gem5_workload_root,
+        module,
+        ruby_protocol=module.RUBY_PROTOCOL_MOESI_CMP_DIRECTORY,
+    )
     llc_restore_file = gem5_uarch_dir / "llc_restore_addrs.txt"
     candidate_file = (
         gem5_uarch_dir / "moesi_multi_private_data_clean_restore_candidates.json"
@@ -1008,7 +1040,7 @@ def test_prepare_snapshot_gem5_uarch_emits_moesi_multi_private_clean_slice(
     assert component["stats"]["llc_backed_block_ids"] == 1
     assert component["stats"]["non_llc_backed_block_ids"] == 1
     assert manifest["components"]["llc"]["line_count"] == 1
-    assert manifest["components"]["llc"]["selected_modified_lines"] == 0
+    assert manifest["components"]["llc"]["selected_modified_lines"] == 1
     assert manifest["components"]["llc"]["protocol_required_modified_lines"] == 1
 
 
@@ -1124,7 +1156,11 @@ def test_prepare_snapshot_gem5_uarch_emits_moesi_private_instruction_only_slice(
         ruby_protocol=module.RUBY_PROTOCOL_MOESI_CMP_DIRECTORY,
     )
 
-    gem5_uarch_dir = gem5_workload_root / "snapshot_0" / "gem5_uarch"
+    gem5_uarch_dir = _gem5_uarch_protocol_dir(
+        gem5_workload_root,
+        module,
+        ruby_protocol=module.RUBY_PROTOCOL_MOESI_CMP_DIRECTORY,
+    )
     llc_restore_file = gem5_uarch_dir / "llc_restore_addrs.txt"
     candidate_file = (
         gem5_uarch_dir / "moesi_private_instruction_only_restore_candidates.json"
@@ -1198,14 +1234,11 @@ def test_prepare_snapshot_gem5_uarch_emits_moesi_private_instruction_only_slice(
         Path(guardrails["report_file"]).read_text(encoding="utf-8")
     )
     assert report["unsupported_block_count"] == 0
-    assert (
-        "single_private_data_clean_nonllc"
-        in report["known_unimplemented_families"]
-    )
+    assert "anything_else" in report["known_unimplemented_families"]
     assert report["observed_unsupported_families"] == {}
 
 
-def test_prepare_snapshot_gem5_uarch_rejects_moesi_single_clean_nonllc_family(
+def test_prepare_snapshot_gem5_uarch_accepts_moesi_single_clean_nonllc_family(
     tmp_path: Path,
 ):
     module = _load_prepare_module()
@@ -1217,17 +1250,35 @@ def test_prepare_snapshot_gem5_uarch_rejects_moesi_single_clean_nonllc_family(
     gem5_workload_root.mkdir()
     (gem5_workload_root / "snapshot_0").mkdir()
 
+    safe_line_addr = 0x100
     line_addr = 0x440
 
     _write_zstd_json(
         source_dir / "llc-0.json.zstd",
-        {"blocks": [{"blocks": []}]},
+        {
+            "blocks": [
+                {
+                    "blocks": [
+                        {
+                            "block_id_with_v": _encode_block_id_with_v(
+                                safe_line_addr
+                            ),
+                            "ts": 10,
+                            "modified": False,
+                        }
+                    ]
+                }
+            ]
+        },
     )
     _write_zstd_json(
         source_dir / "directory-0.json.zstd",
         {
             "entries": [
                 {
+                    str(safe_line_addr // 64): {
+                        "shared": True,
+                    },
                     str(line_addr // 64): {
                         "shared": True,
                         "in_shared_cache": False,
@@ -1259,29 +1310,74 @@ def test_prepare_snapshot_gem5_uarch_rejects_moesi_single_clean_nonllc_family(
         ],
     )
 
-    with pytest.raises(RuntimeError, match="single_private_data_clean_nonllc"):
-        module.prepare_snapshot_gem5_uarch(
-            qflex_run_dir=qflex_run_dir,
-            gem5_workload_root=gem5_workload_root,
-            snapshot="snapshot_0",
-            overwrite=True,
-            ruby_protocol=module.RUBY_PROTOCOL_MOESI_CMP_DIRECTORY,
-        )
+    manifest = module.prepare_snapshot_gem5_uarch(
+        qflex_run_dir=qflex_run_dir,
+        gem5_workload_root=gem5_workload_root,
+        snapshot="snapshot_0",
+        overwrite=True,
+        ruby_protocol=module.RUBY_PROTOCOL_MOESI_CMP_DIRECTORY,
+    )
+
+    gem5_uarch_dir = _gem5_uarch_protocol_dir(
+        gem5_workload_root,
+        module,
+        ruby_protocol=module.RUBY_PROTOCOL_MOESI_CMP_DIRECTORY,
+    )
+    llc_restore_file = gem5_uarch_dir / "llc_restore_addrs.txt"
+    candidate_file = (
+        gem5_uarch_dir / "moesi_multi_private_data_clean_restore_candidates.json"
+    )
+    restore_file = gem5_uarch_dir / "moesi_multi_private_data_clean_restore.txt"
+    nonllc_restore_file = (
+        gem5_uarch_dir / "moesi_multi_private_data_clean_nonllc_restore.txt"
+    )
+    l1d_restore_file = (
+        gem5_uarch_dir / "moesi_l1d_multi_private_data_clean.core1.txt"
+    )
+
+    assert llc_restore_file.read_text(encoding="utf-8") == "0x100\n"
+    assert restore_file.read_text(encoding="utf-8") == ""
+    assert nonllc_restore_file.read_text(encoding="utf-8") == "0x440 1\n"
+    assert l1d_restore_file.read_text(encoding="utf-8") == "0x440 S\n"
+
+    candidates = json.loads(candidate_file.read_text(encoding="utf-8"))
+    assert candidates == {
+        "schema_version": 1,
+        "snapshot": "snapshot_0",
+        "cache_line_size": 64,
+        "candidates": [
+            {
+                "block_id": line_addr // 64,
+                "dir_state": "S",
+                "l1_state": "S",
+                "l2_state": "ILS",
+                "line_addr": "0x440",
+                "llc_backed": False,
+                "private_d_cores": [1],
+                "private_i_cores": [],
+                "sharer_cores": [1],
+            }
+        ],
+    }
+
+    component = manifest["components"]["moesi_multi_private_data_clean"]
+    assert component["candidate_file"] == str(candidate_file)
+    assert component["restore_file"] == str(restore_file)
+    assert component["nonllc_restore_file"] == str(nonllc_restore_file)
+    assert component["l1d_restore_files"] == {"1": str(l1d_restore_file)}
+    assert component["line_count"] == 1
+    assert component["stats"]["candidate_lines"] == 1
 
     report_file = (
-        gem5_workload_root
-        / "snapshot_0"
-        / "gem5_uarch"
+        _gem5_uarch_protocol_dir(
+            gem5_workload_root,
+            module,
+            ruby_protocol=module.RUBY_PROTOCOL_MOESI_CMP_DIRECTORY,
+        )
         / "moesi_unsupported_private_family_report.json"
     )
     report = json.loads(report_file.read_text(encoding="utf-8"))
-    assert report["unsupported_block_count"] == 1
-    assert (
-        report["observed_unsupported_families"][
-            "single_private_data_clean_nonllc"
-        ]["block_count"]
-        == 1
-    )
+    assert report["unsupported_block_count"] == 0
 
 
 def test_prepare_snapshot_gem5_uarch_reports_modified_instruction_only_family(
@@ -1296,17 +1392,35 @@ def test_prepare_snapshot_gem5_uarch_reports_modified_instruction_only_family(
     gem5_workload_root.mkdir()
     (gem5_workload_root / "snapshot_0").mkdir()
 
+    safe_line_addr = 0x100
     line_addr = 0x480
 
     _write_zstd_json(
         source_dir / "llc-0.json.zstd",
-        {"blocks": [{"blocks": []}]},
+        {
+            "blocks": [
+                {
+                    "blocks": [
+                        {
+                            "block_id_with_v": _encode_block_id_with_v(
+                                safe_line_addr
+                            ),
+                            "ts": 10,
+                            "modified": False,
+                        }
+                    ]
+                }
+            ]
+        },
     )
     _write_zstd_json(
         source_dir / "directory-0.json.zstd",
         {
             "entries": [
                 {
+                    str(safe_line_addr // 64): {
+                        "shared": True,
+                    },
                     str(line_addr // 64): {
                         "shared": True,
                         "in_shared_cache": False,
@@ -1347,9 +1461,11 @@ def test_prepare_snapshot_gem5_uarch_reports_modified_instruction_only_family(
         )
 
     report_file = (
-        gem5_workload_root
-        / "snapshot_0"
-        / "gem5_uarch"
+        _gem5_uarch_protocol_dir(
+            gem5_workload_root,
+            module,
+            ruby_protocol=module.RUBY_PROTOCOL_MOESI_CMP_DIRECTORY,
+        )
         / "moesi_unsupported_private_family_report.json"
     )
     report = json.loads(report_file.read_text(encoding="utf-8"))
@@ -1372,17 +1488,35 @@ def test_prepare_snapshot_gem5_uarch_rejects_moesi_anything_else_family(
     gem5_workload_root.mkdir()
     (gem5_workload_root / "snapshot_0").mkdir()
 
+    safe_line_addr = 0x100
     line_addr = 0x4c0
 
     _write_zstd_json(
         source_dir / "llc-0.json.zstd",
-        {"blocks": [{"blocks": []}]},
+        {
+            "blocks": [
+                {
+                    "blocks": [
+                        {
+                            "block_id_with_v": _encode_block_id_with_v(
+                                safe_line_addr
+                            ),
+                            "ts": 10,
+                            "modified": False,
+                        }
+                    ]
+                }
+            ]
+        },
     )
     _write_zstd_json(
         source_dir / "directory-0.json.zstd",
         {
             "entries": [
                 {
+                    str(safe_line_addr // 64): {
+                        "shared": True,
+                    },
                     str(line_addr // 64): {
                         "shared": False,
                         "in_shared_cache": False,
@@ -1437,9 +1571,11 @@ def test_prepare_snapshot_gem5_uarch_rejects_moesi_anything_else_family(
         )
 
     report_file = (
-        gem5_workload_root
-        / "snapshot_0"
-        / "gem5_uarch"
+        _gem5_uarch_protocol_dir(
+            gem5_workload_root,
+            module,
+            ruby_protocol=module.RUBY_PROTOCOL_MOESI_CMP_DIRECTORY,
+        )
         / "moesi_unsupported_private_family_report.json"
     )
     report = json.loads(report_file.read_text(encoding="utf-8"))
@@ -1497,7 +1633,10 @@ def test_prepare_snapshot_gem5_uarch_can_append_controlled_modified_lines(
         llc_debug_modified_count=5,
     )
 
-    output_file = gem5_workload_root / "snapshot_0" / "gem5_uarch" / "llc_restore_addrs.txt"
+    output_file = (
+        _gem5_uarch_protocol_dir(gem5_workload_root, module)
+        / "llc_restore_addrs.txt"
+    )
     assert output_file.read_text(encoding="utf-8") == "0x100\n0x180\n"
     assert manifest["components"]["llc"]["selected_modified_lines"] == 1
 
@@ -1562,7 +1701,10 @@ def test_prepare_snapshot_gem5_uarch_orders_selected_lines_by_set_and_age(
         llc_debug_modified_count=1,
     )
 
-    output_file = gem5_workload_root / "snapshot_0" / "gem5_uarch" / "llc_restore_addrs.txt"
+    output_file = (
+        _gem5_uarch_protocol_dir(gem5_workload_root, module)
+        / "llc_restore_addrs.txt"
+    )
     assert output_file.read_text(encoding="utf-8") == "0x180\n0x100\n0x40\n"
     assert "ascending LLC timestamp" in manifest["components"]["llc"]["selection_policy"]
 
@@ -1677,9 +1819,7 @@ def test_prepare_snapshot_gem5_uarch_migrates_from_sibling_layout(
 
     assert not sibling_dir.exists()
     assert (
-        gem5_workload_root
-        / "snapshot_0"
-        / "gem5_uarch"
+        _gem5_uarch_protocol_dir(gem5_workload_root, module)
         / "llc_restore_addrs.txt"
     ).is_file()
 
@@ -1817,10 +1957,11 @@ def test_prepare_snapshot_gem5_uarch_clears_stale_per_core_restore_files(
         overwrite=True,
     )
 
-    gem5_uarch_dir = gem5_workload_root / "snapshot_0" / "gem5_uarch"
+    gem5_uarch_root = _gem5_uarch_root(gem5_workload_root)
+    gem5_uarch_dir = _gem5_uarch_protocol_dir(gem5_workload_root, module)
     assert (gem5_uarch_dir / "l1d_restore_addrs.core0.txt").exists()
-    assert (gem5_uarch_dir / "btb_restore_addrs.core0.txt").exists()
-    assert (gem5_uarch_dir / "tage_restore_state.core0.json").exists()
+    assert (gem5_uarch_root / "btb_restore_addrs.core0.txt").exists()
+    assert (gem5_uarch_root / "tage_restore_state.core0.json").exists()
 
     (source_dir / "harvard-0.json.zstd").unlink()
     (source_dir / "fetch.json.zstd").unlink()
@@ -1838,8 +1979,8 @@ def test_prepare_snapshot_gem5_uarch_clears_stale_per_core_restore_files(
     )
 
     assert not (gem5_uarch_dir / "l1d_restore_addrs.core0.txt").exists()
-    assert not (gem5_uarch_dir / "btb_restore_addrs.core0.txt").exists()
-    assert not (gem5_uarch_dir / "tage_restore_state.core0.json").exists()
+    assert not (gem5_uarch_root / "btb_restore_addrs.core0.txt").exists()
+    assert not (gem5_uarch_root / "tage_restore_state.core0.json").exists()
 
 
 def test_prepare_snapshot_gem5_uarch_preserves_per_core_l1d_candidates(
@@ -1917,7 +2058,8 @@ def test_prepare_snapshot_gem5_uarch_preserves_per_core_l1d_candidates(
     )
 
     l1d_file = (
-        gem5_workload_root / "snapshot_0" / "gem5_uarch" / "l1d_restore_candidates.json"
+        _gem5_uarch_protocol_dir(gem5_workload_root, module)
+        / "l1d_restore_candidates.json"
     )
     payload = json.loads(l1d_file.read_text(encoding="utf-8"))
     assert payload["candidates"] == [
@@ -1944,32 +2086,24 @@ def test_prepare_snapshot_gem5_uarch_preserves_per_core_l1d_candidates(
     ]
     assert (
         (
-            gem5_workload_root
-            / "snapshot_0"
-            / "gem5_uarch"
+            _gem5_uarch_protocol_dir(gem5_workload_root, module)
             / "l1d_restore_addrs.core0.txt"
         ).read_text(encoding="utf-8")
         == "0x300 S\n"
     )
     assert (
         (
-            gem5_workload_root
-            / "snapshot_0"
-            / "gem5_uarch"
+            _gem5_uarch_protocol_dir(gem5_workload_root, module)
             / "l1d_restore_addrs.core1.txt"
         ).read_text(encoding="utf-8")
         == "0x300 M\n"
     )
     assert not (
-        gem5_workload_root
-        / "snapshot_0"
-        / "gem5_uarch"
+        _gem5_uarch_protocol_dir(gem5_workload_root, module)
         / "l1i_restore_addrs.core0.txt"
     ).exists()
     assert not (
-        gem5_workload_root
-        / "snapshot_0"
-        / "gem5_uarch"
+        _gem5_uarch_protocol_dir(gem5_workload_root, module)
         / "l1i_restore_addrs.core1.txt"
     ).exists()
 
