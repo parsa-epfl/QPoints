@@ -1,0 +1,19 @@
+{
+  "package_root": "/home/dev/qflex_git/QPoints/validation_records/ws_flexus_vs_gem5_mesh_compare_200k_1m/snapshot_0",
+  "artifact_sources": {
+    "gem5_report": "/home/dev/qflex_git/QPoints/sim_outs/ws-image-fresh-8c_compare/gem5_mesh_snapshot0/uipc_report.json",
+    "gem5_summary": "/home/dev/qflex_git/QPoints/sim_outs/ws-image-fresh-8c_compare/gem5_mesh_snapshot0/uipc_summary.json",
+    "gem5_stats": "/home/dev/qflex_git/QPoints/sim_outs/ws-image-fresh-8c_compare/gem5_mesh_snapshot0/stats.txt",
+    "flexus_report": "/home/dev/qflex_git/QPoints/sim_outs/ws-image-fresh-8c/uipc_report.json",
+    "flexus_summary": "/home/dev/qflex_git/QPoints/sim_outs/ws-image-fresh-8c/snapshot_0/uipc_summary.json",
+    "flexus_measurement_log": "/home/dev/qflex_git/QPoints/sim_outs/ws-image-fresh-8c/snapshot_0/all.measurement.end.log",
+    "top_level_args": "/home/dev/qflex_git/args/ws_image_fresh_8c_flexus_compare.qflex.args",
+    "gem5_sim_config": "/home/dev/qflex_git/QPoints/configs/timing_ruby_moesi_ws_flexus_mesh_ref_8c.args",
+    "flexus_timing_cfg": "/mnt/sdb/aansari/experiments/ws-image-fresh-8c/cfg/timing.cfg",
+    "flexus_configuration_json": "/mnt/sdb/aansari/experiments/ws-image-fresh-8c/cfg/flexus_configuration.json"
+  },
+  "commands": {
+    "gem5_mesh": "/home/dev/qflex_git/qflex run_sample --args-file /home/dev/qflex_git/args/ws_image_fresh_8c_flexus_compare.qflex.args --first snapshot_0 --last snapshot_0 --warmup-cycles 200000 --measurement-cycles 1000000 --timing-engine gem5 --timing-ruby-moesi --sim-config /home/dev/qflex_git/QPoints/configs/timing_ruby_moesi_ws_flexus_mesh_ref_8c.args",
+    "flexus": "/home/dev/qflex_git/qflex run_sample --args-file /home/dev/qflex_git/args/ws_image_fresh_8c_flexus_compare.qflex.args --first snapshot_0 --last snapshot_0 --warmup-cycles 200000 --measurement-cycles 1000000 --timing-engine flexus"
+  }
+}

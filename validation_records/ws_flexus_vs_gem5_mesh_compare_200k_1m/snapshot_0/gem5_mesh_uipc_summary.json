@@ -1,0 +1,55 @@
+{
+  "aggregate": {
+    "ipc": 7.256014,
+    "uipc": 6.297251
+  },
+  "average": {
+    "ipc": 0.90700175,
+    "uipc": 0.787156375
+  },
+  "cores": [
+    {
+      "core": 0,
+      "ipc": 0.00014,
+      "uipc": 0.0
+    },
+    {
+      "core": 1,
+      "ipc": 2.412755,
+      "uipc": 2.412755
+    },
+    {
+      "core": 2,
+      "ipc": 1.342581,
+      "uipc": 0.785483
+    },
+    {
+      "core": 3,
+      "ipc": 0.382471,
+      "uipc": 0.0
+    },
+    {
+      "core": 4,
+      "ipc": 0.0001,
+      "uipc": 0.0
+    },
+    {
+      "core": 5,
+      "ipc": 0.00576,
+      "uipc": 0.0
+    },
+    {
+      "core": 6,
+      "ipc": 0.004,
+      "uipc": 0.0
+    },
+    {
+      "core": 7,
+      "ipc": 3.108207,
+      "uipc": 3.099013
+    }
+  ],
+  "engine": "gem5",
+  "experiment": "ws-image-fresh-8c",
+  "snapshot": "snapshot_0"
+}

@@ -1,0 +1,68 @@
+{
+  "validation_package": "ws_flexus_vs_gem5_mesh_compare_200k_1m/snapshot_0",
+  "goal": "Record the current comparable 200k warmup / 1M measurement Flexus-vs-gem5 result for ws-image-fresh-8c snapshot_0 using the final gem5 mesh reference configuration.",
+  "branch": {
+    "name": "ali/ws-flexus-vs-gem5"
+  },
+  "revisions": {
+    "qflex": "7a9a976b81a7bc603ac91171e9c0d9c1657b4aa3",
+    "QPoints": "75f30de75b22dd8838d28bd7e6403969f6e1e79a",
+    "gem5": "69c5a5dc5fda5bb4c983aa906c78d1a99318171e",
+    "WormCacheQFlex": "eb3604cea46aca448ba80193db6f78492be65c31"
+  },
+  "experiment": {
+    "name": "ws-image-fresh-8c",
+    "snapshot": "snapshot_0",
+    "checkpoint_root": "/mnt/sdb/aansari/checkpoints/ws-image-fresh-8c/snapshot_0"
+  },
+  "runtime": {
+    "warmup_cycles": 200000,
+    "measurement_cycles": 1000000,
+    "gem5_command": "/home/dev/qflex_git/qflex run_sample --args-file /home/dev/qflex_git/args/ws_image_fresh_8c_flexus_compare.qflex.args --first snapshot_0 --last snapshot_0 --warmup-cycles 200000 --measurement-cycles 1000000 --timing-engine gem5 --timing-ruby-moesi --sim-config /home/dev/qflex_git/QPoints/configs/timing_ruby_moesi_ws_flexus_mesh_ref_8c.args",
+    "flexus_command": "/home/dev/qflex_git/qflex run_sample --args-file /home/dev/qflex_git/args/ws_image_fresh_8c_flexus_compare.qflex.args --first snapshot_0 --last snapshot_0 --warmup-cycles 200000 --measurement-cycles 1000000 --timing-engine flexus"
+  },
+  "inputs": {
+    "top_level_args": "ws_image_fresh_8c_flexus_compare.qflex.args",
+    "gem5_sim_config": "timing_ruby_moesi_ws_flexus_mesh_ref_8c.args",
+    "flexus_timing_cfg": "flexus_timing.cfg",
+    "flexus_configuration_json": "flexus_configuration.json"
+  },
+  "artifacts": {
+    "intent": "INTENT.txt",
+    "report": "WS_FLEXUS_VS_GEM5_MESH_COMPARE_200K_1M_REPORT.md",
+    "gem5_report": "gem5_mesh_uipc_report.json",
+    "gem5_summary": "gem5_mesh_uipc_summary.json",
+    "gem5_stats": "gem5_mesh_stats.txt",
+    "flexus_report": "flexus_uipc_report.json",
+    "flexus_summary": "flexus_uipc_summary.json",
+    "flexus_measurement_log": "flexus_all.measurement.end.log"
+  },
+  "results": {
+    "gem5_mesh": {
+      "aggregate": {
+        "ipc": 7.256014,
+        "uipc": 6.297251
+      },
+      "average": {
+        "ipc": 0.90700175,
+        "uipc": 0.787156375
+      }
+    },
+    "flexus": {
+      "aggregate": {
+        "ipc": 11.832173,
+        "uipc": 11.821928
+      },
+      "average": {
+        "ipc": 1.479021625,
+        "uipc": 1.477741
+      }
+    }
+  },
+  "major_findings": [
+    "The final gem5 mesh reference run is stable on ws-image-fresh-8c snapshot_0 for the 200k/1M window.",
+    "Flexus and gem5 are not in the same ballpark on this snapshot/window: Flexus is substantially higher on aggregate IPC and uIPC.",
+    "The largest per-core differences are on cores 2 and 3, not on the mostly idle cores.",
+    "The current discrepancy is large enough to justify focused behavioral debugging rather than further minor structural alignment."
+  ]
+}

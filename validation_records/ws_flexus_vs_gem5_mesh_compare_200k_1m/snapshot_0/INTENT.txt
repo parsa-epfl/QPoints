@@ -1,0 +1,8 @@
+Record the current web-search snapshot_0 comparison point using the final
+200k warmup / 1M measurement runs for:
+- gem5 timing-ruby MOESI with the mesh reference config
+- Flexus timing
+
+This package is intentionally narrow. It captures the final comparable runs and
+the resulting behavioral conclusions. It does not attempt to replay the full
+debugging history that led to this point.
