@@ -1,100 +1,112 @@
 # QPoints
 
-QPoints generates gem5-compatible checkpoints from QEMU/QFlex snapshots for
-ARM full-system simulation. The repository includes helpers for creating
-checkpoints, converting snapshot disk images, and running the resulting
-checkpoints in gem5.
+QPoints is currently part of the gem5 conversion bridge used by the top-level
+`qflex` workflow. It is not the primary user-facing entrypoint of the project.
 
-Detailed project notes are also available in the supplemental
-[Notion README](https://www.notion.so/README-2ea46d7f056e80d1aeb5f644d6bb0204?source=copy_link).
-Keep the local README as the version-controlled quickstart.
+Users should normally start from:
 
-Tracked deferred engineering notes live in [DEFERRED_FIXES.md](DEFERRED_FIXES.md).
+- [../docs/gem5_conversion/project_progress.md](../docs/gem5_conversion/project_progress.md)
+- [../docs/gem5_conversion/qflex_cli_guide.md](../docs/gem5_conversion/qflex_cli_guide.md)
 
-## Requirements
+Those documents describe the maintained workflow. This README explains what
+role QPoints still plays inside that workflow.
 
-- QEMU/QFlex snapshot inputs
+## Current role in the stack
+
+QPoints currently acts as a bridge between:
+
+- qflex lifecycle/orchestration on the top-level CLI side
+- BXKraken-origin snapshot and checkpoint source state
+- gem5-facing checkpoint materialization and timing support
+
+In practice, QPoints is responsible for several things:
+
+- staging gem5-consumable checkpoint roots from qflex snapshot inputs
+- preparing gem5-side microarchitectural restore artifacts
+- carrying gem5 integration configs used by the maintained workflow
+- hosting tracked validation records for the conversion and timing flow
+
+This role is narrower and more implementation-oriented than the repository name
+suggests. The name and lineage are now stale and should be cleaned up in a
+later project phase.
+
+## What lives here
+
+Important subtrees include:
+
+- `configs/`
+  - gem5-side sim-config files used by the qflex conversion and timing flow
+- `scripts/uarch_restore/`
+  - preparation logic for microarchitectural restore artifacts
+- `validation_records/`
+  - tracked validation evidence for restored-state and timing experiments
+- `tests/`
+  - focused tests for conversion/runtime behavior
+- `archive/legacy_convert_single/`
+  - archived older conversion surface
+
+## Conversion responsibilities
+
+Within the current project organization, QPoints participates in both major
+gem5-conversion layers:
+
+1. architectural checkpoint materialization for gem5 consumption
+2. microarchitectural restore preparation for selected frontend, cache, and
+   TLB components
+
+The maintained workflow does not expect users to drive those layers directly
+through local QPoints shell wrappers. Instead, the top-level `qflex` CLI
+dispatches into the QPoints conversion/runtime helpers when needed.
+
+For example:
+
+- `qflex qpoints convert-single`
+- `qflex qpoints run-gem5`
+- gem5 `qflex run_sample`, which can drive conversion automatically
+
+The preferred user-facing contract for these commands is documented in:
+
+- [../docs/gem5_conversion/qflex_cli_guide.md](../docs/gem5_conversion/qflex_cli_guide.md)
+
+## Protocol and restore direction
+
+The current gem5-facing restore direction is protocol-aware.
+
+- `MESI_Two_Level` remains useful as a bring-up and reference path
+- `MOESI_CMP_directory` is the active non-inclusive direction for the cache
+  hierarchy because the important BXKraken-origin checkpoints do not match an
+  inclusive LLC model cleanly
+
+QPoints carries the protocol-specific staging logic and configuration support
+required for those paths, including the current sliced LLC/directory contract
+used by the maintained MOESI flow.
+
+## Validation records
+
+Validation evidence is tracked under:
+
+- [validation_records](validation_records)
+
+Those records are the main repository surface for proving what the current
+conversion and timing stack actually supports. They should be treated as the
+evidence layer, not as user quickstarts.
+
+## Setup notes for maintainers
+
+QPoints still depends on the surrounding project environment:
+
+- QEMU/qflex snapshot inputs
 - Python 3
 - `gdb-multiarch`
 - `qemu-img`
 - `sshpass`
 - gem5 and the ARM gem5 system files under `bin/m5`
 
-The setup script installs common package dependencies when `apt-get` is
-available, initializes the gem5 submodule, builds gem5, and downloads the ARM
-gem5 system files:
+The repository still ships `setup.sh` for convenience:
 
 ```bash
 bash setup.sh
 ```
 
-## Generate a Checkpoint
-
-The canonical checkpoint conversion path now lives in the top-level `qflex`
-CLI, not in a standalone QPoints bash wrapper. Use `qpoints convert-single` to
-materialize the checkpoint root from the `.gem` producer bundle and prepare the
-gem5 uarch sidecar artifacts.
-
-```bash
-../qflex qpoints convert-single \
-  --qflex-ckp-dir qflex_checkpoints \
-  --gem5-ckp-dir gem5_checkpoints \
-  --core-count 4 \
-  --memory-gb 16 \
-  --base web_search.qcow2 \
-  --snapshot snapshot_0
-```
-
-The previous bash-based conversion flow has been archived under:
-
-```text
-archive/legacy_convert_single/
-```
-
-## Run a Checkpoint in gem5
-
-The default mode preserves the existing classic gem5 flow. Add `--timing-ruby`
-to use the O3CPU + Ruby MESI_Two_Level configuration, or
-`--timing-ruby-moesi` to use the MOESI_CMP_directory timing-Ruby path for
-non-inclusive cache restore. This path requests the staged LLC/L1 cache
-restore slices by default, uses the validated 8MB shared-cache geometry for
-that restore path, and falls back to cold state only for slices whose
-artifacts are missing.
-
-```bash
-./run_gem5.sh --gem5-ckp-dir gem5_checkpoints --experiment test \
-  --snapshot snapshot_0 --inst 100000 --cores 1
-```
-
-```bash
-./run_gem5.sh --gem5-ckp-dir gem5_checkpoints --experiment test \
-  --snapshot snapshot_0 --inst 100000 --cores 1 --timing-ruby
-```
-
-
-```bash
-./run_gem5.sh --gem5-ckp-dir gem5_checkpoints --experiment test \
-  --snapshot snapshot_0 --inst 100000 --cores 1 --timing-ruby-moesi
-```
-
-## Current Protocol Direction
-
-The current `--timing-ruby` path still uses the O3CPU + Ruby `MESI_Two_Level`
-configuration as the active bring-up and partial-reference path. That remains
-useful for LLC restore, frontend validation, and the already translated clean
-shared-private restore family.
-
-For faithful multicore private-state restoration, the long-term direction has
-changed. The current WormCache/QFlex checkpoints come from a non-inclusive
-shared-cache model, and the important private-present / shared-missing families
-cannot be represented faithfully in `MESI_Two_Level` without inventing LLC
-residency in gem5. Because that would change LLC occupancy and future
-replacement behavior, the intended end-state migration is toward a
-non-inclusive gem5 Ruby protocol, with `MOESI_CMP_directory` as the leading
-candidate.
-
-Treat the current MESI timing path as the maintained bring-up path, not the
-final faithful target for full multicore private-cache restore. The current
-`--timing-ruby-moesi` path now restores the staged LLC/L1 cache slices for the
-non-inclusive migration; BTB/TAGE restore remains outside that path and stays
-on the MESI/reference side for now.
+That script is maintainer-oriented. It should not be read as the canonical
+user workflow for the project as a whole.
