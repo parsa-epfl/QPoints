@@ -1,0 +1,50 @@
+{
+  "aggregate": {
+    "ipc": 1.50004,
+    "uipc": 1.50004
+  },
+  "cores": [
+    {
+      "core": 0,
+      "ipc": 0.0,
+      "uipc": 0.0
+    },
+    {
+      "core": 1,
+      "ipc": 1.50004,
+      "uipc": 1.50004
+    },
+    {
+      "core": 2,
+      "ipc": 0.0,
+      "uipc": 0.0
+    },
+    {
+      "core": 3,
+      "ipc": 0.0,
+      "uipc": 0.0
+    },
+    {
+      "core": 4,
+      "ipc": 0.0,
+      "uipc": 0.0
+    },
+    {
+      "core": 5,
+      "ipc": 0.0,
+      "uipc": 0.0
+    },
+    {
+      "core": 6,
+      "ipc": 0.0,
+      "uipc": 0.0
+    },
+    {
+      "core": 7,
+      "ipc": 0.0,
+      "uipc": 0.0
+    }
+  ],
+  "engine": "flexus",
+  "snapshot": "snapshot_0"
+}

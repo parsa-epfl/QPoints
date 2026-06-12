@@ -1,0 +1,47 @@
+Record the current validation state for the `ubench` snapshot_0 lineage.
+
+This package has two parts.
+
+1. Compare Flexus and gem5 on the same warmed microbenchmark snapshot using:
+
+- warmup: `200000` cycles
+- measurement: `100000` cycles
+- Flexus through `qflex run_sample --timing-engine flexus`
+- gem5 through `qflex run_sample --timing-engine gem5 --timing-ruby-moesi`
+
+Purpose:
+
+- preserve the current IPC/uIPC comparison point on a simple pinned benchmark
+- document that gem5 is currently higher than Flexus on this benchmark
+- place that result alongside the earlier web-search and TLB-resident evidence
+- justify a dedicated project phase to explain the simulator gap across
+  controlled microbenchmarks and, where appropriate, narrow it
+
+2. Compare WormCache and gem5 branch traces for core 1 on the same `snapshot_0`.
+
+Inputs:
+
+- WormCache `test-worm --branch-trace` core-1 trace
+- gem5 `run-gem5 --branch-trace` core-1 trace
+
+Scope:
+
+- compare branch PCs only
+- ignore gem5-only fields such as direction, BTB state, or misprediction bits
+- truncate the larger WormCache trace to the common head length of the gem5
+  trace
+
+Purpose:
+
+- decide whether gem5 continues essentially the same control-flow stream that
+  WormCache continues from the restored snapshot
+- preserve the exact staged traces and the offline comparison script used for
+  the conclusion
+
+Acceptance:
+
+- the staged timing artifacts are internally consistent with the recorded
+  commands
+- the staged branch traces exist and the offline comparison script runs on them
+- the report explains the IPC/uIPC comparison and the branch-PC similarity
+  conclusion without depending on local-only artifacts outside this package

@@ -1,0 +1,69 @@
+{
+  "comparison": {
+    "common_head_len": 166548,
+    "common_prefix_len": 0,
+    "exact_match_count": 163234,
+    "exact_match_rate": 0.9801018325047434,
+    "first_divergence": {
+      "gem5_pc": "0xffff800008010c80",
+      "index": 0,
+      "wormcache_pc": "0xaaaacf44061c"
+    },
+    "gem5_top_pcs": [
+      {
+        "count": 163554,
+        "pc": "0xaaaacf44061c"
+      },
+      {
+        "count": 320,
+        "pc": "0xaaaacf440624"
+      },
+      {
+        "count": 116,
+        "pc": "0xffff800008a41570"
+      },
+      {
+        "count": 50,
+        "pc": "0xffff800008a41538"
+      },
+      {
+        "count": 34,
+        "pc": "0xffff800008a41528"
+      },
+      {
+        "count": 26,
+        "pc": "0xffff80000810789c"
+      },
+      {
+        "count": 26,
+        "pc": "0xffff8000081078a8"
+      },
+      {
+        "count": 26,
+        "pc": "0xffff800008107914"
+      },
+      {
+        "count": 26,
+        "pc": "0xffff8000081078e0"
+      },
+      {
+        "count": 18,
+        "pc": "0xffff800008576978"
+      }
+    ],
+    "wormcache_top_pcs": [
+      {
+        "count": 166223,
+        "pc": "0xaaaacf44061c"
+      },
+      {
+        "count": 325,
+        "pc": "0xaaaacf440624"
+      }
+    ]
+  },
+  "gem5_loaded_records": 166548,
+  "gem5_trace": "/home/dev/qflex_git/QPoints/validation_records/ubench_snapshot0_phase_validation/snapshot_0/analyses/branch_pc_compare/gem5_branch_trace_core_1.log.gz",
+  "wormcache_loaded_records": 166548,
+  "wormcache_trace": "/home/dev/qflex_git/QPoints/validation_records/ubench_snapshot0_phase_validation/snapshot_0/analyses/branch_pc_compare/wormcache_branch_trace_core_1.log.gz"
+}
