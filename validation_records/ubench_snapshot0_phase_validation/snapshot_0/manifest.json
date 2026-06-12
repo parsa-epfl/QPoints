@@ -1,0 +1,70 @@
+{
+  "validation_package": "ubench_snapshot0_phase_validation/snapshot_0",
+  "goal": "Record the current ubench snapshot_0 timing comparison and branch-PC continuity evidence for Flexus, gem5, and WormCache.",
+  "branch": {
+    "name": "ali/ubench-bringup"
+  },
+  "revisions": {
+    "qflex": "55a2f26b2bf6e967f7bf0a998ee7cdc0a67bd1a7",
+    "QPoints": "2ab46cb89a15c77d4b021c1f00663dc8b614fccc",
+    "gem5": "f2852608323bd80dc27c26492457c77dbfc2ecb7",
+    "WormCacheQFlex": "01b4e8dff2b5e9b9199a87a48b96b712bc3723c5"
+  },
+  "experiment": {
+    "name": "ubench",
+    "snapshot": "snapshot_0",
+    "checkpoint_root": "/mnt/sdb/aansari/checkpoints/ubench/snapshot_0"
+  },
+  "runtime": {
+    "warmup_cycles": 200000,
+    "measurement_cycles": 100000,
+    "gem5_run_sample_command": "/home/dev/qflex_git/qflex run_sample --args-file /home/dev/qflex_git/args/ubench.qflex.args --first snapshot_0 --last snapshot_0 --warmup-cycles 200000 --measurement-cycles 100000 --timing-engine gem5 --timing-ruby-moesi --cache-hierarchy-restore --no-cleanup-conversion-artifacts --sim-config /home/dev/qflex_git/QPoints/configs/timing_ruby_moesi_ws_flexus_mesh_ref_8c.args",
+    "flexus_run_sample_command": "/home/dev/qflex_git/qflex run_sample --args-file /home/dev/qflex_git/args/ubench.qflex.args --first snapshot_0 --last snapshot_0 --warmup-cycles 200000 --measurement-cycles 100000 --timing-engine flexus",
+    "wormcache_branch_trace_command": "/home/dev/qflex_git/qflex test-worm --args-file /home/dev/qflex_git/args/ubench.qflex.args --loadvm-name snapshot_0 --branch-trace --monitor-port 45454",
+    "gem5_branch_trace_command": "/home/dev/qflex_git/qflex qpoints run-gem5 --args-file /home/dev/qflex_git/args/ubench.qflex.args --snapshot snapshot_0 --inst 1000000 --branch-trace --timing-ruby-moesi --cache-hierarchy-restore --sim-config /home/dev/qflex_git/QPoints/configs/timing_ruby_moesi_ws_flexus_mesh_ref_8c.args"
+  },
+  "inputs": {
+    "top_level_args": "ubench.qflex.args",
+    "gem5_sim_config": "timing_ruby_moesi_ws_flexus_mesh_ref_8c.args"
+  },
+  "artifacts": {
+    "intent": "INTENT.txt",
+    "report": "UBENCH_SNAPSHOT0_PHASE_REPORT.md",
+    "gem5_report": "gem5_uipc_report.json",
+    "gem5_summary": "gem5_uipc_summary.json",
+    "gem5_stats": "gem5_stats.txt",
+    "flexus_report": "flexus_uipc_report.json",
+    "flexus_summary": "flexus_uipc_summary.json",
+    "flexus_measurement_log": "flexus_all.measurement.end.log",
+    "branch_pc_compare_script": "analyses/branch_pc_compare/compare_branch_pcs.py",
+    "branch_pc_compare_json": "analyses/branch_pc_compare/branch_pc_comparison.json",
+    "wormcache_branch_trace": "analyses/branch_pc_compare/wormcache_branch_trace_core_1.log.gz",
+    "gem5_branch_trace": "analyses/branch_pc_compare/gem5_branch_trace_core_1.log.gz"
+  },
+  "results": {
+    "gem5": {
+      "aggregate": {
+        "ipc": 3.4566899999999996,
+        "uipc": 3.40748
+      }
+    },
+    "flexus": {
+      "aggregate": {
+        "ipc": 1.50004,
+        "uipc": 1.50004
+      }
+    },
+    "branch_pc_comparison": {
+      "common_head_len": 166548,
+      "exact_match_count": 163234,
+      "exact_match_rate": 0.9801018325047434,
+      "common_prefix_len": 0
+    }
+  },
+  "major_findings": [
+    "On ubench snapshot_0 with a 200k/100k sampled timing window, gem5 is materially higher than Flexus on aggregate IPC/uIPC and on the active core.",
+    "This result points in the opposite direction from the earlier web-search comparison and strengthens the case for a dedicated simulator-behavior phase using controlled microbenchmarks.",
+    "The WormCache and gem5 core-1 branch traces are not aligned from the first event, but after normalizing to branch PCs and truncating to the common head, their event-wise agreement is 98.01%.",
+    "The staged branch traces and the offline comparison script are sufficient to reproduce the branch-PC continuity conclusion without rerunning any simulator."
+  ]
+}
