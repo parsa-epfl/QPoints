@@ -1,0 +1,59 @@
+{
+  "goal": "Show that the recovered vmlinux-to-elf kernel reproduces the previous validated ubench gem5 run when only the kernel ELF is changed.",
+  "baseline_kernel_reference": "/mnt/sdb/aansari/checkpoints/ubench/kernel/vmlinux-6.1.34-3-virt.elf",
+  "candidate_kernel": "/mnt/sdb/aansari/checkpoints/ubench_vte/kernel/vmlinux-6.1.34-3-virt.elf",
+  "aggregate_report_equal_after_normalizing_experiment_name": true,
+  "snapshot_summary_equal_after_normalizing_experiment_name": true,
+  "selected_stats": {
+    "simTicks": {
+      "baseline": "50000000",
+      "candidate": "50000000",
+      "equal": true
+    },
+    "simInsts": {
+      "baseline": "993812",
+      "candidate": "993812",
+      "equal": true
+    },
+    "core1_numCycles": {
+      "baseline": "100000",
+      "candidate": "100000",
+      "equal": true
+    },
+    "core1_branchMispredicts": {
+      "baseline": "111",
+      "candidate": "111",
+      "equal": true
+    },
+    "core1_committedInsts": {
+      "baseline": "340748",
+      "candidate": "340748",
+      "equal": true
+    },
+    "core1_committedOps": {
+      "baseline": "397447",
+      "candidate": "397447",
+      "equal": true
+    },
+    "core1_ipc": {
+      "baseline": "3.407480",
+      "candidate": "3.407480",
+      "equal": true
+    },
+    "core1_condPredicted": {
+      "baseline": "58917",
+      "candidate": "58917",
+      "equal": true
+    },
+    "core1_condIncorrect": {
+      "baseline": "111",
+      "candidate": "111",
+      "equal": true
+    },
+    "core1_btbHitRatio": {
+      "baseline": "1.000000",
+      "candidate": "1.000000",
+      "equal": true
+    }
+  }
+}

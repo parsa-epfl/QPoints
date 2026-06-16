@@ -1,0 +1,1 @@
+Record why the recovered vmlinux-to-elf kernel ELF is trusted for the current qflex/gem5 flow by showing that the validated ubench gem5 run reproduces the prior results when only the kernel ELF is changed.
