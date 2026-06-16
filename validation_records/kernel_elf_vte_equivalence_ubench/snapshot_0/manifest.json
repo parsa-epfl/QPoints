@@ -1,0 +1,58 @@
+{
+  "validation_package": "kernel_elf_vte_equivalence_ubench/snapshot_0",
+  "goal": "Show that the recovered vmlinux-to-elf kernel reproduces the previous validated ubench gem5 run when only the kernel ELF is changed.",
+  "branch": {
+    "name": "ali/kernel-elf-vte-migration"
+  },
+  "revisions": {
+    "qflex": "060239f1c1d965d541d9888c9947aa8c86ca793f",
+    "QPoints": "c156e9b09e4e56188fe8e3435107d7734afc03f4",
+    "gem5": "f2852608323bd80dc27c26492457c77dbfc2ecb7",
+    "WormCacheQFlex": "01b4e8dff2b5e9b9199a87a48b96b712bc3723c5"
+  },
+  "experiment": {
+    "baseline_experiment": "ubench",
+    "candidate_experiment": "ubench_vte",
+    "snapshot": "snapshot_0",
+    "baseline_checkpoint_root": "/mnt/sdb/aansari/checkpoints/ubench",
+    "candidate_checkpoint_root": "/mnt/sdb/aansari/checkpoints/ubench_vte"
+  },
+  "artifacts": {
+    "intent": "INTENT.txt",
+    "report": "KERNEL_ELF_VTE_EQUIVALENCE_UBENCH_REPORT.md",
+    "comparison": "comparison.json",
+    "baseline_report": "baseline_uipc_report.json",
+    "baseline_summary": "baseline_uipc_summary.json",
+    "baseline_stats": "baseline_stats.txt",
+    "candidate_report": "candidate_uipc_report.json",
+    "candidate_summary": "candidate_uipc_summary.json",
+    "candidate_stats": "candidate_stats.txt"
+  },
+  "results": {
+    "aggregate_equal_after_normalizing_experiment_name": true,
+    "summary_equal_after_normalizing_experiment_name": true,
+    "baseline_aggregate": {
+      "ipc": 3.4566899999999996,
+      "uipc": 3.40748
+    },
+    "candidate_aggregate": {
+      "ipc": 3.4566899999999996,
+      "uipc": 3.40748
+    },
+    "baseline_core1": {
+      "core": 1,
+      "ipc": 3.40748,
+      "uipc": 3.40748
+    },
+    "candidate_core1": {
+      "core": 1,
+      "ipc": 3.40748,
+      "uipc": 3.40748
+    }
+  },
+  "major_findings": [
+    "The alternate-kernel gem5 run_sample used the same validated ubench timing mode and reproduced the baseline aggregate IPC/uIPC exactly.",
+    "The active-core IPC/uIPC and selected core-1 stats matched exactly between the baseline kernel and the recovered vmlinux-to-elf kernel.",
+    "This provides a focused trust record for the recovered kernel ELF without changing the broader ubench methodology or simulator settings."
+  ]
+}
