@@ -7,6 +7,8 @@
     "candidate_report": "/home/dev/qflex_git/QPoints/sim_outs/ubench_vte/uipc_report.json",
     "candidate_summary": "/home/dev/qflex_git/QPoints/sim_outs/ubench_vte/snapshot_0/uipc_summary.json",
     "candidate_stats": "/home/dev/qflex_git/QPoints/sim_outs/ubench_vte/snapshot_0/stats.txt",
+    "baseline_kernel_reference": "/mnt/sdb/aansari/checkpoints/ubench/kernel/vmlinux-6.1.34-3-virt.elf",
+    "candidate_kernel": "/mnt/sdb/aansari/checkpoints/ubench_vte/kernel/vmlinux-6.1.34-3-virt.elf",
     "top_level_args": "/home/dev/qflex_git/args/ubench.qflex.args",
     "gem5_sim_config": "/home/dev/qflex_git/QPoints/configs/timing_ruby_moesi_ws_flexus_mesh_ref_8c.args"
   },

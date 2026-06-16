@@ -15,7 +15,9 @@
     "candidate_experiment": "ubench_vte",
     "snapshot": "snapshot_0",
     "baseline_checkpoint_root": "/mnt/sdb/aansari/checkpoints/ubench",
-    "candidate_checkpoint_root": "/mnt/sdb/aansari/checkpoints/ubench_vte"
+    "candidate_checkpoint_root": "/mnt/sdb/aansari/checkpoints/ubench_vte",
+    "baseline_kernel_reference": "/mnt/sdb/aansari/checkpoints/ubench/kernel/vmlinux-6.1.34-3-virt.elf",
+    "candidate_kernel": "/mnt/sdb/aansari/checkpoints/ubench_vte/kernel/vmlinux-6.1.34-3-virt.elf"
   },
   "artifacts": {
     "intent": "INTENT.txt",

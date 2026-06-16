@@ -31,9 +31,13 @@ Candidate kernel path:
 
 - `/mnt/sdb/aansari/checkpoints/ubench_vte/kernel/vmlinux-6.1.34-3-virt.elf`
 
-The candidate run changes the experiment name only to preserve a separate
-`sim_outs` tree. The timing mode, timing window, restore settings, sim-config,
-and snapshot remain the same.
+The candidate run changes:
+
+- the experiment name, to preserve a separate `sim_outs` tree
+- the gem5 checkpoint root, so the run consumes the alternate kernel ELF
+
+The timing mode, timing window, restore settings, sim-config, and snapshot
+remain the same.
 
 ## Result
 

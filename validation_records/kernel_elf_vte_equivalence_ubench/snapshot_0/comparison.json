@@ -1,5 +1,6 @@
 {
   "goal": "Show that the recovered vmlinux-to-elf kernel reproduces the previous validated ubench gem5 run when only the kernel ELF is changed.",
+  "baseline_kernel_reference": "/mnt/sdb/aansari/checkpoints/ubench/kernel/vmlinux-6.1.34-3-virt.elf",
   "candidate_kernel": "/mnt/sdb/aansari/checkpoints/ubench_vte/kernel/vmlinux-6.1.34-3-virt.elf",
   "aggregate_report_equal_after_normalizing_experiment_name": true,
   "snapshot_summary_equal_after_normalizing_experiment_name": true,
