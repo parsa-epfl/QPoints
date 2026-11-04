@@ -8,3 +8,4 @@ sim_outs
 m5out/
 run_gen_snapshot.sh
 bin
+scripts/arun/results/
