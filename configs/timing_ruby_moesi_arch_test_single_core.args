@@ -1,0 +1,82 @@
+# MOESI timing-Ruby config for the arch-test-single-core experiment
+# (--core-count 1, --llc-size-per-tile-mb 1).
+#
+# This file is written fully explicit (nothing left to inherit from
+# configs/timing_ruby_moesi_gem5.args / configs/timing_ruby_frontend_fdip.args
+# defaults) and every structural size below was cross-checked against the
+# WormCacheQFlex compile-time constants that actually get compiled into the
+# functional-warming plugin (templates/parameter.rs.j2, plus the fixed,
+# never-templated constants in WormCacheQFlex/src/parameter.rs), so gem5
+# restores into the same shapes WormCache recorded.
+
+# L1 cache geometry.
+# WormCache: HARVARD_PRI_I_CACHE_SET=128 * HARVARD_PRI_I_CACHE_ASSO=8 * 64B
+# = 64kB, 8-way (fixed regardless of experiment args).
+--l1i_size=64kB
+--l1i_assoc=8
+# WormCache: HARVARD_PRI_D_CACHE_SET=128 * HARVARD_PRI_D_CACHE_ASSO=8 * 64B
+# = 64kB, 8-way (fixed regardless of experiment args).
+--l1d_size=64kB
+--l1d_assoc=8
+
+# Shared LLC/directory geometry.
+# WormCache: l2_set = core_count * llc_size_per_tile_mb * 1MB / (64 * l2_way)
+# (commands/config.py, l2_way hardcoded to 16) -> for --core-count 1
+# --llc-size-per-tile-mb 1 this is 1MB total in a single slice/directory.
+--l2_size=1MB
+--l2_assoc=16
+--num-l2caches=1
+--num-dirs=1
+--topology=Crossbar
+
+# DRAM controller model. WormCache has no equivalent knob here (it only
+# tracks physical memory contents, not DRAM channel/rank topology), so this
+# is a free gem5-side performance-model choice, reused unchanged from the
+# other tracked configs.
+--mem-type=DDR4_2400_8x8
+--mem-channels=1
+--mem-ranks=4
+
+# MMU geometry.
+# WormCache: ITLB_ASSO=64 * ITLB_SET=1 -> 64-entry fully-associative ITLB;
+# DTLB_ASSO=64 * DTLB_SET=1 -> 64-entry fully-associative DTLB (both fixed
+# regardless of experiment args). Note WormCache's STLB (4-way, 1024 sets)
+# has no gem5-side restore/config equivalent yet (STLB restore is not
+# implemented in this project phase).
+--itb-size=64
+--dtb-size=64
+--have-large-asid-64
+
+# Frontend geometry.
+# WormCache: BTB_SET=4096 * BTB_ASSO=4 -> 16384-entry, 4-way BTB (fixed).
+# WormCache's RAS (BP_RAS_COUNT=32) and TAGE table geometry (tage.rs:
+# NHIST=7 history lengths) have no exposed gem5 sim-config knob; the gem5
+# fork's branch predictor class is expected to already match these by
+# construction, not by CLI override.
+--fdip
+--ftqSize=8
+--btb-entries=16384
+--btb-ways=4
+
+# Warm restored frontend/MMU state. LLC/L1D/L1I restore is added
+# automatically by run_gem5.sh for --timing-ruby-moesi unless
+# --no-cache-hierarchy-restore is passed.
+--restore-btb-state
+--restore-tage-state
+--restore-tlb-state
+
+# Core OoO pipeline widths/queue depths below have no WormCache counterpart
+# at all (WormCache only tracks structural cache/predictor/TLB state, not a
+# pipeline timing model). Left unset here so gem5's own O3CPU defaults apply;
+# uncomment and size explicitly only if this experiment needs a specific
+# core shape.
+# --fetch-width=8
+# --decode-width=8
+# --rename-width=8
+# --dispatch-width=8
+# --issue-width=8
+# --wb-width=8
+# --commit-width=4
+# --fetch-queue-size=48
+# --rob-entries=140
+# --sq-entries=12

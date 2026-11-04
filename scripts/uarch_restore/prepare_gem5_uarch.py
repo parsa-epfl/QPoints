@@ -118,8 +118,7 @@ LLC_SOURCE_FILE = "llc-0.json.zstd"
 DIRECTORY_SOURCE_FILE = "directory-0.json.zstd"
 HARVARD_SOURCE_FILE = "harvard-0.json.zstd"
 FETCH_SOURCE_FILE = "fetch.json.zstd"
-MMU_SOURCE_FILE_TEMPLATE = "mmus-{core}.json.zstd"
-MMU_SHARED_SOURCE_FILE = "mmus-0.json.zstd"
+GEM5_TLB_SOURCE_FILE = "gem5-tlbs-0.json.zstd"
 MANIFEST_FILE = "manifest.json"
 CONVERSION_ACCOUNTING_FILE = "conversion_accounting.json"
 CACHE_LINE_SIZE = 64
@@ -764,22 +763,19 @@ def _parse_fetch(path: Path) -> list[dict]:
 def _discover_mmu_source_files(qflex_uarch_dir: Path, core_count: int) -> dict[str, str]:
     source_files: dict[str, str] = {}
 
-    # Current WormCache export writes one mmus-0.json.zstd file whose top-level
-    # array contains one MMU payload per CPU. Keep support for the older
-    # one-file-per-core contract as a fallback.
-    shared_source = qflex_uarch_dir / MMU_SHARED_SOURCE_FILE
-    if shared_source.is_file():
-        mmus = _load_qflex_json(shared_source)
-        if isinstance(mmus, list):
-            for core in range(min(core_count, len(mmus))):
-                source_files[str(core)] = str(shared_source)
-            if source_files:
-                return source_files
+    # WormCacheQFlex writes this file only in gem5 mode (experiment option --emit-gem):
+    # one entry per CPU, each holding that CPU's gem5 L1 ITLB and DTLB.
+    gem5_tlb_source = qflex_uarch_dir / GEM5_TLB_SOURCE_FILE
+    if not gem5_tlb_source.is_file():
+        raise FileNotFoundError(
+            f"gem5 TLB snapshot not found: {gem5_tlb_source}. "
+            "Re-run initialize with --emit-gem, then fw."
+        )
 
-    for core in range(core_count):
-        mmu_source = qflex_uarch_dir / MMU_SOURCE_FILE_TEMPLATE.format(core=core)
-        if mmu_source.is_file():
-            source_files[str(core)] = str(mmu_source)
+    tlbs = _load_qflex_json(gem5_tlb_source)
+    if isinstance(tlbs, list):
+        for core in range(min(core_count, len(tlbs))):
+            source_files[str(core)] = str(gem5_tlb_source)
 
     return source_files
 
